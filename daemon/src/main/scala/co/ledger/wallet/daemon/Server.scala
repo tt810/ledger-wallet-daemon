@@ -22,18 +22,33 @@
  * SOFTWARE.
  */
 
-package co.ledger.wallet.cli
+package co.ledger.wallet.daemon
 
-import java.net.URI
+import java.net.InetSocketAddress
 
-import org.backuity.clist._
+import org.java_websocket.WebSocket
+import org.java_websocket.handshake.ClientHandshake
+import org.java_websocket.server.WebSocketServer
 
-object LedgerWalletCli extends CliMain[Unit] {
-  var server = opt[URI](description = "Configure the daemon uri to connect to.", default = new URI("ws://localhost:4060"))
-  lazy val client: Client = new Client(server)
+class Server(address: InetSocketAddress) extends WebSocketServer(address) {
 
-  override def run: Unit = {
-    client.run()
+  override def onError(webSocket: WebSocket, e: Exception): Unit = {
+
   }
 
+  override def onMessage(webSocket: WebSocket, s: String): Unit = {
+    println("Received", s)
+  }
+
+  override def onClose(webSocket: WebSocket, i: Int, s: String, b: Boolean): Unit = {
+
+  }
+
+  override def onOpen(webSocket: WebSocket, clientHandshake: ClientHandshake): Unit = {
+
+  }
+
+  override def onStart(): Unit = {
+
+  }
 }

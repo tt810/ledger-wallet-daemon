@@ -26,14 +26,29 @@ package co.ledger.wallet.cli
 
 import java.net.URI
 
-import org.backuity.clist._
+import org.java_websocket.client.WebSocketClient
+import org.java_websocket.drafts.{Draft, Draft_17}
+import org.java_websocket.handshake.ServerHandshake
 
-object LedgerWalletCli extends CliMain[Unit] {
-  var server = opt[URI](description = "Configure the daemon uri to connect to.", default = new URI("ws://localhost:4060"))
-  lazy val client: Client = new Client(server)
+class Client(uri: URI, draft: Draft = new Draft_17) extends WebSocketClient(uri, draft) {
 
-  override def run: Unit = {
-    client.run()
+  override def onError(e: Exception): Unit = {
+    println(s"Error ${e.getMessage}")
+    e.printStackTrace()
   }
+
+  override def onMessage(s: String): Unit = {
+    println(s"Received message: '$s'")
+  }
+
+  override def onClose(i: Int, s: String, b: Boolean): Unit = {
+    println("Connection closed.")
+  }
+
+  override def onOpen(serverHandshake: ServerHandshake): Unit = {
+    println("Opening connection...")
+    send("Hello you")
+  }
+
 
 }

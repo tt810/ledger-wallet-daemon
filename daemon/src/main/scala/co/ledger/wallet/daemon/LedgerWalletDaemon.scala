@@ -22,18 +22,17 @@
  * SOFTWARE.
  */
 
-package co.ledger.wallet.cli
+package co.ledger.wallet.daemon
 
-import java.net.URI
+import java.net.InetSocketAddress
 
 import org.backuity.clist._
 
-object LedgerWalletCli extends CliMain[Unit] {
-  var server = opt[URI](description = "Configure the daemon uri to connect to.", default = new URI("ws://localhost:4060"))
-  lazy val client: Client = new Client(server)
+object LedgerWalletDaemon extends CliMain[Unit] {
+  var port = opt[Int](description = "Server listening port", default = 4060)
+  lazy val server = new Server(new InetSocketAddress("localhost", port))
 
   override def run: Unit = {
-    client.run()
+    server.run()
   }
-
 }

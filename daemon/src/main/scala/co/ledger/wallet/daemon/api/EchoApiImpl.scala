@@ -22,18 +22,13 @@
  * SOFTWARE.
  */
 
-package co.ledger.wallet.cli
+package co.ledger.wallet.daemon.api
 
-import java.net.URI
+import co.ledger.wallet.protocol.EchoApi
 
-import org.backuity.clist._
-
-object LedgerWalletCli extends CliMain[Unit] {
-  var server = opt[URI](description = "Configure the daemon uri to connect to.", default = new URI("ws://localhost:4060"))
-  lazy val client: Client = new Client(server)
-
-  override def run: Unit = {
-    client.run()
+class EchoApiImpl extends EchoApi {
+  override def echo(str: String): String = {
+    println(str)
+    str
   }
-
 }
