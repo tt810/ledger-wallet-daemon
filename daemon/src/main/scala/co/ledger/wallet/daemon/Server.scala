@@ -32,23 +32,37 @@ import org.java_websocket.server.WebSocketServer
 
 class Server(address: InetSocketAddress) extends WebSocketServer(address) {
 
+  private def init() = {
+
+  }
+
   override def onError(webSocket: WebSocket, e: Exception): Unit = {
 
   }
 
   override def onMessage(webSocket: WebSocket, s: String): Unit = {
     println("Received", s)
+    _connections.lift(webSocket) match {
+      case Some(connection) =>
+        connection.onMessage(s)
+      case None =>
+        System.err.println(s"Unable to find matching connection to ${webSocket.getResourceDescriptor}")
+    }
   }
 
   override def onClose(webSocket: WebSocket, i: Int, s: String, b: Boolean): Unit = {
-
+    _connections.remove(webSocket)
   }
 
   override def onOpen(webSocket: WebSocket, clientHandshake: ClientHandshake): Unit = {
-
+    _connections(webSocket) = new Connection(webSocket)
   }
 
   override def onStart(): Unit = {
 
   }
+
+  private val _connections = scala.collection.mutable.HashMap[WebSocket, Connection]()
+
+  init()
 }

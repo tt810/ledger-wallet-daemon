@@ -22,12 +22,17 @@
  * SOFTWARE.
  */
 
-package co.ledger.wallet.daemon.api
+package co.ledger.wallet.cli.commands
 
-import co.ledger.wallet.protocol.EchoApi
+import java.net.URI
+
+import co.ledger.wallet.cli.Client
+import org.backuity.clist._
 
 import scala.concurrent.Future
 
-class EchoApiImpl extends EchoApi {
-  override def echo(str: String): Future[String] = Future.successful(str)
+trait CliCommand {this: Command =>
+  var server = opt[URI](description = "Configure the daemon uri to connect to.", default = new URI("ws://localhost:4060"))
+
+  def run(client: Client): Future[Unit]
 }

@@ -22,22 +22,20 @@
  * SOFTWARE.
  */
 
-package co.ledger.wallet.cli
+package co.ledger.wallet.daemon
 
-import java.net.URI
-
+import co.ledger.wallet.daemon.api.EchoApiImpl
+import co.ledger.wallet.protocol.EchoApi
 import io.github.shogowada.scala.jsonrpc.JSONRPCServerAndClient
 import io.github.shogowada.scala.jsonrpc.client.JSONRPCClient
 import io.github.shogowada.scala.jsonrpc.serializers.UpickleJSONSerializer
 import io.github.shogowada.scala.jsonrpc.server.JSONRPCServer
-import org.java_websocket.client.WebSocketClient
-import org.java_websocket.drafts.{Draft, Draft_17}
-import org.java_websocket.handshake.ServerHandshake
-import co.ledger.wallet.protocol.EchoApi
+import org.java_websocket.WebSocket
 
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
-class Client(uri: URI, draft: Draft = new Draft_17) extends WebSocketClient(uri, draft) {
+class Connection(val websocket: WebSocket) {
   private implicit val ec = scala.concurrent.ExecutionContext.Implicits.global
 
   lazy val rpc = {
@@ -47,36 +45,26 @@ class Client(uri: URI, draft: Draft = new Draft_17) extends WebSocketClient(uri,
     JSONRPCServerAndClient(server, client)
   }
 
-  override def onError(e: Exception): Unit = {
-    if (!_connectionPromise.isCompleted) {
-      _connectionPromise.failure(new Exception(s"Connection closed [${e.getCause}]"))
+  def onMessage(json: String) = {
+    rpc.server.receive(json) onComplete {
+      case Success(Some(response)) => sendJson(response)
+      case Success(None) => // Do nothing
+      case Failure(ex) =>
+        System.err.println("RPC exception")
+        ex.printStackTrace()
     }
   }
-
-  override def onMessage(s: String): Unit = {
-    rpc.receiveAndSend(s)
-  }
-
-  override def onClose(i: Int, s: String, b: Boolean): Unit = {
-    if (!_connectionPromise.isCompleted) {
-      _connectionPromise.failure(new Exception(s"Connection closed [${s}]"))
-    }
-  }
-
-  override def onOpen(serverHandshake: ServerHandshake): Unit = {
-    _connectionPromise.success()
-  }
-
-  def ready: Future[Unit] = _connectionPromise.future
 
   private val sendJson: (String) => Future[Option[String]] = {(json: String) =>
-    send(json)
+    websocket.send(json)
     Future.successful(None)
   }
 
-  object api {
-    val echo = rpc.client.createAPI[EchoApi]
+  val api = new EchoApiImpl
+
+  private def init(): Unit = {
+    rpc.bindAPI[EchoApi](api)
   }
 
-  private val _connectionPromise = Promise[Unit]()
+  init()
 }

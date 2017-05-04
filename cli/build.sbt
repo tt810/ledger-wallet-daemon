@@ -9,13 +9,16 @@ scalaVersion := "2.12.2"
 
 resolvers += "clojars.org" at "http://clojars.org/repo"
 
+fork in run := true
+cancelable in Global := true
+
 libraryDependencies += "com.lihaoyi" % "ammonite" % "0.8.4" % "test" cross CrossVersion.full
 
 initialCommands in (Test, console) := """ammonite.Main().run()"""
 
 libraryDependencies ++= Seq(
-    "org.jline" % "jline" % "3.2.0",
     "io.github.shogowada" %% "scala-json-rpc" % "0.9.0",
+    "io.github.shogowada" %% "scala-json-rpc-upickle-json-serializer" % "0.9.0",
     "org.java-websocket" % "java-websocket" % "1.3.3"
 )
 

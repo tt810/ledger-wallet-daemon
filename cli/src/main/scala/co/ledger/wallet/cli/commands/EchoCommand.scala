@@ -22,12 +22,21 @@
  * SOFTWARE.
  */
 
-package co.ledger.wallet.daemon.api
+package co.ledger.wallet.cli.commands
 
-import co.ledger.wallet.protocol.EchoApi
+import co.ledger.wallet.cli.Client
+import org.backuity.clist._
 
 import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 
-class EchoApiImpl extends EchoApi {
-  override def echo(str: String): Future[String] = Future.successful(str)
+class EchoCommand
+  extends Command(name = "echo", description = "Send a string to the server and receive the same string from the server.")
+  with CliCommand {
+
+  var string = arg[String](description = "The string you want to echo")
+
+  override def run(client: Client): Future[Unit] = {
+    client.api.echo.echo(string).map(println)
+  }
 }

@@ -24,6 +24,8 @@
 
 package co.ledger.wallet.protocol
 
+import scala.concurrent.Future
+
 trait EchoApi {
-  def echo(str: String): String
+  def echo(str: String): Future[String]
 }

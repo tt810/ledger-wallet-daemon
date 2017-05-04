@@ -26,14 +26,36 @@ package co.ledger.wallet.cli
 
 import java.net.URI
 
+import co.ledger.wallet.cli.commands.{CliCommand, EchoCommand}
 import org.backuity.clist._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.{Failure, Success}
 
-object LedgerWalletCli extends CliMain[Unit] {
-  var server = opt[URI](description = "Configure the daemon uri to connect to.", default = new URI("ws://localhost:4060"))
+object LedgerWalletCli extends App {
+  var server: URI = _
   lazy val client: Client = new Client(server)
 
-  override def run: Unit = {
-    client.run()
+  private def exit(errorCode: Int) = {
+    if (client.isOpen) client.close()
+    sys.exit(errorCode)
   }
 
+  Cli.parse(args)
+    .withHelpCommand("help")
+    .withProgramName("ledger-wallet-cli")
+    .withCommand(new EchoCommand) {
+      case command: CliCommand =>
+        server = command.server
+        client.ready flatMap {(_) =>
+          command.run(client)
+        } onComplete {
+          case Success(_) =>
+            exit(0)
+          case Failure(ex) =>
+            ex.printStackTrace()
+            System.err.println(ex.getMessage)
+            exit(1)
+        }
+        client.run()
+    }
 }
