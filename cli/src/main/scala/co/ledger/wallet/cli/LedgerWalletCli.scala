@@ -26,8 +26,9 @@ package co.ledger.wallet.cli
 
 import java.net.URI
 
-import co.ledger.wallet.cli.commands.{CliCommand, EchoCommand}
+import co.ledger.wallet.cli.commands.{CliCommand, CreatePoolCommand, EchoCommand, ListPoolCommand}
 import org.backuity.clist._
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
@@ -43,19 +44,19 @@ object LedgerWalletCli extends App {
   Cli.parse(args)
     .withHelpCommand("help")
     .withProgramName("ledger-wallet-cli")
-    .withCommand(new EchoCommand) {
-      case command: CliCommand =>
-        server = command.server
-        client.ready flatMap {(_) =>
-          command.run(client)
-        } onComplete {
-          case Success(_) =>
-            exit(0)
-          case Failure(ex) =>
-            ex.printStackTrace()
-            System.err.println(ex.getMessage)
-            exit(1)
-        }
-        client.run()
+    .withCommands(
+      EchoCommand, ListPoolCommand, CreatePoolCommand
+    ) foreach {(command) =>
+      server = command.server
+      client.ready flatMap { (_) =>
+        command.run(client)
+      } onComplete {
+        case Success(_) =>
+          exit(0)
+        case Failure(ex) =>
+          System.err.println(ex.getMessage)
+          exit(1)
+      }
+      client.run()
     }
 }

@@ -22,34 +22,18 @@
  * SOFTWARE.
  */
 
-package co.ledger.wallet.daemon
+package co.ledger.wallet
 
-import java.net.InetSocketAddress
+import scala.concurrent.Future
 
-import com.typesafe.config.ConfigFactory
-import org.backuity.clist._
+package object protocol {
 
-import scala.util.Try
-
-object LedgerWalletDaemon extends CliMain[Unit] {
-  var port = opt[Int](description = "Server listening port", default = 4060)
-  lazy val server = new Server(new InetSocketAddress("localhost", port))
-  lazy val manager = new PoolsManagerService()
-  lazy val configuration = ConfigFactory.load()
-
-  val profileName = Try(LedgerWalletDaemon.configuration.getString("database_engine")).toOption.getOrElse("sqlite3")
-  val profile = {
-    profileName match {
-      case "sqlite3" =>
-        slick.jdbc.SQLiteProfile
-      case "postgres" =>
-        slick.jdbc.PostgresProfile
-      case others => throw new Exception(s"Unkown database backend $others")
-    }
+  object errors {
+    val RuntimeError = -32000
   }
 
-  override def run: Unit = {
-    manager.start()
-    server.run()
-  }
+  case class RPCError(code: Int, message: String)
+
+  type RPCFuture[T] = Future[Either[RPCError, T]]
+
 }

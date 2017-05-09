@@ -24,32 +24,20 @@
 
 package co.ledger.wallet.daemon
 
-import java.net.InetSocketAddress
+import co.ledger.wallet.protocol.{RPCError, errors}
 
-import com.typesafe.config.ConfigFactory
-import org.backuity.clist._
+import scala.util.{Failure, Success, Try}
 
-import scala.util.Try
+package object api {
 
-object LedgerWalletDaemon extends CliMain[Unit] {
-  var port = opt[Int](description = "Server listening port", default = 4060)
-  lazy val server = new Server(new InetSocketAddress("localhost", port))
-  lazy val manager = new PoolsManagerService()
-  lazy val configuration = ConfigFactory.load()
+  case class RPCException(code: Int, message: String) extends RuntimeException(message)
 
-  val profileName = Try(LedgerWalletDaemon.configuration.getString("database_engine")).toOption.getOrElse("sqlite3")
-  val profile = {
-    profileName match {
-      case "sqlite3" =>
-        slick.jdbc.SQLiteProfile
-      case "postgres" =>
-        slick.jdbc.PostgresProfile
-      case others => throw new Exception(s"Unkown database backend $others")
-    }
+  def protocolize[A](result: Try[A]): Try[Either[RPCError, A]] = {
+    Try(result match {
+      case Success(r) => Right(r)
+      case Failure(ex: RPCException) => Left(RPCError(ex.code, ex.message))
+      case Failure(ex) => Left(RPCError(errors.RuntimeError, ex.getMessage))
+    })
   }
 
-  override def run: Unit = {
-    manager.start()
-    server.run()
-  }
 }

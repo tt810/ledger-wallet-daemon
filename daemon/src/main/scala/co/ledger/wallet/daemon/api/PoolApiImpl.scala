@@ -22,34 +22,21 @@
  * SOFTWARE.
  */
 
-package co.ledger.wallet.daemon
+package co.ledger.wallet.daemon.api
 
-import java.net.InetSocketAddress
+import co.ledger.wallet.daemon.{LedgerWalletDaemon, database}
+import co.ledger.wallet.protocol.{PoolApi, RPCError, RPCFuture}
 
-import com.typesafe.config.ConfigFactory
-import org.backuity.clist._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
-import scala.util.Try
+class PoolApiImpl extends PoolApi {
+  import LedgerWalletDaemon.profile.api._
 
-object LedgerWalletDaemon extends CliMain[Unit] {
-  var port = opt[Int](description = "Server listening port", default = 4060)
-  lazy val server = new Server(new InetSocketAddress("localhost", port))
-  lazy val manager = new PoolsManagerService()
-  lazy val configuration = ConfigFactory.load()
 
-  val profileName = Try(LedgerWalletDaemon.configuration.getString("database_engine")).toOption.getOrElse("sqlite3")
-  val profile = {
-    profileName match {
-      case "sqlite3" =>
-        slick.jdbc.SQLiteProfile
-      case "postgres" =>
-        slick.jdbc.PostgresProfile
-      case others => throw new Exception(s"Unkown database backend $others")
-    }
-  }
+  override def listPools(): Future[Either[RPCError, Array[String]]] = LedgerWalletDaemon.manager.database flatMap {(db) =>
+    db.run(database.pools.map(_.name).result).map(_.toArray)
+  } transform protocolize
 
-  override def run: Unit = {
-    manager.start()
-    server.run()
-  }
+  override def createPool(name: String): RPCFuture[Unit] = LedgerWalletDaemon.manager.createPool(name) transform protocolize
 }

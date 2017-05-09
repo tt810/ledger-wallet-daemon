@@ -30,7 +30,7 @@ import org.backuity.clist._
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class EchoCommand
+object EchoCommand
   extends Command(name = "echo", description = "Send a string to the server and receive the same string from the server.")
   with CliCommand {
 
