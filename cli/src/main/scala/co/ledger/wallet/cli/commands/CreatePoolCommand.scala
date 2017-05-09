@@ -22,34 +22,18 @@
  * SOFTWARE.
  */
 
-package co.ledger.wallet.daemon
+package co.ledger.wallet.cli.commands
 
-import java.net.InetSocketAddress
+import co.ledger.wallet.cli.Client
+import org.backuity.clist.Command
 
-import com.typesafe.config.ConfigFactory
+import scala.concurrent.Future
 import org.backuity.clist._
+import scala.concurrent.ExecutionContext.Implicits.global
+object CreatePoolCommand extends Command(name = "create", description = "Creates a new wallet pool") with CliCommand {
 
-import scala.util.Try
+  var pool_name = arg[String](description = "The name of the newly created pool")
 
-object LedgerWalletDaemon extends CliMain[Unit] {
-  var port = opt[Int](description = "Server listening port", default = 4060)
-  lazy val server = new Server(new InetSocketAddress("localhost", port))
-  lazy val manager = new PoolsManagerService()
-  lazy val configuration = ConfigFactory.load()
+  override def run(client: Client): Future[Unit] = client.api.pool.createPool(pool_name) map protocolize
 
-  val profileName = Try(LedgerWalletDaemon.configuration.getString("database_engine")).toOption.getOrElse("sqlite3")
-  val profile = {
-    profileName match {
-      case "sqlite3" =>
-        slick.jdbc.SQLiteProfile
-      case "postgres" =>
-        slick.jdbc.PostgresProfile
-      case others => throw new Exception(s"Unkown database backend $others")
-    }
-  }
-
-  override def run: Unit = {
-    manager.start()
-    server.run()
-  }
 }

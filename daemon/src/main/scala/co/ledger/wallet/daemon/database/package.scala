@@ -23,33 +23,33 @@
  */
 
 package co.ledger.wallet.daemon
+import java.sql.{Date, Timestamp}
 
-import java.net.InetSocketAddress
+import slick.lifted.ProvenShape
+import slick.sql.SqlProfile.ColumnOption.SqlType
 
-import com.typesafe.config.ConfigFactory
-import org.backuity.clist._
+package object database {
 
-import scala.util.Try
+  import LedgerWalletDaemon.profile.api._
 
-object LedgerWalletDaemon extends CliMain[Unit] {
-  var port = opt[Int](description = "Server listening port", default = 4060)
-  lazy val server = new Server(new InetSocketAddress("localhost", port))
-  lazy val manager = new PoolsManagerService()
-  lazy val configuration = ConfigFactory.load()
-
-  val profileName = Try(LedgerWalletDaemon.configuration.getString("database_engine")).toOption.getOrElse("sqlite3")
-  val profile = {
-    profileName match {
-      case "sqlite3" =>
-        slick.jdbc.SQLiteProfile
-      case "postgres" =>
-        slick.jdbc.PostgresProfile
-      case others => throw new Exception(s"Unkown database backend $others")
-    }
+  class DatabaseVersion(tag: Tag) extends Table[(Int, Timestamp)](tag, "__database__") {
+    def version = column[Int]("version", O.PrimaryKey)
+    def createdAt = column[Timestamp]("created_at", SqlType("timestamp not null default CURRENT_TIMESTAMP"))
+    override def * : ProvenShape[(Int, Timestamp)] = (version, createdAt)
   }
+  val databaseVersions = TableQuery[DatabaseVersion]
 
-  override def run: Unit = {
-    manager.start()
-    server.run()
+  class Pools(tag: Tag) extends Table[(String, Timestamp)](tag, "pools") {
+    def name = column[String]("name", O.PrimaryKey)
+    def createdAt = column[Timestamp]("created_at", SqlType("timestamp not null default CURRENT_TIMESTAMP"))
+    def * = (name, createdAt)
   }
+  val pools = TableQuery[Pools]
+
+  val Migrations = Map(
+    0 -> DBIO.seq(
+      (pools.schema ++ databaseVersions.schema).create
+    )
+  )
+
 }
