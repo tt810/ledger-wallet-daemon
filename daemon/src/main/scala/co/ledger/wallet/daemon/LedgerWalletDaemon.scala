@@ -26,6 +26,7 @@ package co.ledger.wallet.daemon
 
 import java.net.InetSocketAddress
 
+import com.dropbox.djinni.NativeLibLoader
 import com.typesafe.config.ConfigFactory
 import org.backuity.clist._
 
@@ -44,11 +45,12 @@ object LedgerWalletDaemon extends CliMain[Unit] {
         slick.jdbc.SQLiteProfile
       case "postgres" =>
         slick.jdbc.PostgresProfile
-      case others => throw new Exception(s"Unkown database backend $others")
+      case others => throw new Exception(s"Unknown database backend $others")
     }
   }
 
   override def run: Unit = {
+    NativeLibLoader.loadLibs()
     manager.start()
     server.run()
   }

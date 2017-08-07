@@ -33,7 +33,7 @@ import io.github.shogowada.scala.jsonrpc.server.JSONRPCServer
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.drafts.{Draft, Draft_17}
 import org.java_websocket.handshake.ServerHandshake
-import co.ledger.wallet.protocol.{EchoApi, PoolApi}
+import co.ledger.wallet.protocol.{EchoApi, LedgerCoreApi, PoolApi}
 
 import scala.concurrent.{Future, Promise}
 
@@ -77,6 +77,7 @@ class Client(uri: URI, draft: Draft = new Draft_17) extends WebSocketClient(uri,
   object api {
     val echo = rpc.client.createAPI[EchoApi]
     val pool = rpc.client.createAPI[PoolApi]
+    val lib = rpc.client.createAPI[LedgerCoreApi]
   }
 
   private val _connectionPromise = Promise[Unit]()
