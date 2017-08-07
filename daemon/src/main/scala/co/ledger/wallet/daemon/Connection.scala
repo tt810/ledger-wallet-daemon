@@ -24,8 +24,8 @@
 
 package co.ledger.wallet.daemon
 
-import co.ledger.wallet.daemon.api.{EchoApiImpl, PoolApiImpl}
-import co.ledger.wallet.protocol.{EchoApi, PoolApi}
+import co.ledger.wallet.daemon.api.{EchoApiImpl, LedgerCoreApiImpl, PoolApiImpl}
+import co.ledger.wallet.protocol.{EchoApi, LedgerCoreApi, PoolApi}
 import io.github.shogowada.scala.jsonrpc.JSONRPCServerAndClient
 import io.github.shogowada.scala.jsonrpc.client.JSONRPCClient
 import io.github.shogowada.scala.jsonrpc.serializers.UpickleJSONSerializer
@@ -64,6 +64,7 @@ class Connection(val websocket: WebSocket) {
   private def init(): Unit = {
     rpc.bindAPI[EchoApi](new EchoApiImpl)
     rpc.bindAPI[PoolApi](new PoolApiImpl)
+    rpc.bindAPI[LedgerCoreApi](new LedgerCoreApiImpl)
   }
 
   init()
