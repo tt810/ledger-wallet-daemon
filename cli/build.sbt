@@ -1,4 +1,6 @@
 
+enablePlugins(JavaAppPackaging)
+
 organization := "co.ledger"
 
 name := "ledger-wallet-cli"
