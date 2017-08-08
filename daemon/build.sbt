@@ -1,3 +1,6 @@
+
+enablePlugins(JavaServerAppPackaging)
+
 organization := "co.ledger"
 
 name := "ledger-wallet-daemon"
