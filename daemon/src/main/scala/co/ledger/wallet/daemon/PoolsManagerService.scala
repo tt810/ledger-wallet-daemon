@@ -26,17 +26,22 @@ package co.ledger.wallet.daemon
 
 import java.sql.Timestamp
 import java.util.Date
-import java.util.concurrent.{Executor, Executors, ThreadPoolExecutor}
+import java.util.concurrent.{ConcurrentHashMap, Executor, Executors, ThreadPoolExecutor}
 
+import co.ledger.core.WalletPool
+
+import scala.collection.parallel.mutable
 import scala.concurrent.{ExecutionContext, Future}
+
 
 class PoolsManagerService {
   private implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newCachedThreadPool())
+
   import LedgerWalletDaemon.profile.api._
   import co.ledger.wallet.daemon.database._
 
-  def start(): Future[Unit] = database map {(database) =>
-
+  def start(): Future[Unit] = database map { (database) =>
+    // Initialize the pool instance
   }
 
   def stop(): Future[Unit] = synchronized {
@@ -46,17 +51,22 @@ class PoolsManagerService {
     Future.successful()
   }
 
-  def createPool(name: String): Future[Unit] = database flatMap {(db) =>
-    db.run(pools.filter(_.name === name).size.result).map((_, db))
-  } flatMap {case (size, db) =>
-    if (size == 0) {
-      db.run(DBIO.seq(
-        pools += (name, new Timestamp(new Date().getTime))
-      ))
-    } else {
-      throw new RuntimeException(s"Pool '$name' already exists")
+  def createPool(name: String, password: Option[String], databaseBackendName: Option[String],
+                 dbConnectString: Option[String], configuration: Option[String]): Future[Unit] =
+    database flatMap { (db) =>
+      db.run(pools.filter(_.name === name).size.result).map((_, db))
+    } flatMap { case (size, db) =>
+      if (size == 0) {
+        db.run(DBIO.seq(
+          pools += (name, new Timestamp(new Date().getTime), configuration.getOrElse("{}"),
+            databaseBackendName.getOrElse("sqlite"), dbConnectString.getOrElse(name))
+        ))
+      } else {
+        throw new RuntimeException(s"Pool '$name' already exists")
+      }
     }
-  }
+
+  def isPoolOpen(name: String): Boolean = _pools contains name
 
   def database = synchronized {
     _database match {
@@ -64,20 +74,20 @@ class PoolsManagerService {
         _database = Some(Future {
           Database.forConfig(LedgerWalletDaemon.profileName)
         } flatMap migrate)
-      case Some(d) =>
-        d
+      case Some(d) => d
     }
     _database.get
   }
 
   private def migrate(db: Database): Future[Database] = {
     // Fetch database version
-    db.run(databaseVersions.sortBy(_.version.desc).map(_.version).take(1).result) map {(result) =>
+    db.run(databaseVersions.sortBy(_.version.desc).map(_.version).take(1).result) map { (result) =>
       result.head
     } recover {
       case all => -1
-    } flatMap {(currentVersion) =>
+    } flatMap { (currentVersion) =>
       val maxVersion = Migrations.keys.toArray.sortWith(_ > _).head
+
       def migrate(version: Int): Future[Unit] = {
         if (version > maxVersion)
           Future.successful()
@@ -86,16 +96,18 @@ class PoolsManagerService {
             Migrations(version),
             databaseVersions += (version, new Timestamp(new Date().getTime))
           )
-          db.run(script.transactionally) map {(_) =>
+          db.run(script.transactionally) map { (_) =>
             migrate(version + 1)
           }
         }
       }
+
       migrate(currentVersion + 1)
-    } map {(_) =>
+    } map { (_) =>
       db
     }
   }
 
+  private val _pools = new ConcurrentHashMap[String, WalletPool]()
   private var _database: Option[Future[Database]] = None
 }

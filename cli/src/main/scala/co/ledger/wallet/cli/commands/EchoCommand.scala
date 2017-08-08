@@ -31,7 +31,7 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
 object EchoCommand
-  extends Command(name = "echo", description = "Send a string to the server and receive the same string from the server.")
+  extends Command(name = "debug/echo", description = "Send a string to the server and receive the same string from the server.")
   with CliCommand {
 
   var string = arg[String](description = "The string you want to echo")

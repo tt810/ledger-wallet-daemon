@@ -25,16 +25,26 @@
 package co.ledger.wallet.cli.commands
 
 import co.ledger.wallet.cli.Client
+import de.vandermeer.asciitable.AsciiTable
+import de.vandermeer.skb.interfaces.document.TableRowStyle
 import org.backuity.clist.Command
 
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
-object ListPoolCommand extends Command(name = "pools", description = "Lists all pools on the server") with CliCommand {
+object ListPoolCommand extends Command(name = "pool/list", description = "Lists all pools on the server") with CliCommand {
 
   override def run(client: Client): Future[Unit] = {
     client.api.pool.listPools().map(protocolize).map {(pools) =>
-      pools.foreach(println)
+      val table = new AsciiTable()
+      table.addRule()
+      table.addRow("Pool name", "Running", "Database backend")
+      table.addRule()
+      for (pool <- pools) {
+        table.addRow(pool.name, if (pool.isOpen) "yes" else "no", pool.databaseBackend)
+        table.addRule()
+      }
+      print(table.render())
     } recover {
       case other =>
         other.printStackTrace()

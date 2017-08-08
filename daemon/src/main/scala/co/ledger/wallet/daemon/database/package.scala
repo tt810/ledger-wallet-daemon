@@ -25,6 +25,7 @@
 package co.ledger.wallet.daemon
 import java.sql.{Date, Timestamp}
 
+import slick.ast.Subquery.Default
 import slick.lifted.ProvenShape
 import slick.sql.SqlProfile.ColumnOption.SqlType
 
@@ -39,10 +40,14 @@ package object database {
   }
   val databaseVersions = TableQuery[DatabaseVersion]
 
-  class Pools(tag: Tag) extends Table[(String, Timestamp)](tag, "pools") {
+  class Pools(tag: Tag) extends Table[(String, Timestamp, String, String, String)](tag, "pools") {
     def name = column[String]("name", O.PrimaryKey)
     def createdAt = column[Timestamp]("created_at", SqlType("timestamp not null default CURRENT_TIMESTAMP"))
-    def * = (name, createdAt)
+    def configuration = column[String]("configuration", O.Default("{}"))
+    def dbBackend = column[String]("db_backend")
+    def dbConnectString = column[String]("db_connect")
+
+    def * = (name, createdAt, configuration, dbBackend, dbConnectString)
   }
   val pools = TableQuery[Pools]
 

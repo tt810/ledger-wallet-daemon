@@ -30,10 +30,21 @@ import org.backuity.clist.Command
 import scala.concurrent.Future
 import org.backuity.clist._
 import scala.concurrent.ExecutionContext.Implicits.global
-object CreatePoolCommand extends Command(name = "create", description = "Creates a new wallet pool") with CliCommand {
+object CreatePoolCommand extends Command(name = "pool/create", description = "Creates a new wallet pool") with CliCommand {
 
   var pool_name = arg[String](description = "The name of the newly created pool")
+  var password = opt[Option[String]](description = "Optionally encrypts the pool with a password")
+  var database = opt[Option[String]](description = "Sets the database backend sqlite|pgsql (sqlite by default)")
+  var connect = opt[Option[String]](description = "Set the database connect string (uses the pool name by default)")
+  var configuration = opt[Option[String]](description = "Path of the configuration file to use while opening the pool")
 
-  override def run(client: Client): Future[Unit] = client.api.pool.createPool(pool_name) map protocolize
+  override def run(client: Client): Future[Unit] = {
+    val conf = configuration map { (filePath) =>
+      val source = scala.io.Source.fromFile(filePath)
+      val lines = try source.mkString finally source.close()
+      lines
+    }
+    client.api.pool.createPool(pool_name, password.orNull, database.orNull, connect.orNull, conf.orNull) map protocolize
+  }
 
 }

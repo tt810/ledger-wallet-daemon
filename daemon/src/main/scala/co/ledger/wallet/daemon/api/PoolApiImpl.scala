@@ -25,7 +25,7 @@
 package co.ledger.wallet.daemon.api
 
 import co.ledger.wallet.daemon.{LedgerWalletDaemon, database}
-import co.ledger.wallet.protocol.{PoolApi, RPCError, RPCFuture}
+import co.ledger.wallet.protocol.{PoolApi, PoolDescription, RPCError, RPCFuture}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -33,10 +33,20 @@ import scala.concurrent.Future
 class PoolApiImpl extends PoolApi {
   import LedgerWalletDaemon.profile.api._
 
-
-  override def listPools(): Future[Either[RPCError, Array[String]]] = LedgerWalletDaemon.manager.database flatMap {(db) =>
-    db.run(database.pools.map(_.name).result).map(_.toArray)
+  override def listPools(): Future[Either[RPCError, Array[PoolDescription]]] = LedgerWalletDaemon.manager.database flatMap {(db) =>
+    db.run(database.pools.result).map {(pools) =>
+      pools.toArray.map {
+        case (name, _, _, dbBackend, dbConnectString) =>
+          PoolDescription(name, LedgerWalletDaemon.manager.isPoolOpen(name), dbBackend)
+      }
+    }
   } transform protocolize
 
-  override def createPool(name: String): RPCFuture[Unit] = LedgerWalletDaemon.manager.createPool(name) transform protocolize
+  override def createPool(name: String, password: String, databaseBackendName: String, dbConnectString: String,
+                          configuration: String): Future[Either[RPCError, Unit]] = {
+    LedgerWalletDaemon.manager.createPool(name, Option(password), Option(databaseBackendName), Option(dbConnectString),
+      Option(configuration)) transform protocolize
+  }
+
+  override def openPool(name: String, password: String): Future[Either[RPCError, Unit]] = ???
 }

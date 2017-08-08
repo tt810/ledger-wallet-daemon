@@ -26,7 +26,11 @@ package co.ledger.wallet.protocol
 
 import scala.concurrent.Future
 
+case class PoolDescription(name: String, isOpen: Boolean, databaseBackend: String)
+
 trait PoolApi {
-  def listPools(): Future[Either[RPCError, Array[String]]]
-  def createPool(name: String): Future[Either[RPCError, Unit]]
+  def listPools(): Future[Either[RPCError, Array[PoolDescription]]]
+  def createPool(name: String, password: String, databaseBackendName: String, dbConnectString: String,
+                 configuration: String): Future[Either[RPCError, Unit]]
+  def openPool(name: String, password: String): Future[Either[RPCError, Unit]]
 }
