@@ -12,6 +12,7 @@ scalaVersion := "2.12.2"
 fork in run := true
 cancelable in Global := true
 
+resolvers += "maxaf-releases" at s"https://repo.bumnetworks.com/releases/"
 libraryDependencies ++= Seq(
   "org.backuity.clist" %% "clist-core" % "3.2.2",
   "org.backuity.clist" %% "clist-macros" % "3.2.2" % "provided",

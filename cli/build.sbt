@@ -21,7 +21,8 @@ initialCommands in (Test, console) := """ammonite.Main().run()"""
 libraryDependencies ++= Seq(
     "io.github.shogowada" %% "scala-json-rpc" % "0.9.0",
     "io.github.shogowada" %% "scala-json-rpc-upickle-json-serializer" % "0.9.0",
-    "org.java-websocket" % "Java-WebSocket" % "1.3.4"
+    "org.java-websocket" % "Java-WebSocket" % "1.3.4",
+    "de.vandermeer" % "asciitable" % "0.3.2"
 )
 
 libraryDependencies ++= Seq(
