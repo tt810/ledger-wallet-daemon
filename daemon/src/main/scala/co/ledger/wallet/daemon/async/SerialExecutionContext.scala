@@ -2,7 +2,7 @@ package co.ledger.wallet.daemon.async
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class SerialExecutionContext(val ec: ExecutionContext) extends ExecutionContext {
+class SerialExecutionContext(implicit val ec: ExecutionContext) extends ExecutionContext {
   private var _lastTask = Future.successful[Unit]()
 
   override def execute(runnable: Runnable): Unit = synchronized {
@@ -14,5 +14,5 @@ class SerialExecutionContext(val ec: ExecutionContext) extends ExecutionContext 
 }
 
 object SerialExecutionContext {
-  def newInstance() = new SerialExecutionContext(scala.concurrent.ExecutionContext.Implicits.global)
+  def newInstance() = new SerialExecutionContext()(scala.concurrent.ExecutionContext.Implicits.global)
 }

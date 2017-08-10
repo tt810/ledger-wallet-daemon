@@ -28,13 +28,14 @@ import java.sql.Timestamp
 import java.util.Date
 
 import co.ledger.wallet.daemon.LedgerWalletDaemon.profile
+import co.ledger.wallet.daemon.async.SerialExecutionContext
 
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 
 
 class PoolsManagerService {
-  private implicit val ec: ExecutionContext = SerialExecutionContext.newInstance()
+  implicit val ec: ExecutionContext = SerialExecutionContext.newInstance()
 
   import LedgerWalletDaemon.profile.api._
   import co.ledger.wallet.daemon.database._
