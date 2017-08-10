@@ -45,7 +45,7 @@ object LedgerWalletCli extends App {
     .withHelpCommand("help")
     .withProgramName("ledger-wallet-cli")
     .withCommands(
-      EchoCommand, ListPoolCommand, CreatePoolCommand, LedgerCoreCommand
+      EchoCommand, ListPoolCommand, CreatePoolCommand, LedgerCoreCommand, OpenPoolCommand
     ) foreach {(command) =>
       server = command.server
       client.ready flatMap { (_) =>
