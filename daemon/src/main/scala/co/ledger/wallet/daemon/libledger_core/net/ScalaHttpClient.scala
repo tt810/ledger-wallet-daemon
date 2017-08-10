@@ -79,7 +79,7 @@ class ScalaHttpClient extends co.ledger.core.HttpClient {
       }
     }
     request.complete(proxy, null)
-  }.failed.recover[co.ledger.core.Error]({
+  }.failed.map[co.ledger.core.Error]({
     case others: Throwable =>
       new co.ledger.core.Error(ErrorCode.HTTP_ERROR, others.getMessage)
   }).foreach(request.complete(null, _))
