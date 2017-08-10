@@ -48,5 +48,6 @@ class PoolApiImpl extends PoolApi {
       Option(configuration)) transform protocolize
   }
 
-  override def openPool(name: String, password: String): Future[Either[RPCError, Unit]] = ???
+  override def openPool(name: String, password: String): Future[Either[RPCError, Unit]] =
+    LedgerWalletDaemon.manager.openPool(name, Option(password)).map(_ => ()) transform protocolize
 }
