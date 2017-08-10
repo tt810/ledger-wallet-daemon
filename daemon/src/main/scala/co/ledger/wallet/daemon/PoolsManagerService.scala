@@ -26,16 +26,15 @@ package co.ledger.wallet.daemon
 
 import java.sql.Timestamp
 import java.util.Date
-import java.util.concurrent.{ConcurrentHashMap, Executor, Executors, ThreadPoolExecutor}
 
-import co.ledger.core.WalletPool
+import co.ledger.wallet.daemon.LedgerWalletDaemon.profile
 
-import scala.collection.parallel.mutable
+import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 
 
 class PoolsManagerService {
-  private implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newCachedThreadPool())
+  private implicit val ec: ExecutionContext = SerialExecutionContext.newInstance()
 
   import LedgerWalletDaemon.profile.api._
   import co.ledger.wallet.daemon.database._
@@ -66,9 +65,22 @@ class PoolsManagerService {
       }
     }
 
-  def isPoolOpen(name: String): Boolean = _pools contains name
+  def openPool(name: String, password: Option[String]): Future[PoolContainer] = {
+    _pools.getOrElse(name, {
+      val pool = database.flatMap { (db) =>
+        db.run(pools.result).map(_.filter(_._1 == name).headOption.getOrElse(throw PoolNotFoundException(name)))
+      } flatMap { case (_, _, configuration, dbBackend, dbConnectString) =>
+        PoolContainer.open(name, password, Option(dbBackend), Option(dbConnectString), Option(configuration))
+      }
+      _pools(name) = pool
+      pool
+    })
+  }
 
-  def database = synchronized {
+  def getPool(name: String): Future[PoolContainer] = _pools.getOrElse(name, Future.failed[PoolContainer](PoolNotOpenException(name)))
+
+  def isPoolOpen(name: String): Boolean = _pools.get(name).exists(_.isCompleted)
+  def database: Future[profile.api.Database] = synchronized {
     _database match {
       case None =>
         _database = Some(Future {
@@ -108,6 +120,9 @@ class PoolsManagerService {
     }
   }
 
-  private val _pools = new ConcurrentHashMap[String, WalletPool]()
+  case class PoolNotOpenException(name: String) extends Exception(s"$name is not open yet.")
+  case class PoolNotFoundException(name: String) extends Exception(s"$name doesn't exist")
+
+  private val _pools = mutable.Map[String, Future[PoolContainer]]()
   private var _database: Option[Future[Database]] = None
 }
