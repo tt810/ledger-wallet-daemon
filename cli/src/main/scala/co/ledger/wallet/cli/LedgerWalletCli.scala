@@ -27,6 +27,8 @@ package co.ledger.wallet.cli
 import java.net.URI
 
 import co.ledger.wallet.cli.commands._
+import co.ledger.wallet.cli.commands.pool.{CreatePoolCommand, ListPoolCommand, OpenPoolCommand}
+import co.ledger.wallet.cli.commands.wallet.WalletListCommand
 import org.backuity.clist._
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -45,7 +47,7 @@ object LedgerWalletCli extends App {
     .withHelpCommand("help")
     .withProgramName("ledger-wallet-cli")
     .withCommands(
-      EchoCommand, ListPoolCommand, CreatePoolCommand, LedgerCoreCommand, OpenPoolCommand
+      EchoCommand, ListPoolCommand, CreatePoolCommand, LedgerCoreCommand, OpenPoolCommand, WalletListCommand
     ) foreach {(command) =>
       server = command.server
       client.ready flatMap { (_) =>

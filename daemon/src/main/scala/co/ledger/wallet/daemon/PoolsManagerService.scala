@@ -76,6 +76,10 @@ class PoolsManagerService {
       _pools(name) = pool
       pool
     })
+  } recover {
+    case all: Throwable =>
+      all.printStackTrace()
+      throw all
   }
 
   def getPool(name: String): Future[PoolContainer] = _pools.getOrElse(name, Future.failed[PoolContainer](PoolNotOpenException(name)))

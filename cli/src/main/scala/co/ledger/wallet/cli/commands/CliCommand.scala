@@ -27,12 +27,16 @@ package co.ledger.wallet.cli.commands
 import java.net.URI
 
 import co.ledger.wallet.cli.Client
+import co.ledger.wallet.protocol.RPCError
 import org.backuity.clist._
 
 import scala.concurrent.Future
 
 trait CliCommand {this: Command =>
+  import co.ledger.wallet.cli.commands._
   var server = opt[URI](description = "Configure the daemon uri to connect to.", default = new URI("ws://localhost:4060"))
 
   def run(client: Client): Future[Unit]
+
+  def protocolize[A](result: Either[RPCError, A]) = co.ledger.wallet.cli.commands.protocolize(result)
 }

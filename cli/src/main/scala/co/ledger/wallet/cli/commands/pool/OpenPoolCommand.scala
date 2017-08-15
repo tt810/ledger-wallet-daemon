@@ -1,11 +1,11 @@
-package co.ledger.wallet.cli.commands
+package co.ledger.wallet.cli.commands.pool
 
 import co.ledger.wallet.cli.Client
-import de.vandermeer.asciitable.AsciiTable
+import co.ledger.wallet.cli.commands.CliCommand
 import org.backuity.clist.{Command, arg, opt}
 
-import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 object OpenPoolCommand extends Command(name = "pool/run", description = "Starts monitoring the given pool") with CliCommand {
 

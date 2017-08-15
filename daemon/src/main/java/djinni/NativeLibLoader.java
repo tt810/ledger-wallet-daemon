@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-package com.dropbox.djinni;
+package djinni;
 
 import java.io.File;
 import java.io.IOException;

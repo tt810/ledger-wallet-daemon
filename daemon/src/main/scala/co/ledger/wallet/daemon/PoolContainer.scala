@@ -9,6 +9,7 @@ import co.ledger.wallet.daemon.libledger_core.crypto.SecureRandomRNG
 import co.ledger.wallet.daemon.libledger_core.debug.NoOpLogPrinter
 import co.ledger.wallet.daemon.libledger_core.filesystem.ScalaPathResolver
 import co.ledger.wallet.daemon.libledger_core.net.ScalaHttpClient
+import co.ledger.wallet.daemon.utils.DynamicObjectUtils
 
 import scala.concurrent.{Future, Promise}
 
@@ -20,7 +21,7 @@ object PoolContainer {
 
   def open(poolName: String, password: Option[String], databaseBackendName: Option[String],
            dbConnectionString: Option[String], configuration: Option[String]): Future[PoolContainer] = {
-      val conf = DynamicObject.load(configuration.getOrElse("{}").getBytes)
+      val conf = DynamicObjectUtils.fromJSON(configuration.getOrElse("{}"))
       val promise = Promise[PoolContainer]()
       val dispatcher = new ScalaThreadDispatcher(LedgerWalletDaemon.manager.ec)
       val backend = databaseBackendName.getOrElse("sqlite") match {
