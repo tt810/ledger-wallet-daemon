@@ -11,7 +11,8 @@ class ScalaPathResolver(poolName: String) extends PathResolver {
     * @param path The path to resolve.
     * @return The resolved path.
     */
-  override def resolveDatabasePath(path: String): String = resolve(path)
+  override def resolveDatabasePath(path: String): String = resolve(path, "databases")
+
 
   /**
     * Resolves the path of a single log file.
@@ -19,7 +20,7 @@ class ScalaPathResolver(poolName: String) extends PathResolver {
     * @param path The path to resolve.
     * @return The resolved path.
     */
-  override def resolveLogFilePath(path: String): String = resolve(path)
+  override def resolveLogFilePath(path: String): String = resolve(path, "logs")
 
   /**
     * Resolves the path for a json file.
@@ -27,11 +28,11 @@ class ScalaPathResolver(poolName: String) extends PathResolver {
     * @param path The path to resolve.
     * @return The resolved path.
     */
-  override def resolvePreferencesPath(path: String): String = resolve(path)
+  override def resolvePreferencesPath(path: String): String = resolve(path, "preferences")
 
-  private def resolve(path: String) = {
-    val resolvedPath = new File(installDirectory, path)
-    resolvedPath.mkdirs()
+  private def resolve(path: String, folder: String) = {
+    val resolvedPath = new File(new File(installDirectory, folder), path)
+    resolvedPath.getParentFile.mkdirs()
     resolvedPath.getAbsolutePath
   }
   private lazy val installDirectory: File = {

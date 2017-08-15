@@ -26,7 +26,7 @@ package co.ledger.wallet.daemon
 
 import java.net.InetSocketAddress
 
-import com.dropbox.djinni.NativeLibLoader
+import djinni.NativeLibLoader
 import com.typesafe.config.ConfigFactory
 import org.backuity.clist._
 

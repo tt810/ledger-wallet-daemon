@@ -8,6 +8,8 @@ lazy val commonSettings = Seq(
 
 lazy val protocol = (project in file("protocol"))
 
+lazy val binding = (project in file("ledger-core-binding"))
+
 lazy val cli = (project in file("cli")).dependsOn(protocol).
   settings(commonSettings: _*).
   settings(
@@ -15,6 +17,7 @@ lazy val cli = (project in file("cli")).dependsOn(protocol).
   )
 
 lazy val daemon = (project in file("daemon")).dependsOn(protocol)
+    .dependsOn(binding)
   .settings(commonSettings: _*)
   .settings(
     mainClass in assembly := Some("co.ledger.wallet.daemon.LedgerWalletDaemon")

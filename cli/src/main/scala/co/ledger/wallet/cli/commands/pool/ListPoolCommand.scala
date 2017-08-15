@@ -22,29 +22,34 @@
  * SOFTWARE.
  */
 
-package co.ledger.wallet.cli.commands
+package co.ledger.wallet.cli.commands.pool
 
 import co.ledger.wallet.cli.Client
+import co.ledger.wallet.cli.commands.{CliCommand, protocolize}
+import de.vandermeer.asciitable.AsciiTable
 import org.backuity.clist.Command
 
-import scala.concurrent.Future
-import org.backuity.clist._
 import scala.concurrent.ExecutionContext.Implicits.global
-object CreatePoolCommand extends Command(name = "pool/create", description = "Creates a new wallet pool") with CliCommand {
+import scala.concurrent.Future
 
-  var pool_name = arg[String](description = "The name of the newly created pool")
-  var password = opt[Option[String]](description = "Optionally encrypts the pool with a password")
-  var database = opt[Option[String]](description = "Sets the database backend sqlite|pgsql (sqlite by default)")
-  var connect = opt[Option[String]](description = "Set the database connect string (uses the pool name by default)")
-  var configuration = opt[Option[String]](description = "Path of the configuration file to use while opening the pool")
+object ListPoolCommand extends Command(name = "pool/list", description = "Lists all pools on the server") with CliCommand {
 
   override def run(client: Client): Future[Unit] = {
-    val conf = configuration map { (filePath) =>
-      val source = scala.io.Source.fromFile(filePath)
-      val lines = try source.mkString finally source.close()
-      lines
+    client.api.pool.listPools().map(protocolize).map {(pools) =>
+      val table = new AsciiTable()
+      table.addRule()
+      table.addRow("Pool name", "Running", "Database backend")
+      table.addRule()
+      for (pool <- pools) {
+        table.addRow(pool.name, if (pool.isOpen) "yes" else "no", pool.databaseBackend)
+        table.addRule()
+      }
+      print(table.render())
+    } recover {
+      case other =>
+        other.printStackTrace()
+        throw other
     }
-    client.api.pool.createPool(pool_name, password.orNull, database.orNull, connect.orNull, conf.orNull) map protocolize
-  }
 
+  }
 }
