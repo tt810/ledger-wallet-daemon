@@ -1,68 +1,60 @@
-/*
- * MIT License
- *
- * Copyright (c) 2017 Ledger
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
-
 package co.ledger.wallet.daemon
 
-import java.net.InetSocketAddress
+import co.ledger.wallet.daemon.controllers.StatusController
+import co.ledger.wallet.daemon.database.DatabaseInitializationRoutine
+import co.ledger.wallet.daemon.filters.{AuthenticationFilter, DemoUserAuthenticationFilter}
+import com.google.inject.Module
+import com.jakehschwartz.finatra.swagger.DocsController
+import com.twitter.finatra.http.HttpServer
+import com.twitter.finatra.http.filters.CommonFilters
+import com.twitter.finatra.http.routing.HttpRouter
+import com.typesafe.config.ConfigFactory
+import djinni.NativeLibLoader
+import org.bitcoin.{NativeSecp256k1Util, Secp256k1Context}
+import org.slf4j.LoggerFactory
+import scala.concurrent.ExecutionContext.Implicits.global
 
-import org.java_websocket.WebSocket
-import org.java_websocket.handshake.ClientHandshake
-import org.java_websocket.server.WebSocketServer
+import scala.util.{Failure, Success, Try}
 
-class Server(address: InetSocketAddress) extends WebSocketServer(address) {
+object Server extends ServerImpl {
 
-  private def init() = {
+}
 
-  }
-
-  override def onError(webSocket: WebSocket, e: Exception): Unit = {
-
-  }
-
-  override def onMessage(webSocket: WebSocket, s: String): Unit = {
-    println("Received", s)
-    _connections.lift(webSocket) match {
-      case Some(connection) =>
-        connection.onMessage(s)
-      case None =>
-        System.err.println(s"Unable to find matching connection to ${webSocket.getResourceDescriptor}")
+class ServerImpl extends HttpServer {
+  lazy val configuration = ConfigFactory.load()
+  val profileName = Try(configuration.getString("database_engine")).toOption.getOrElse("sqlite3")
+  val profile = {
+    profileName match {
+      case "sqlite3" =>
+        slick.jdbc.SQLiteProfile
+      case "postgres" =>
+        slick.jdbc.PostgresProfile
+      case "h2mem1" =>
+        slick.jdbc.H2Profile
+      case others => throw new Exception(s"Unknown database backend $others")
     }
   }
 
-  override def onClose(webSocket: WebSocket, i: Int, s: String, b: Boolean): Unit = {
-    _connections.remove(webSocket)
+  override protected def modules: Seq[Module] = Seq(
+    ServerSwaggerModule
+  )
+  override protected def configureHttp(router: HttpRouter): Unit =
+    router
+        .filter[CommonFilters]
+        .filter[DemoUserAuthenticationFilter]
+        .add[DocsController]
+        .add[AuthenticationFilter, StatusController]
+
+  override protected def warmup(): Unit = {
+    super.warmup()
+    NativeLibLoader.loadLibs()
+    injector.instance[DatabaseInitializationRoutine](classOf[DatabaseInitializationRoutine]).perform() onComplete {
+      case Success(_) =>
+        info("Database initialized with routine successfully")
+      case Failure(ex) =>
+        error("Unable to perform database routine")
+        error(ex)
+        exitOnError(ex.getMessage)
+    }
   }
-
-  override def onOpen(webSocket: WebSocket, clientHandshake: ClientHandshake): Unit = {
-    _connections(webSocket) = new Connection(webSocket)
-  }
-
-  override def onStart(): Unit = {
-
-  }
-
-  private val _connections = scala.collection.mutable.HashMap[WebSocket, Connection]()
-
-  init()
 }

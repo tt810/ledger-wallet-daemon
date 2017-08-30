@@ -1,29 +1,6 @@
-/*
- * MIT License
- *
- * Copyright (c) 2017 Ledger
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
-
 package co.ledger.wallet.daemon
 import java.sql.{Date, Timestamp}
+import java.util.Date
 
 import slick.ast.Subquery.Default
 import slick.lifted.ProvenShape
@@ -31,7 +8,7 @@ import slick.sql.SqlProfile.ColumnOption.SqlType
 
 package object database {
 
-  import LedgerWalletDaemon.profile.api._
+  import Server.profile.api._
 
   class DatabaseVersion(tag: Tag) extends Table[(Int, Timestamp)](tag, "__database__") {
     def version = column[Int]("version", O.PrimaryKey)
@@ -40,20 +17,32 @@ package object database {
   }
   val databaseVersions = TableQuery[DatabaseVersion]
 
-  class Pools(tag: Tag) extends Table[(String, Timestamp, String, String, String)](tag, "pools") {
-    def name = column[String]("name", O.PrimaryKey)
-    def createdAt = column[Timestamp]("created_at", SqlType("timestamp not null default CURRENT_TIMESTAMP"))
+  case class User(id: Option[Long], pubKey: String, createdAt: Option[Timestamp] = Some(new Timestamp(new java.util.Date().getTime)))
+  class Users(tag: Tag) extends Table[User](tag, "users") {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def pubKey = column[String]("pub_key", O.Default(null))
+    def createdAt = column[Timestamp]("created_at", SqlType("timestamp default CURRENT_TIMESTAMP"))
+    override def * = (id.?, pubKey, createdAt.?) <> (User.tupled, User.unapply)
+  }
+  val users = TableQuery[Users]
+
+  case class Pool(id: Long, name: String, createdAt: Timestamp, configuration: String, dbBackend: String, dbConnectString: String, userId: Long)
+  class Pools(tag: Tag) extends Table[Pool](tag, "pools") {
+    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def name = column[String]("name")
+    def createdAt = column[Timestamp]("created_at", SqlType("timestamp default CURRENT_TIMESTAMP"))
     def configuration = column[String]("configuration", O.Default("{}"))
     def dbBackend = column[String]("db_backend")
     def dbConnectString = column[String]("db_connect")
-
-    def * = (name, createdAt, configuration, dbBackend, dbConnectString)
+    def userId = column[Long]("user_id")
+    def user = foreignKey("user_fk", userId, users)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
+    def * = (id, name, createdAt, configuration, dbBackend, dbConnectString, userId) <> (Pool.tupled, Pool.unapply)
   }
   val pools = TableQuery[Pools]
 
   val Migrations = Map(
     0 -> DBIO.seq(
-      (pools.schema ++ databaseVersions.schema).create
+      (users.schema ++ pools.schema ++ databaseVersions.schema).create
     )
   )
 
