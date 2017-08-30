@@ -2,7 +2,7 @@ package co.ledger.wallet.daemon
 
 import co.ledger.wallet.daemon.controllers.StatusController
 import co.ledger.wallet.daemon.database.DatabaseInitializationRoutine
-import co.ledger.wallet.daemon.filters.{AuthenticationFilter, DemoUserAuthenticationFilter}
+import co.ledger.wallet.daemon.filters.{AuthenticationFilter, DemoUserAuthenticationFilter, LWDAutenticationFilter}
 import com.google.inject.Module
 import com.jakehschwartz.finatra.swagger.DocsController
 import com.twitter.finatra.http.HttpServer
@@ -12,8 +12,8 @@ import com.typesafe.config.ConfigFactory
 import djinni.NativeLibLoader
 import org.bitcoin.{NativeSecp256k1Util, Secp256k1Context}
 import org.slf4j.LoggerFactory
-import scala.concurrent.ExecutionContext.Implicits.global
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success, Try}
 
 object Server extends ServerImpl {
@@ -40,10 +40,11 @@ class ServerImpl extends HttpServer {
   )
   override protected def configureHttp(router: HttpRouter): Unit =
     router
-        .filter[CommonFilters]
-        .filter[DemoUserAuthenticationFilter]
-        .add[DocsController]
-        .add[AuthenticationFilter, StatusController]
+          .filter[CommonFilters]
+          .filter[DemoUserAuthenticationFilter]
+          .filter[LWDAutenticationFilter]
+          .add[DocsController]
+          .add[AuthenticationFilter, StatusController]
 
   override protected def warmup(): Unit = {
     super.warmup()

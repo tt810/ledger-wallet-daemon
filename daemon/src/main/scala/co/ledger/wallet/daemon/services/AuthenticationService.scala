@@ -1,6 +1,7 @@
 package co.ledger.wallet.daemon.services
 
 import java.nio.charset.StandardCharsets
+import java.util.Date
 import javax.inject.{Inject, Singleton}
 
 import co.ledger.wallet.daemon.services.AuthenticationService.AuthenticationFailedException
@@ -30,6 +31,11 @@ class AuthenticationService @Inject()(databaseService: DatabaseService, ecdsa: E
       }
     } flatMap {user =>
       val time = request.authContext.time
+      val date = new Date(time * 1000)
+      val now = new Date()
+      if (now.getTime - date.getTime > 60000) {
+        throw AuthenticationFailedException()
+      }
       val message = Sha256Hash.hash(s"LWD: $time\n".getBytes(StandardCharsets.US_ASCII))
       val signed = request.authContext.signedMessage
       ecdsa.verify(message, signed, request.authContext.pubKey).map({(success) =>

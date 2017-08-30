@@ -10,6 +10,8 @@ package object database {
 
   import Server.profile.api._
 
+  val PERMISSION_CREATE_USER = 0x01
+
   class DatabaseVersion(tag: Tag) extends Table[(Int, Timestamp)](tag, "__database__") {
     def version = column[Int]("version", O.PrimaryKey)
     def createdAt = column[Timestamp]("created_at", SqlType("timestamp not null default CURRENT_TIMESTAMP"))
@@ -17,12 +19,13 @@ package object database {
   }
   val databaseVersions = TableQuery[DatabaseVersion]
 
-  case class User(id: Option[Long], pubKey: String, createdAt: Option[Timestamp] = Some(new Timestamp(new java.util.Date().getTime)))
+  case class User(id: Option[Long], pubKey: String, permissions: Long, createdAt: Option[Timestamp] = Some(new Timestamp(new java.util.Date().getTime)))
   class Users(tag: Tag) extends Table[User](tag, "users") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
     def pubKey = column[String]("pub_key", O.Default(null))
     def createdAt = column[Timestamp]("created_at", SqlType("timestamp default CURRENT_TIMESTAMP"))
-    override def * = (id.?, pubKey, createdAt.?) <> (User.tupled, User.unapply)
+    def permissions = column[Long]("permissions")
+    override def * = (id.?, pubKey, permissions, createdAt.?) <> (User.tupled, User.unapply)
   }
   val users = TableQuery[Users]
 

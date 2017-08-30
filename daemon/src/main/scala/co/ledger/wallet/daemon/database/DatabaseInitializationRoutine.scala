@@ -18,7 +18,7 @@ class DatabaseInitializationRoutine @Inject()(usersService: UsersService, ecdsa:
   import Server.profile.api._
 
   def perform(): Future[Unit] = {
-    insertDemoUsers()
+    insertDemoUsers().flatMap(_ => insertWhitelistedUsers())
   }
 
   private def insertDemoUsers() = Future {
@@ -32,6 +32,19 @@ class DatabaseInitializationRoutine @Inject()(usersService: UsersService, ecdsa:
         val privKey = Sha256Hash.hash(auth.getBytes)
         val pk = HexUtils.valueOf(Await.result(ecdsa.computePublicKey(privKey), Duration.Inf))
         Try(Await.result(usersService.insertUser(pk), Duration.Inf))
+      }
+    }
+    ()
+  }
+
+  private def insertWhitelistedUsers() = Future {
+    if (Server.configuration.hasPath("whitelist")){
+      val usersConfig = Server.configuration.getConfigList("whitelist")
+      for (i <- 0 until usersConfig.size()) {
+        val userConfig = usersConfig.get(i)
+        val pubKey = userConfig.getString("key")
+        val permissions = if (Try(userConfig.getBoolean("account_creation")).getOrElse(false)) PERMISSION_CREATE_USER else 0
+        Try(Await.result(usersService.insertUser(pubKey, permissions), Duration.Inf))
       }
     }
     ()

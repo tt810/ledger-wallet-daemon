@@ -10,8 +10,8 @@ import scala.concurrent.Future
 class UsersService @Inject()(databaseService: DatabaseService) {
   import co.ledger.wallet.daemon.Server.profile.api._
 
-  def insertUser(publicKey: String): Future[Unit] = databaseService.database flatMap {(db) =>
-    db.run(insertNewUserActions(User(None, publicKey)))
+  def insertUser(publicKey: String, permissions: Long = 0): Future[Unit] = databaseService.database flatMap {(db) =>
+    db.run(insertNewUserActions(User(None, publicKey, permissions)))
   } map {_ =>
     ()
   }
