@@ -4,7 +4,8 @@ import java.nio.charset.StandardCharsets
 import java.util.Date
 import javax.inject.{Inject, Singleton}
 
-import co.ledger.wallet.daemon.services.AuthenticationService.AuthenticationFailedException
+import co.ledger.wallet.daemon.database.User
+import co.ledger.wallet.daemon.services.AuthenticationService.{AuthenticationFailedException, AuthentifiedUser, AuthentifiedUserContext}
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.twitter.finagle.http.Request
 import com.twitter.util.Future
@@ -41,6 +42,7 @@ class AuthenticationService @Inject()(databaseService: DatabaseService, ecdsa: E
       ecdsa.verify(message, signed, request.authContext.pubKey).map({(success) =>
         if (!success)
           throw AuthenticationFailedException()
+        AuthentifiedUserContext.setUser(request, user)
         ()
       })
     } asTwitter()
@@ -63,18 +65,14 @@ object AuthenticationService {
     }
   }
 
-  case class AuthentifiedUser(id: Long)
+  case class AuthentifiedUser(get: User)
   object AuthentifiedUserContext {
     private val UserField = Request.Schema.newField[AuthentifiedUser]()
 
     implicit class UserContextSyntax(val request: Request) extends AnyVal {
       def user: AuthentifiedUser = request.ctx(UserField)
     }
-
-    def setUser(request: Request): Unit = {
-      val user = AuthentifiedUser(1) //Parse user from request headers/cookies/etc.
-      request.ctx.update(UserField, user)
-    }
+    def setUser(request: Request, user: User): Unit = request.ctx.update(UserField, user)
   }
 
 }
