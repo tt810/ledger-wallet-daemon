@@ -47,7 +47,7 @@ class AuthenticationFeatureTest extends FeatureTest {
     val privKey = Sha256Hash.hash(FixturesUtils.seed(seedName).getBytes)
     val pubKey = Await.result(ecdsa.computePublicKey(privKey), Duration.Inf)
     val timestamp = time.getTime / 1000
-    val message = Sha256Hash.hash(s"LWD: $timestamp".getBytes)
+    val message = Sha256Hash.hash(s"LWD: $timestamp\n".getBytes)
     val signed = Await.result(ecdsa.sign(message, privKey), Duration.Inf)
     Map(
       "authorization" -> s"LWD ${Base64.encode(s"${HexUtils.valueOf(pubKey)}:$timestamp:${HexUtils.valueOf(signed)}".getBytes).mkString}"
