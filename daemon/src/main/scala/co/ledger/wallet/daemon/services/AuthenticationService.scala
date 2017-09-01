@@ -52,7 +52,6 @@ class AuthenticationService @Inject()(databaseService: DatabaseService, ecdsa: E
 
 object AuthenticationService {
 
-
   case class AuthenticationFailedException() extends Exception("Unable to authenticate user with those credentials")
   case class AuthContext(pubKey: Array[Byte], time: Long, signedMessage: Array[Byte])
   object AuthContextContext {
@@ -72,7 +71,7 @@ object AuthenticationService {
     implicit class UserContextSyntax(val request: Request) extends AnyVal {
       def user: AuthentifiedUser = request.ctx(UserField)
     }
-    def setUser(request: Request, user: User): Unit = request.ctx.update(UserField, user)
+    def setUser(request: Request, user: User): Unit = request.ctx.update[AuthentifiedUser](UserField, AuthentifiedUser(user))
   }
 
 }

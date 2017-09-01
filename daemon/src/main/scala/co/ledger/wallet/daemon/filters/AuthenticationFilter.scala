@@ -12,10 +12,6 @@ class AuthenticationFilter @Inject()(authService: AuthenticationService) extends
   override def apply(request: Request, service: Service[Request, Response]): Future[Response] = {
     authService.authorize(request) flatMap {(_) =>
       service(request)
-    } rescue {
-      case all: Throwable =>
-        request.response.statusCode = Status.Unauthorized.code
-        Future(request.response)
     }
   }
 

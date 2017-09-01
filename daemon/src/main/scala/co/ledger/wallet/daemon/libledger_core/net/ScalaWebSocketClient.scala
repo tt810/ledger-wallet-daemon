@@ -1,5 +1,5 @@
 package co.ledger.wallet.daemon.libledger_core.net
 
-class ScalaWebSocketClient {
+class ScalaWebSocketClient extends co.ledger.core.WebSocketClient {
 
 }

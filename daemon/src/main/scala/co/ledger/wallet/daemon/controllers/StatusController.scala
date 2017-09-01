@@ -4,16 +4,19 @@ import javax.inject.Inject
 
 import co.ledger.core.LedgerCore
 import co.ledger.wallet.daemon.services.DatabaseService
+import co.ledger.wallet.daemon.swagger.DocumentedController
 import com.jakehschwartz.finatra.swagger.SwaggerController
 import com.twitter.finagle.http.{Request, Response}
 import com.twitter.finatra.http.Controller
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import io.swagger.models.{SecurityRequirement, Swagger}
 
-class StatusController @Inject()(s: Swagger, db: DatabaseService) extends SwaggerController {
+class StatusController @Inject()(db: DatabaseService) extends DocumentedController {
   import StatusController._
-  override protected implicit val swagger: Swagger = s
 
+  /**
+    *
+    */
   getWithDoc("/status") {o =>
     o .summary("Retrieves the current status and a bunch information about the running wallet manager.")
       .tag("Status API")

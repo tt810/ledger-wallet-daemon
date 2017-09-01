@@ -1,8 +1,10 @@
 package co.ledger.wallet.daemon
 
-import co.ledger.wallet.daemon.controllers.StatusController
+import co.ledger.wallet.daemon.controllers.{StatusController, WalletPoolsController}
 import co.ledger.wallet.daemon.database.DatabaseInitializationRoutine
 import co.ledger.wallet.daemon.filters.{AuthenticationFilter, DemoUserAuthenticationFilter, LWDAutenticationFilter}
+import co.ledger.wallet.daemon.mappers.AuthenticationExceptionMapper
+import co.ledger.wallet.daemon.services.PoolsService
 import com.google.inject.Module
 import com.jakehschwartz.finatra.swagger.DocsController
 import com.twitter.finatra.http.HttpServer
@@ -13,7 +15,9 @@ import djinni.NativeLibLoader
 import org.bitcoin.{NativeSecp256k1Util, Secp256k1Context}
 import org.slf4j.LoggerFactory
 
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 object Server extends ServerImpl {
@@ -35,6 +39,8 @@ class ServerImpl extends HttpServer {
     }
   }
 
+  lazy val swagger = ServerSwaggerModule.swagger
+
   override protected def modules: Seq[Module] = Seq(
     ServerSwaggerModule
   )
@@ -45,6 +51,8 @@ class ServerImpl extends HttpServer {
           .filter[LWDAutenticationFilter]
           .add[DocsController]
           .add[AuthenticationFilter, StatusController]
+          .add[AuthenticationFilter, WalletPoolsController]
+          .exceptionMapper[AuthenticationExceptionMapper]
 
   override protected def warmup(): Unit = {
     super.warmup()
@@ -57,5 +65,7 @@ class ServerImpl extends HttpServer {
         error(ex)
         exitOnError(ex.getMessage)
     }
+    val poolsService = injector.instance[PoolsService](classOf[PoolsService])
+    Await.result(poolsService.initialize(), 1.minute)
   }
 }
