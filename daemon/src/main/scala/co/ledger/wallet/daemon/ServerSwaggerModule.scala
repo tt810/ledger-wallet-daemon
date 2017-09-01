@@ -8,9 +8,7 @@ import javax.inject.Singleton
 
 object ServerSwaggerModule extends SwaggerModule {
 
-  @Singleton
-  @Provides
-  def swagger: Swagger = {
+  val swagger: Swagger = {
     val swagger = new Swagger()
 
     val info = new Info()

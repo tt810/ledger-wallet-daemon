@@ -29,6 +29,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.slick" %% "slick" % versions.slick,
   "org.postgresql" % "postgresql" % "9.3-1100-jdbc4",
   "org.xerial" % "sqlite-jdbc" % "3.7.15-M1",
+  "com.h2database" % "h2" % "1.3.166",
   "ch.qos.logback" % "logback-classic" % "1.0.9",
   "com.typesafe.slick" %% "slick-hikaricp" % versions.slick,
   "com.twitter" %% "finatra-http" % versions.finatra,

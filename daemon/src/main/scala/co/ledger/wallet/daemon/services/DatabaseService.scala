@@ -2,6 +2,7 @@ package co.ledger.wallet.daemon.services
 
 import java.sql.Timestamp
 import java.util.Date
+import java.util.concurrent.{ExecutorService, Executors}
 import javax.inject.Singleton
 
 import co.ledger.wallet.daemon.Server
@@ -12,7 +13,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
 class DatabaseService {
-  implicit val ec: ExecutionContext = SerialExecutionContext.newInstance()
+  implicit val ec: ExecutionContext = new SerialExecutionContext()(ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor()))
   import co.ledger.wallet.daemon.Server.profile.api._
   import co.ledger.wallet.daemon.database._
 
