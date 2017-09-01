@@ -3,6 +3,7 @@ package co.ledger.wallet.daemon.controllers
 import javax.inject.Inject
 
 import co.ledger.wallet.daemon.converters.PoolConverter
+import co.ledger.wallet.daemon.models
 import co.ledger.wallet.daemon.services.PoolsService
 import co.ledger.wallet.daemon.swagger.DocumentedController
 import com.twitter.finagle.http.Request
@@ -17,7 +18,12 @@ class WalletPoolsController @Inject()(poolsService: PoolsService, poolConverter:
   import WalletPoolsController._
 
   get("/pools") {(request: Request) =>
-    poolsService.pools(request.user.get).asTwitter().map(_.map(poolConverter.apply))
+    poolsService.pools(request.user.get).asTwitter().flatMap({(pools) =>
+      val f: Seq[Future[models.Pool]] = pools map {(pool) =>
+        poolConverter(pool)
+      }
+      Future.collect(f.toList)
+    })
   }
 
   post("/pools/:pool_name/create") {(request: Request) =>

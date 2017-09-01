@@ -12,6 +12,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 @Singleton
 class PoolConverter {
 
-  def apply(pool: WalletPool): Future[models.Pool] = pool.getWalletCount().map(models.Pool("change it", _)).asTwitter()
+  def apply(pool: WalletPool): Future[models.Pool] = pool.getWalletCount().map(models.Pool("change it", _)).asTwitter().map {(p) =>
+    println(s"Mapping ${p.name} ${p.wallet_count}")
+    p
+  }
 
 }

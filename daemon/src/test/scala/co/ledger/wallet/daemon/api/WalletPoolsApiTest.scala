@@ -9,7 +9,7 @@ class WalletPoolsApiTest extends APIFeatureTest {
 
   test("WalletPools#Create and list single pool") {
     server.httpPost("/pools/my_pool/create", "", headers = defaultHeaders)
-    val pools = parse[Seq[models.Pool]](server.httpGet("/pools", headers = defaultHeaders))
+    val pools = parse[List[models.Pool]](server.httpGet("/pools", headers = defaultHeaders))
   }
 
 }
