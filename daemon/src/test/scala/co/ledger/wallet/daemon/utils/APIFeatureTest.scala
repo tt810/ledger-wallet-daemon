@@ -3,6 +3,7 @@ package co.ledger.wallet.daemon.utils
 import java.util.Date
 
 import co.ledger.wallet.daemon.ServerImpl
+import co.ledger.wallet.daemon.libledger_core.filesystem.ScalaPathResolver
 import co.ledger.wallet.daemon.services.ECDSAService
 import com.lambdaworks.codec.Base64
 import com.twitter.finagle.http.Response
@@ -30,5 +31,15 @@ trait APIFeatureTest extends FeatureTest {
     Map(
       "authorization" -> s"LWD ${Base64.encode(s"${HexUtils.valueOf(pubKey)}:$timestamp:${HexUtils.valueOf(signed)}".getBytes).mkString}"
     )
+  }
+
+  override protected def beforeAll(): Unit = {
+    super.beforeEach()
+    val directory = new ScalaPathResolver("").installDirectory.getParentFile
+    for (f <- directory.listFiles()) {
+      if (f.isDirectory) {
+        f.delete()
+      }
+    }
   }
 }

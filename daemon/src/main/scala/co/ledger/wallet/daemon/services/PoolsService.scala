@@ -59,11 +59,24 @@ class PoolsService @Inject()(databaseService: DatabaseService) {
     }
   }
 
-  def pool(user: User, poolName: String): Future[WalletPool] = ???
+  def pool(user: User, poolName: String): Future[WalletPool] = Future {
+    val p = _pools.getOrDefault(poolIdentifier(user.id.get, poolName), null)
+    if (p != null)
+     p
+    else
+      throw PoolNotFoundException(poolName)
+  }
 
   def removePool(user: User, poolName: String): Future[Unit] = {
     implicit val ec = _writeContext
-    ???
+    pool(user, poolName) flatMap {(p) =>
+      // p.release() TODO once WalletPool#release exists
+      _pools.remove(poolIdentifier(user.id.get, poolName))
+      val q = database.pools.filter(p => p.userId === user.id.get.bind && p.name === poolName.bind)
+      databaseService.database flatMap {(db) =>
+        db.run(q.delete)
+      } map {(_) => ()}
+    }
   }
 
   private def mapPool(pool: Pool): Future[WalletPool] = {
@@ -71,10 +84,11 @@ class PoolsService @Inject()(databaseService: DatabaseService) {
     if (p != null)
       Future.successful(p)
     else
-      Future.failed(PoolNotFoundException(pool))
+      Future.failed(PoolNotFoundException(pool.name))
   }
 
-  private def poolIdentifier(pool: Pool) = HexUtils.valueOf(Sha256Hash.hash(s"${pool.userId}:${pool.name}".getBytes))
+  private def poolIdentifier(pool: Pool): String = poolIdentifier(pool.userId, pool.name)
+  private def poolIdentifier(userId: Long, poolName: String): String = HexUtils.valueOf(Sha256Hash.hash(s"${userId}:${poolName}".getBytes))
 
   private def buildPool(pool: Pool): Future[WalletPool] = {
     val dispatcher = new ScalaThreadDispatcher(scala.concurrent.ExecutionContext.Implicits.global)
@@ -114,5 +128,5 @@ object PoolsService {
     override def toString: String = ""
   }
   case class PoolAlreadyExistsException(poolName: String) extends Exception(s"Pool $poolName already exists")
-  case class PoolNotFoundException(pool: Pool) extends ResourceNotFoundException(s"Pool '${}' doesn't exist")
+  case class PoolNotFoundException(poolName: String) extends ResourceNotFoundException(s"Pool '$poolName' doesn't exist")
 }
