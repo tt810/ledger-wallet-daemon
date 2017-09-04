@@ -36,7 +36,7 @@ class ScalaPathResolver(poolName: String) extends PathResolver {
     println(resolvedPath.getAbsolutePath)
     resolvedPath.getAbsolutePath
   }
-  private lazy val installDirectory: File = {
+  lazy val installDirectory: File = {
     import java.net.URLDecoder
     val jarPath = URLDecoder.decode(classOf[Nothing].getProtectionDomain.getCodeSource.getLocation.getPath, "UTF-8")
     new File(new File(jarPath).getParentFile, poolName)

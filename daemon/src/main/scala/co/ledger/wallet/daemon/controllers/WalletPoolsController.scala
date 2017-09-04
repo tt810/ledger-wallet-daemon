@@ -26,10 +26,22 @@ class WalletPoolsController @Inject()(poolsService: PoolsService, poolConverter:
     })
   }
 
+  get("/pools/:pool_name") {(request: Request) =>
+    val poolName = request.getParam("pool_name")
+    poolsService.pool(request.user.get, poolName).asTwitter().flatMap(poolConverter.apply)
+  }
+
   post("/pools/:pool_name/create") {(request: Request) =>
     val poolName = request.getParam("pool_name")
     val configuration = PoolConfiguration() // TODO: Deserialize the configuration from the body of the request
-    poolsService.createPool(request.user.get, poolName, PoolConfiguration()).asTwitter().map(poolConverter.apply)
+    poolsService.createPool(request.user.get, poolName, PoolConfiguration()).asTwitter().flatMap({(p) =>
+      poolConverter(p)
+    })
+  }
+
+  delete("/pools/:pool_name") {(request: Request) =>
+    val poolName = request.getParam("pool_name")
+    poolsService.removePool(request.user.get, poolName)
   }
 
 }
