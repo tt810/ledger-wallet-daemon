@@ -20,7 +20,7 @@ trait APIFeatureTest extends FeatureTest {
 
   def defaultHeaders = lwdBasicAuthorisationHeader("whitelisted")
   def parse[A](response: Response)(implicit manifest: Manifest[A]): A = server.mapper.parse[A](response)
-
+  
   private def lwdBasicAuthorisationHeader(seedName: String, time: Date = new Date()) = {
     val ecdsa = server.injector.instance(classOf[ECDSAService])
     val privKey = Sha256Hash.hash(FixturesUtils.seed(seedName).getBytes)

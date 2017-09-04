@@ -14,9 +14,6 @@ import io.swagger.models.{SecurityRequirement, Swagger}
 class StatusController @Inject()(db: DatabaseService) extends DocumentedController {
   import StatusController._
 
-  /**
-    *
-    */
   getWithDoc("/status") {o =>
     o .summary("Retrieves the current status and a bunch information about the running wallet manager.")
       .tag("Status API")
