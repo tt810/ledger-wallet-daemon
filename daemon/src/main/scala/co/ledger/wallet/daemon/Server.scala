@@ -49,9 +49,9 @@ class ServerImpl extends HttpServer {
           .filter[CommonFilters]
           .filter[DemoUserAuthenticationFilter]
           .filter[LWDAutenticationFilter]
-          .add[DocsController]
           .add[AuthenticationFilter, StatusController]
           .add[AuthenticationFilter, WalletPoolsController]
+          .add[DocsController]
           .exceptionMapper[AuthenticationExceptionMapper]
 
   override protected def warmup(): Unit = {
