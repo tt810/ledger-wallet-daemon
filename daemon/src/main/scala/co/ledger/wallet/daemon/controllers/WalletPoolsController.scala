@@ -11,6 +11,7 @@ import com.twitter.util.Future
 import co.ledger.wallet.daemon.utils._
 import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
 import co.ledger.wallet.daemon.services.PoolsService.PoolConfiguration
+import com.twitter.finatra.request.RouteParam
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -31,7 +32,7 @@ class WalletPoolsController @Inject()(poolsService: PoolsService, poolConverter:
     poolsService.pool(request.user.get, poolName).asTwitter().flatMap(poolConverter.apply)
   }
 
-  post("/pools/:pool_name/create") {(request: Request) =>
+  post("/pools/:pool_name") {(request: Request) =>
     val poolName = request.getParam("pool_name")
     val configuration = PoolConfiguration() // TODO: Deserialize the configuration from the body of the request
     poolsService.createPool(request.user.get, poolName, PoolConfiguration()).asTwitter().flatMap({(p) =>
@@ -47,6 +48,5 @@ class WalletPoolsController @Inject()(poolsService: PoolsService, poolConverter:
 }
 
 object WalletPoolsController {
-
   case class WalletPoolResult(test: String)
 }

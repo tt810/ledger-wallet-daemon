@@ -9,9 +9,12 @@ version := "1.0"
 
 scalaVersion := "2.12.2"
 
-fork in run := true
-cancelable in Global := true
-parallelExecution in ThisBuild := false
+
+concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
+parallelExecution in Test := false
+parallelExecution in IntegrationTest := false
+testForkedParallel in Test := false
+testForkedParallel in IntegrationTest := false
 
 lazy val versions = new {
   val finatra = "2.12.0"

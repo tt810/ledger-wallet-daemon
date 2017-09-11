@@ -30,12 +30,20 @@ class AuthenticationFeatureTest extends FeatureTest {
     server.httpGet(path = "/status", headers = lwdBasicAuthorisationHeader("whitelisted"))
   }
 
+  test("Authentication#Authenticate with LWD whitelisted and valid timestamp (after now)") {
+    server.httpGet(path = "/status", headers = lwdBasicAuthorisationHeader("whitelisted", new Date(new Date().getTime + 10000)))
+  }
+
   test("Authentication#Authenticate with LWD backlisted") {
     server.httpGet(path = "/status", headers = lwdBasicAuthorisationHeader("blacklisted"), andExpect = Status.Unauthorized)
   }
 
-  test("Authentication#Authenticate with LWD whitelisted and invalid timestamp") {
+  test("Authentication#Authenticate with LWD whitelisted and invalid timestamp (before now)") {
     server.httpGet(path = "/status", headers = lwdBasicAuthorisationHeader("whitelisted", new Date(new Date().getTime - 60000)), andExpect = Status.Unauthorized)
+  }
+
+  test("Authentication#Authenticate with LWD whitelisted and invalid timestamp (after now)") {
+    server.httpGet(path = "/status", headers = lwdBasicAuthorisationHeader("whitelisted", new Date(new Date().getTime + 60000)), andExpect = Status.Unauthorized)
   }
 
   private def basicAuthorisationHeader(username: String, password: String) = Map(

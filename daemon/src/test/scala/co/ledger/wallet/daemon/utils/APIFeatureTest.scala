@@ -1,5 +1,6 @@
 package co.ledger.wallet.daemon.utils
 
+import java.io.File
 import java.util.Date
 
 import co.ledger.wallet.daemon.ServerImpl
@@ -20,7 +21,15 @@ trait APIFeatureTest extends FeatureTest {
 
   def defaultHeaders = lwdBasicAuthorisationHeader("whitelisted")
   def parse[A](response: Response)(implicit manifest: Manifest[A]): A = server.mapper.parse[A](response)
-  
+
+  def createWallet(): Unit = {
+
+  }
+
+  def createPool(poolName: String): Unit = {
+    server.httpPost(s"/pools/$poolName", "", headers = defaultHeaders)
+  }
+
   private def lwdBasicAuthorisationHeader(seedName: String, time: Date = new Date()) = {
     val ecdsa = server.injector.instance(classOf[ECDSAService])
     val privKey = Sha256Hash.hash(FixturesUtils.seed(seedName).getBytes)
@@ -35,11 +44,32 @@ trait APIFeatureTest extends FeatureTest {
 
   override protected def beforeAll(): Unit = {
     super.beforeEach()
-    val directory = new ScalaPathResolver("").installDirectory.getParentFile
+    cleanup()
+  }
+
+  protected override def afterAll(): Unit = {
+    super.afterAll()
+    cleanup()
+  }
+
+  private def cleanup(): Unit = {
+    val directory = new ScalaPathResolver("").installDirectory
+    println(s"CLEAN UP ${directory.toString}")
     for (f <- directory.listFiles()) {
       if (f.isDirectory) {
-        f.delete()
+        deleteDirectory(f)
       }
     }
   }
+
+  private def deleteDirectory(directory: File): Unit = {
+    for (f <- directory.listFiles()) {
+      if (f.isDirectory)
+        deleteDirectory(f)
+      else
+        f.delete()
+    }
+    directory.delete()
+  }
+
 }

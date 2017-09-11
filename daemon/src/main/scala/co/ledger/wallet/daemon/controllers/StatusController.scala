@@ -11,8 +11,10 @@ import com.twitter.finatra.http.Controller
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import io.swagger.models.{SecurityRequirement, Swagger}
 
-class StatusController @Inject()(db: DatabaseService) extends DocumentedController {
+class StatusController @Inject()(db: DatabaseService, s: Swagger) extends SwaggerController {
   import StatusController._
+  override protected implicit val swagger: Swagger = s
+
 
   getWithDoc("/status") {o =>
     o .summary("Retrieves the current status and a bunch information about the running wallet manager.")
@@ -22,7 +24,6 @@ class StatusController @Inject()(db: DatabaseService) extends DocumentedControll
   } {(request: Request) =>
     response.ok(Status(LedgerCore.getStringVersion))
   }
-
 }
 
 object StatusController {

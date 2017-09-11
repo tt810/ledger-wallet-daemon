@@ -1,6 +1,6 @@
 package co.ledger.wallet.daemon
 
-import co.ledger.wallet.daemon.controllers.{StatusController, WalletPoolsController}
+import co.ledger.wallet.daemon.controllers.{AccountsController, StatusController, WalletPoolsController, WalletsController}
 import co.ledger.wallet.daemon.database.DatabaseInitializationRoutine
 import co.ledger.wallet.daemon.filters.{AuthenticationFilter, DemoUserAuthenticationFilter, LWDAutenticationFilter}
 import co.ledger.wallet.daemon.mappers.AuthenticationExceptionMapper
@@ -51,6 +51,8 @@ class ServerImpl extends HttpServer {
           .filter[LWDAutenticationFilter]
           .add[AuthenticationFilter, StatusController]
           .add[AuthenticationFilter, WalletPoolsController]
+          .add[AuthenticationFilter, WalletsController]
+          .add[AuthenticationFilter, AccountsController]
           .add[DocsController]
           .exceptionMapper[AuthenticationExceptionMapper]
 
