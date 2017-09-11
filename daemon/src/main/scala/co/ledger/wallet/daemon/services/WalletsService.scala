@@ -8,6 +8,7 @@ import co.ledger.core.implicits._
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 
 @Singleton
 class WalletsService @Inject()(poolsService: PoolsService) {

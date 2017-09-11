@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets
 import java.util.Date
 import javax.inject.{Inject, Singleton}
 
+import co.ledger.wallet.daemon.Server
 import co.ledger.wallet.daemon.database.User
 import co.ledger.wallet.daemon.services.AuthenticationService.{AuthenticationFailedException, AuthentifiedUser, AuthentifiedUserContext}
 import co.ledger.wallet.daemon.utils.HexUtils
@@ -34,7 +35,7 @@ class AuthenticationService @Inject()(databaseService: DatabaseService, ecdsa: E
       val time = request.authContext.time
       val date = new Date(time * 1000)
       val now = new Date()
-      if (now.getTime - date.getTime > 60000) {
+      if (Math.abs(now.getTime - date.getTime) > _tokenDuration) {
         throw AuthenticationFailedException()
       }
       val message = Sha256Hash.hash(s"LWD: $time\n".getBytes(StandardCharsets.US_ASCII))
@@ -46,6 +47,13 @@ class AuthenticationService @Inject()(databaseService: DatabaseService, ecdsa: E
         ()
       })
     } asTwitter()
+  }
+
+  private val _tokenDuration = {
+    if (Server.configuration.hasPath("authentication.token_duration"))
+      Server.configuration.getInt("authentication.token_duration") * 1000
+    else
+      30000
   }
 
 }

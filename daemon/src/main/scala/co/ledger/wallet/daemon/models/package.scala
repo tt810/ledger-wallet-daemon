@@ -9,4 +9,17 @@ package object models {
                    @ApiModelProperty(value = "The number of wallet managed by the pool") wallet_count: Int
                  )
 
+  case class BitcoinLikeNetworkParams(
+
+                                )
+
+  case class Currency(
+                      bitcoin_like_network_params: Option[BitcoinLikeNetworkParams]
+                     )
+
+  case class Wallet(
+                    name: String,
+                    currency: Currency
+                   )
+
 }
