@@ -26,8 +26,20 @@ trait APIFeatureTest extends FeatureTest {
 
   }
 
+  def getPools(): Response = {
+    server.httpGet("/pools", headers = defaultHeaders)
+  }
+
+  def getPool(poolName: String): Response = {
+    server.httpGet(s"/pools/$poolName", headers = defaultHeaders)
+  }
+
   def createPool(poolName: String): Unit = {
     server.httpPost(s"/pools/$poolName", "", headers = defaultHeaders)
+  }
+
+  def deletePool(poolName: String): Unit = {
+    server.httpDelete(s"/pools/$poolName", "", headers = defaultHeaders)
   }
 
   private def lwdBasicAuthorisationHeader(seedName: String, time: Date = new Date()) = {
@@ -42,8 +54,7 @@ trait APIFeatureTest extends FeatureTest {
     )
   }
 
-  override protected def beforeAll(): Unit = {
-    super.beforeEach()
+  protected override def beforeAll(): Unit = {
     cleanup()
   }
 

@@ -6,9 +6,8 @@ import co.ledger.wallet.daemon.services.ECDSAService
 import co.ledger.wallet.daemon.utils.{FixturesUtils, HexUtils}
 import com.lambdaworks.codec.Base64
 import com.twitter.finagle.http.Status
-import com.twitter.finagle.http.Status._
 import com.twitter.finatra.http.EmbeddedHttpServer
-import com.twitter.inject.server.{EmbeddedTwitterServer, FeatureTest}
+import com.twitter.inject.server.{FeatureTest}
 import org.bitcoinj.core.Sha256Hash
 
 import scala.concurrent.Await

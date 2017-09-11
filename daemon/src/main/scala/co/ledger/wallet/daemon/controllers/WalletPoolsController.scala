@@ -11,12 +11,10 @@ import com.twitter.util.Future
 import co.ledger.wallet.daemon.utils._
 import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
 import co.ledger.wallet.daemon.services.PoolsService.PoolConfiguration
-import com.twitter.finatra.request.RouteParam
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class WalletPoolsController @Inject()(poolsService: PoolsService, poolConverter: PoolConverter) extends DocumentedController {
-  import WalletPoolsController._
 
   get("/pools") {(request: Request) =>
     poolsService.pools(request.user.get).asTwitter().flatMap({(pools) =>
