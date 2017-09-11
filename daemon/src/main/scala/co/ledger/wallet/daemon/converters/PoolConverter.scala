@@ -1,10 +1,9 @@
 package co.ledger.wallet.daemon.converters
 
-import javax.inject.{Inject, Singleton}
+import javax.inject.{Singleton}
 
 import co.ledger.core.WalletPool
 import co.ledger.wallet.daemon.models
-import co.ledger.wallet.daemon.services.PoolsService
 import com.twitter.util.Future
 import co.ledger.core.implicits._
 import co.ledger.wallet.daemon.utils._

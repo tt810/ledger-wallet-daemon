@@ -3,7 +3,7 @@ package co.ledger.wallet.daemon.database
 import javax.inject.{Inject, Singleton}
 
 import co.ledger.wallet.daemon.Server
-import co.ledger.wallet.daemon.services.{DatabaseService, ECDSAService, UsersService}
+import co.ledger.wallet.daemon.services.{ECDSAService, UsersService}
 import co.ledger.wallet.daemon.utils.HexUtils
 import org.bitcoinj.core.Sha256Hash
 import org.spongycastle.util.encoders.Base64
@@ -15,7 +15,6 @@ import scala.util.Try
 
 @Singleton
 class DatabaseInitializationRoutine @Inject()(usersService: UsersService, ecdsa: ECDSAService) {
-  import Server.profile.api._
 
   def perform(): Future[Unit] = {
     insertDemoUsers().flatMap(_ => insertWhitelistedUsers())

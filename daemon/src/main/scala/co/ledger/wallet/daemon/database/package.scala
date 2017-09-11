@@ -1,8 +1,5 @@
 package co.ledger.wallet.daemon
-import java.sql.{Date, Timestamp}
-import java.util.Date
-
-import slick.ast.Subquery.Default
+import java.sql.{Timestamp}
 import slick.lifted.ProvenShape
 import slick.sql.SqlProfile.ColumnOption.SqlType
 

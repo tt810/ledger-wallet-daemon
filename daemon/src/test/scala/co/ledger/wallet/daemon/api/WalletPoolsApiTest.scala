@@ -1,34 +1,33 @@
 package co.ledger.wallet.daemon.api
 
-import co.ledger.wallet.daemon.controllers.WalletPoolsController.WalletPoolResult
 import co.ledger.wallet.daemon.models
 import co.ledger.wallet.daemon.utils.APIFeatureTest
-import com.twitter.inject.server.{EmbeddedTwitterServer, FeatureTest}
 
 class WalletPoolsApiTest extends APIFeatureTest {
 
   test("WalletPools#Create and list single pool") {
-    server.httpPost("/pools/my_pool", "", headers = defaultHeaders)
-    val pools = parse[List[models.Pool]](server.httpGet("/pools", headers = defaultHeaders))
-    server.httpDelete("/pools/my_pool", "", headers = defaultHeaders)
+    createPool("my_pool")
+    val pools = parse[List[models.Pool]](getPools())
+    assert(pools.size == 1)
+    deletePool("my_pool")
   }
 
   test("WalletPools#Create and list multiple pool") {
-    server.httpPost("/pools/your_pool", "", headers = defaultHeaders)
-    server.httpPost("/pools/this_pool", "", headers = defaultHeaders)
-    val pools = parse[List[models.Pool]](server.httpGet("/pools", headers = defaultHeaders))
+    createPool("your_pool")
+    createPool("this_pool")
+    val pools = parse[List[models.Pool]](getPools())
     assert(pools.size == 2)
-    server.httpDelete("/pools/your_pool", "", headers = defaultHeaders)
-    server.httpDelete("/pools/this_pool", "", headers = defaultHeaders)
-    val pools2 = parse[List[models.Pool]](server.httpGet("/pools", headers = defaultHeaders))
+    deletePool("your_pool")
+    deletePool("this_pool")
+    val pools2 = parse[List[models.Pool]](getPools())
     assert(pools2.size == 0)
   }
 
   test("WalletPool#Get single pool") {
-    server.httpPost("/pools/anotha_pool", "", headers = defaultHeaders)
-    val pool = parse[models.Pool](server.httpGet("/pools/anotha_pool", headers = defaultHeaders))
+    createPool("anotha_pool")
+    val pool = parse[models.Pool](getPool("anotha_pool"))
     assert(pool.name == "anotha_pool")
-    server.httpDelete("/pools/anotha_pool", "", headers = defaultHeaders)
+    deletePool("anotha_pool")
   }
 
 }

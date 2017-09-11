@@ -4,12 +4,10 @@ import javax.inject.Inject
 
 import co.ledger.core.LedgerCore
 import co.ledger.wallet.daemon.services.DatabaseService
-import co.ledger.wallet.daemon.swagger.DocumentedController
 import com.jakehschwartz.finatra.swagger.SwaggerController
-import com.twitter.finagle.http.{Request, Response}
-import com.twitter.finatra.http.Controller
+import com.twitter.finagle.http.{Request}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
-import io.swagger.models.{SecurityRequirement, Swagger}
+import io.swagger.models.{Swagger}
 
 class StatusController @Inject()(db: DatabaseService, s: Swagger) extends SwaggerController {
   import StatusController._

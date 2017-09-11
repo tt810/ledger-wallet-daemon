@@ -12,8 +12,6 @@ import com.twitter.finatra.http.filters.CommonFilters
 import com.twitter.finatra.http.routing.HttpRouter
 import com.typesafe.config.ConfigFactory
 import djinni.NativeLibLoader
-import org.bitcoin.{NativeSecp256k1Util, Secp256k1Context}
-import org.slf4j.LoggerFactory
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
