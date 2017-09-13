@@ -1,14 +1,19 @@
 package co.ledger.wallet.daemon
 
+import co.ledger.core.WalletPool
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.fasterxml.jackson.annotation.JsonProperty
 import io.swagger.annotations.ApiModelProperty
+import co.ledger.core.{BitcoinLikeNetworkParameters, CurrencyUnit, Currency => CoreCurrency}
+import co.ledger.core.implicits._
 
 import scala.collection.JavaConverters._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 package object models {
 
-  def newInstance(coreCrcyNetworkPrms: co.ledger.core.BitcoinLikeNetworkParameters): BitcoinLikeNetworkParams =
+  def newInstance(coreCrcyNetworkPrms: BitcoinLikeNetworkParameters): BitcoinLikeNetworkParams =
     BitcoinLikeNetworkParams(
       coreCrcyNetworkPrms.getIdentifier,
       utils.HexUtils.valueOf(coreCrcyNetworkPrms.getP2PKHVersion),
@@ -20,7 +25,7 @@ package object models {
       coreCrcyNetworkPrms.getUsesTimestampedTransaction
     )
 
-  def newInstance(crCrcy: co.ledger.core.Currency): Currency =
+  def newInstance(crCrcy: CoreCurrency): Currency =
     Currency(
       crCrcy.getName,
       crCrcy.getWalletType.name,
@@ -30,7 +35,9 @@ package object models {
       newInstance(crCrcy.getBitcoinLikeNetworkParameters)
     )
 
-  def newInstance(coreCurrencyUnit: co.ledger.core.CurrencyUnit): Unit =
+  def newInstance(pool: WalletPool): Future[Pool] = pool.getWalletCount().map(models.Pool(pool.getName, _))
+
+  def newInstance(coreCurrencyUnit: CurrencyUnit): Unit =
     Unit(
       coreCurrencyUnit.getName,
       coreCurrencyUnit.getSymbol,
@@ -59,8 +66,8 @@ package object models {
                      )
 
   case class Pool(
-                 @ApiModelProperty(value = "Name of the pool") name: String,
-                 @ApiModelProperty(value = "The number of wallet managed by the pool") wallet_count: Int
+                 @JsonProperty("name") @ApiModelProperty(value = "Name of the pool") name: String,
+                 @JsonProperty("wallet_count") @ApiModelProperty(value = "The number of wallet managed by the pool") walletCount: Int
                  )
 
   case class Unit(
@@ -71,8 +78,11 @@ package object models {
                  )
 
   case class Wallet(
-                    name: String,
-                    currency: Currency
+                   @JsonProperty("name") name: String,
+                   @JsonProperty("account_count") accountCount: Int,
+                   @JsonProperty("balance") balance: Long,
+                   @JsonProperty("currency") currency: Currency
+                   //@JsonProperty("configuration") configuration: Map[String, Any]
                    )
 
 }
