@@ -1,10 +1,11 @@
-package co.ledger.wallet.daemon
+package co.ledger.wallet.daemon.modules
+
+import javax.inject.Singleton
 
 import com.google.inject.Provides
 import com.jakehschwartz.finatra.swagger.SwaggerModule
 import io.swagger.models.auth.BasicAuthDefinition
 import io.swagger.models.{Info, Swagger}
-import javax.inject.Singleton
 
 object ServerSwaggerModule extends SwaggerModule {
 
