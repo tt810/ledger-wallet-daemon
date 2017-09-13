@@ -1,6 +1,6 @@
 package co.ledger.wallet.daemon.api
 
-import co.ledger.wallet.daemon.models.{Currency, BitcoinLikeNetworkParams}
+import co.ledger.wallet.daemon.models.{Currency, BitcoinLikeNetworkParams, Unit => CurrencyUnit}
 import co.ledger.wallet.daemon.utils.APIFeatureTest
 import com.twitter.finagle.http.{Response, Status}
 
@@ -58,10 +58,10 @@ class CurrenciesApiTest extends APIFeatureTest {
     0,
     "bitcoin",
     List(
-      co.ledger.wallet.daemon.models.Unit("satoshi","satoshi","satoshi",0),
-      co.ledger.wallet.daemon.models.Unit("bitcoin", "BTC", "BTC", 8),
-      co.ledger.wallet.daemon.models.Unit("milli-bitcoin","mBTC", "mBTC", 5),
-      co.ledger.wallet.daemon.models.Unit("micro-bitcoin", "μBTC", "μBTC", 2),
+      CurrencyUnit("satoshi","satoshi","satoshi",0),
+      CurrencyUnit("bitcoin", "BTC", "BTC", 8),
+      CurrencyUnit("milli-bitcoin","mBTC", "mBTC", 5),
+      CurrencyUnit("micro-bitcoin", "μBTC", "μBTC", 2),
       ),
     BitcoinLikeNetworkParams("btc", "00", "05", "0488B21E", "PER_BYTE", 5430, "Bitcoin signed message:\n", false)
   )

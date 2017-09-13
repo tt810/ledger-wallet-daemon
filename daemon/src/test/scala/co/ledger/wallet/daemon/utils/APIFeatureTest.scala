@@ -7,7 +7,7 @@ import co.ledger.wallet.daemon.ServerImpl
 import co.ledger.wallet.daemon.libledger_core.filesystem.ScalaPathResolver
 import co.ledger.wallet.daemon.services.ECDSAService
 import com.lambdaworks.codec.Base64
-import com.twitter.finagle.http.Response
+import com.twitter.finagle.http.{Response, Status}
 import com.twitter.finatra.http.EmbeddedHttpServer
 import com.twitter.inject.server.FeatureTest
 import org.bitcoinj.core.Sha256Hash
@@ -27,14 +27,14 @@ trait APIFeatureTest extends FeatureTest {
   }
 
   def getPools(): Response = {
-    server.httpGet("/pools", headers = defaultHeaders)
+    server.httpGet("/pools", headers = defaultHeaders, andExpect = Status.Ok)
   }
 
   def getPool(poolName: String): Response = {
     server.httpGet(s"/pools/$poolName", headers = defaultHeaders)
   }
 
-  def createPool(poolName: String): Unit = {
+  def createPool(poolName: String): Response = {
     server.httpPost(s"/pools/$poolName", "", headers = defaultHeaders)
   }
 
