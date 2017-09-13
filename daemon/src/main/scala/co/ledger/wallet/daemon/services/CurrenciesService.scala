@@ -15,7 +15,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 @Singleton
 class CurrenciesService @Inject()(poolsService: PoolsService) {
-  import CurrenciesService._
 
   def currency(user: User, poolName: String, currencyName: String): Future[Currency] = {
     val coreCurrency = for {
@@ -31,7 +30,7 @@ class CurrenciesService @Inject()(poolsService: PoolsService) {
 
   }
 
-  def currencies(user: User, poolName: String): Future[List[Currency]] = {
+  def currencies(user: User, poolName: String): Future[Seq[Currency]] = {
     val currencies = for {
       pool <- poolsService.pool(user, poolName)
       coreCurrencies <- pool.getCurrencies()
@@ -42,8 +41,4 @@ class CurrenciesService @Inject()(poolsService: PoolsService) {
       case e: Throwable => throw new OtherCoreException(s"Other Exception $e.getMessage")
     } map(_.asScala.toList.map(newInstance(_)))
   }
-}
-
-object CurrenciesService {
-
 }
