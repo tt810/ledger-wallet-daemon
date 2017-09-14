@@ -6,8 +6,7 @@ import javax.inject.{Inject, Singleton}
 
 import co.ledger.wallet.daemon.Server
 import co.ledger.wallet.daemon.database.User
-import co.ledger.wallet.daemon.services.AuthenticationService.{AuthenticationFailedException, AuthentifiedUser, AuthentifiedUserContext}
-import co.ledger.wallet.daemon.utils.HexUtils
+import co.ledger.wallet.daemon.services.AuthenticationService.{AuthenticationFailedException, AuthentifiedUserContext}
 import com.twitter.finagle.http.Request
 import com.twitter.util.Future
 import org.bitcoinj.core.Sha256Hash
@@ -15,18 +14,14 @@ import org.bitcoinj.core.Sha256Hash
 import scala.concurrent.ExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.utils._
 
-import scala.concurrent.Await
-import scala.concurrent.duration.Duration
-
 @Singleton
 class AuthenticationService @Inject()(databaseService: DatabaseService, ecdsa: ECDSAService) {
-  import co.ledger.wallet.daemon.Server.profile.api._
   import co.ledger.wallet.daemon.services.AuthenticationService.AuthContextContext._
   import co.ledger.wallet.daemon.database._
 
   def authorize(request: Request): Future[Unit] = {
     databaseService.database flatMap {(db) =>
-      db.run(users.filter(_.pubKey === HexUtils.valueOf(request.authContext.pubKey)).result) map {(users) =>
+      db.run(getUsers(request.authContext.pubKey)) map { (users) =>
         if (users.isEmpty)
           throw AuthenticationFailedException()
         users.head

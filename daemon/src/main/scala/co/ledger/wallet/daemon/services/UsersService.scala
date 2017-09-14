@@ -2,7 +2,8 @@ package co.ledger.wallet.daemon.services
 
 import javax.inject.{Inject, Singleton}
 
-import co.ledger.wallet.daemon.database._
+import co.ledger.wallet.daemon.database
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
@@ -10,19 +11,11 @@ import scala.concurrent.Future
 class UsersService @Inject()(databaseService: DatabaseService) {
   import co.ledger.wallet.daemon.Server.profile.api._
 
-  def insertUser(publicKey: String, permissions: Long = 0): Future[Unit] = databaseService.database flatMap {(db) =>
-    db.run(insertNewUserActions(User(None, publicKey, permissions)))
-  } map {_ =>
-    ()
-  }
-
-  private def insertNewUserActions(user: User) = (
-    users.filter(_.pubKey === user.pubKey.bind).exists.result.flatMap {(exists) =>
-      if (!exists) {
-        users += user
-      } else {
-        DBIO.failed(new Exception(s"User ${user.pubKey} already exists"))
-      }
+  def insertUser(publicKey: String, permissions: Long = 0): Future[Unit] =
+    databaseService.database flatMap { (db) =>
+      db.run(database.insertUser(database.createUser(publicKey, permissions)).transactionally)
+    } map {_ =>
+      ()
     }
-  ).transactionally
+
 }

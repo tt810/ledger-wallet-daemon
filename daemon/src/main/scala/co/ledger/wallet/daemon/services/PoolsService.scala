@@ -1,12 +1,9 @@
 package co.ledger.wallet.daemon.services
 
-import java.sql.Timestamp
-import java.util.Date
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.{Inject, Singleton}
 
 import co.ledger.core.{DatabaseBackend, DynamicObject, WalletPool, WalletPoolBuilder}
-import co.ledger.wallet.daemon.database.{Pool, User}
 
 import scala.concurrent.Future
 import co.ledger.core.implicits._
@@ -20,7 +17,9 @@ import co.ledger.wallet.daemon.utils.HexUtils
 import org.bitcoinj.core.Sha256Hash
 import co.ledger.wallet.daemon.Server.profile.api._
 import co.ledger.wallet.daemon.database
+import co.ledger.wallet.daemon.database.{Pool, User}
 import co.ledger.wallet.daemon.exceptions.ResourceNotFoundException
+
 import scala.concurrent.ExecutionContext.Implicits.global
 
 @Singleton
@@ -31,18 +30,9 @@ class PoolsService @Inject()(databaseService: DatabaseService) {
 
   def createPool(user: User, poolName: String, configuration: PoolConfiguration): Future[WalletPool] = {
     implicit val ec = _writeContext
-    val newPool = Pool(0, poolName, new Timestamp(new Date().getTime), configuration.toString, "", "", user.id.get)
+    val newPool = database.createPool(poolName, user.id.get, configuration.toString)
     databaseService.database flatMap {(db) =>
-      val q = database.pools
-                      .filter(pool => pool.userId === user.id.get.bind && pool.name === poolName.bind)
-                      .exists.result flatMap {exists =>
-        if (!exists) {
-          database.pools += newPool
-        } else {
-          DBIO.failed(PoolAlreadyExistsException(poolName))
-        }
-      }
-      db.run(q.transactionally)
+      db.run(database.insertPool(newPool).transactionally)
     } flatMap {(_) =>
       buildPool(newPool)
     }
@@ -50,10 +40,7 @@ class PoolsService @Inject()(databaseService: DatabaseService) {
 
   def pools(user: User): Future[Seq[WalletPool]] = {
     databaseService.database flatMap {(db) =>
-      val q = for {
-        p <- database.pools if p.userId === user.id.get.bind
-      } yield p
-      db.run(q.result)
+      db.run(database.getPools(user.id.get))
     } flatMap {p =>
       Future.sequence(p.map(mapPool).toSeq)
     }
@@ -64,18 +51,19 @@ class PoolsService @Inject()(databaseService: DatabaseService) {
     if (p != null)
      p
     else
-      throw PoolNotFoundException(poolName)
+      throw ResourceNotFoundException(classOf[WalletPool], poolName)
   }
 
   def removePool(user: User, poolName: String): Future[Unit] = {
     implicit val ec = _writeContext
     pool(user, poolName) flatMap {(p) =>
       // p.release() TODO once WalletPool#release exists
-      _pools.remove(poolIdentifier(user.id.get, poolName))
-      val q = database.pools.filter(p => p.userId === user.id.get.bind && p.name === poolName.bind)
       databaseService.database flatMap {(db) =>
-        db.run(q.delete)
-      } map {(_) => ()}
+        db.run(database.deletePool(poolName, user.id.get))
+      } map {(_) =>
+        _pools.remove(poolIdentifier(user.id.get, poolName))
+        ()
+      }
     }
   }
 
@@ -84,7 +72,7 @@ class PoolsService @Inject()(databaseService: DatabaseService) {
     if (p != null)
       Future.successful(p)
     else
-      Future.failed(PoolNotFoundException(pool.name))
+      Future.failed(ResourceNotFoundException(classOf[WalletPool], pool.name))
   }
 
   private def poolIdentifier(pool: Pool): String = poolIdentifier(pool.userId, pool.name)
@@ -113,7 +101,7 @@ class PoolsService @Inject()(databaseService: DatabaseService) {
 
   def initialize(): Future[Unit] = {
     databaseService.database flatMap {(db) =>
-      db.run(database.pools.result).flatMap {(pools) =>
+      db.run(database.getPools).flatMap {(pools) =>
         Future.sequence(pools.map(buildPool))
       } map {_ =>
         ()
@@ -127,6 +115,5 @@ object PoolsService {
   case class PoolConfiguration() {
     override def toString: String = ""
   }
-  case class PoolAlreadyExistsException(poolName: String) extends Exception(s"Pool $poolName already exists")
-  case class PoolNotFoundException(poolName: String) extends ResourceNotFoundException(s"Pool '$poolName' doesn't exist")
+
 }

@@ -4,7 +4,7 @@ import co.ledger.wallet.daemon.controllers._
 import co.ledger.wallet.daemon.database.DatabaseInitializationRoutine
 import co.ledger.wallet.daemon.filters.{AuthenticationFilter, DemoUserAuthenticationFilter, LWDAutenticationFilter}
 import co.ledger.wallet.daemon.mappers.AuthenticationExceptionMapper
-import co.ledger.wallet.daemon.modules.{DefaultExceptionMapperModule, ServerSwaggerModule}
+import co.ledger.wallet.daemon.modules.ServerSwaggerModule
 import co.ledger.wallet.daemon.services.PoolsService
 import com.google.inject.Module
 import com.jakehschwartz.finatra.swagger.DocsController
@@ -41,7 +41,6 @@ class ServerImpl extends HttpServer {
   lazy val swagger = ServerSwaggerModule.swagger
 
   override protected def modules: Seq[Module] = Seq(
-    DefaultExceptionMapperModule,
     ServerSwaggerModule
   )
   override protected def configureHttp(router: HttpRouter): Unit =
@@ -69,6 +68,6 @@ class ServerImpl extends HttpServer {
         exitOnError(ex.getMessage)
     }
     val poolsService = injector.instance[PoolsService](classOf[PoolsService])
-    Await.result(poolsService.initialize(), 1.minute)
+    Await.result(poolsService.initialize(), Duration.Inf)
   }
 }

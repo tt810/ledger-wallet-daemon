@@ -1,8 +1,12 @@
 package co.ledger.wallet.daemon
 
+import scala.reflect.ClassTag
+
 package object exceptions {
 
-  class ResourceNotFoundException(message: String) extends Exception(message)
+  case class ResourceNotFoundException[T: ClassTag](resourceType: T, resourceName: String)
+    extends Exception(s"$resourceType $resourceName doesn't exist")
 
-  class OtherCoreException(message: String) extends Exception(message)
+  case class ResourceAlreadyExistException[T: ClassTag](resourceType: T, resourceName: String)
+    extends Exception(s"$resourceType $resourceName already exists")
 }
