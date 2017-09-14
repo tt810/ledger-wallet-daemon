@@ -2,16 +2,19 @@ package co.ledger.wallet.daemon.controllers
 
 import javax.inject.Inject
 
+import co.ledger.wallet.daemon.database.Pool
+import co.ledger.wallet.daemon.exceptions.{ResourceAlreadyExistException, ResourceNotFoundException}
 import co.ledger.wallet.daemon.{ErrorCode, ErrorResponseBody}
 import co.ledger.wallet.daemon.models._
 import co.ledger.wallet.daemon.services.PoolsService
 import co.ledger.wallet.daemon.swagger.DocumentedController
 import com.twitter.finagle.http.Request
 import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
-import co.ledger.wallet.daemon.services.PoolsService.{PoolAlreadyExistsException, PoolConfiguration, PoolNotFoundException}
+import co.ledger.wallet.daemon.services.PoolsService.PoolConfiguration
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.reflect.ClassTag
 
 class WalletPoolsController @Inject()(poolsService: PoolsService) extends DocumentedController {
 
@@ -35,7 +38,7 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Docume
   get("/pools/:pool_name") {(request: Request) =>
     val poolName = request.getParam("pool_name")
     poolsService.pool(request.user.get, poolName).flatMap(newInstance(_)).recover {
-      case pe: PoolNotFoundException => {
+      case pe: ResourceNotFoundException[ClassTag[Pool]] => {
         debug("Not Found", pe)
         response.notFound()
           .body(ErrorResponseBody(ErrorCode.Not_Found, s"$poolName is not a pool"))
@@ -56,7 +59,7 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Docume
       pool = newInstance(walletPool)
     ) yield pool
     modelPool.flatten.recover {
-      case alreadyExist: PoolAlreadyExistsException => {
+      case alreadyExist: ResourceAlreadyExistException[ClassTag[Pool]] => {
         debug("Duplicate request", alreadyExist)
         response.ok()
           .body(ErrorResponseBody(ErrorCode.Duplicate_Request, s"Attempt creating $poolName request is ignored"))
@@ -72,7 +75,7 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Docume
   delete("/pools/:pool_name") {(request: Request) =>
     val poolName = request.getParam("pool_name")
     poolsService.removePool(request.user.get, poolName).recover {
-      case pe: PoolNotFoundException => {
+      case pe: ResourceNotFoundException[ClassTag[Pool]] => {
         debug("Not Found", pe)
         response.notFound()
           .body(ErrorResponseBody(ErrorCode.Invalid_Request, s"Attempt deleting $poolName request is ignored"))

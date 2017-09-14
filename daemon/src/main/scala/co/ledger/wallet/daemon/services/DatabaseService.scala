@@ -1,10 +1,9 @@
 package co.ledger.wallet.daemon.services
 
-import java.sql.Timestamp
-import java.util.Date
-import java.util.concurrent.{ExecutorService, Executors}
+import java.util.concurrent.Executors
 import javax.inject.Singleton
 
+import co.ledger.wallet.daemon.database.DBMigrations._
 import co.ledger.wallet.daemon.Server
 import co.ledger.wallet.daemon.Server.profile
 import co.ledger.wallet.daemon.async.SerialExecutionContext
@@ -27,10 +26,8 @@ class DatabaseService {
 
   private def migrate(db: profile.api.Database) = {
     // Fetch database version
-    db.run(databaseVersions.sortBy(_.version.desc).map(_.version).take(1).result) map { (result) =>
-      result.head
-    } recover {
-      case all => -1
+    db.run(getLastMigrationVersion) recover {
+      case _ => -1
     } flatMap { (currentVersion) =>
       val maxVersion = Migrations.keys.toArray.sortWith(_ > _).head
 
@@ -38,11 +35,8 @@ class DatabaseService {
         if (version > maxVersion)
           Future.successful()
         else {
-          val script = DBIO.seq(
-            Migrations(version),
-            databaseVersions += (version, new Timestamp(new Date().getTime))
-          )
-          db.run(script.transactionally) map { (_) =>
+          val migrationQ = DBIO.seq(Migrations(version),insertDatabaseVersion(version))
+          db.run(migrationQ.transactionally) map { (_) =>
             migrate(version + 1)
           }
         }

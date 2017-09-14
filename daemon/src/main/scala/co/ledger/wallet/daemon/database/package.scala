@@ -1,7 +1,13 @@
 package co.ledger.wallet.daemon
-import java.sql.{Timestamp}
+import java.sql.Timestamp
+import java.util.Date
+
+import co.ledger.wallet.daemon.exceptions.ResourceAlreadyExistException
+import co.ledger.wallet.daemon.utils.HexUtils
 import slick.lifted.ProvenShape
 import slick.sql.SqlProfile.ColumnOption.SqlType
+
+import scala.concurrent.ExecutionContext.Implicits.global
 
 package object database {
 
@@ -40,10 +46,69 @@ package object database {
   }
   val pools = TableQuery[Pools]
 
-  val Migrations = Map(
-    0 -> DBIO.seq(
-      (users.schema ++ pools.schema ++ databaseVersions.schema).create
-    )
-  )
+  def createPool(poolName: String, userId: Long, configuration: String): Pool =
+    Pool(0, poolName, new Timestamp(new Date().getTime), configuration, "", "", userId)
+
+  def createUser(publicKey: String, permissions: Long): User =
+    User(None, publicKey, permissions)
+
+  def deletePool(poolName: String, userId: Long): DBIO[Int] = {
+    filterPool(poolName, userId).delete
+  }
+
+  def getLastMigrationVersion(): DBIO[Int] =
+    databaseVersions.sortBy(_.version.desc).map(_.version).take(1).result.head
+
+  def getPools: DBIO[Seq[Pool]] =
+    pools.result
+
+  def getPools(userId: Long): DBIO[Seq[Pool]] = {
+    val query = for {
+      p <- database.pools if p.userId === userId.bind
+    } yield p
+    query.result
+  }
+
+  def getUsers(targetPubKey: Array[Byte]): DBIO[Seq[User]] =
+    users.filter(_.pubKey === HexUtils.valueOf(targetPubKey)).result
+
+  def insertDatabaseVersion(version: Int): DBIO[Int] =
+    databaseVersions += (version, new Timestamp(new Date().getTime))
+
+  /**
+    * Insert pool if not exists, throw <code>ResourceAlreadyExistException</code> otherwise.
+    *
+    * @param newPool The new pool instance.
+    * @throws ResourceAlreadyExistException If the given pool name and user id are already taken.
+    */
+  def insertPool(newPool: Pool): DBIO[Int] = {
+    filterPool(newPool.name, newPool.userId).exists.result.flatMap { exists =>
+      if (!exists) {
+        pools += newPool
+      } else {
+        DBIO.failed(ResourceAlreadyExistException(classOf[Pool], newPool.name))
+      }
+    }
+  }
+
+  /**
+    * Insert user if not exists, throw <code>ResourceAlreadyExistException</code> otherwise.
+    *
+    * @param newUser The new user instance.
+    * @return ResourceAlreadyExistException If the given user pubKey already exists.
+    */
+  def insertUser(newUser: User): DBIO[Int] = {
+    users.filter(_.pubKey === newUser.pubKey.bind).exists.result.flatMap {(exists) =>
+      if (!exists) {
+        users += newUser
+      } else {
+        DBIO.failed(ResourceAlreadyExistException(classOf[User], newUser.pubKey))
+      }
+    }
+  }
+
+  private def filterPool(poolName: String, userId: Long) = {
+    pools.filter(pool => pool.userId === userId.bind && pool.name === poolName.bind)
+  }
 
 }
