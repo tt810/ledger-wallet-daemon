@@ -31,14 +31,18 @@ trait APIFeatureTest extends FeatureTest {
   }
 
   def getPool(poolName: String): Response = {
-    server.httpGet(s"/pools/$poolName", headers = defaultHeaders)
+    getPool(poolName, Status.Ok)
+  }
+
+  def getPool(poolName: String, expected: Status): Response = {
+    server.httpGet(s"/pools/$poolName", headers = defaultHeaders, andExpect = expected)
   }
 
   def createPool(poolName: String): Response = {
-    server.httpPost(s"/pools/$poolName", "", headers = defaultHeaders)
+    server.httpPost(s"/pools/$poolName", "", headers = defaultHeaders, andExpect = Status.Ok)
   }
 
-  def deletePool(poolName: String): Unit = {
+  def deletePool(poolName: String): Response = {
     server.httpDelete(s"/pools/$poolName", "", headers = defaultHeaders)
   }
 
