@@ -2,12 +2,13 @@ package co.ledger.wallet.daemon.controllers
 
 import javax.inject.Inject
 
+import co.ledger.wallet.daemon.{ErrorCode, ErrorResponseBody}
 import co.ledger.wallet.daemon.models._
 import co.ledger.wallet.daemon.services.PoolsService
 import co.ledger.wallet.daemon.swagger.DocumentedController
 import com.twitter.finagle.http.Request
 import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
-import co.ledger.wallet.daemon.services.PoolsService.PoolConfiguration
+import co.ledger.wallet.daemon.services.PoolsService.{PoolAlreadyExistsException, PoolConfiguration, PoolNotFoundException}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -22,27 +23,66 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Docume
           pool <- newInstance(walletPool)
         ) yield pool
       }) yield Future.sequence(pools)
-    modelPools.flatten
+    modelPools.flatten.recover {
+      case e: Throwable => {
+        error("Internal error", e)
+        response.ok()
+          .body(ErrorResponseBody(ErrorCode.Internal_Error, "Problem occurred when processing the request, check with developers"))
+      }
+    }
   }
 
   get("/pools/:pool_name") {(request: Request) =>
     val poolName = request.getParam("pool_name")
-    poolsService.pool(request.user.get, poolName).flatMap(newInstance(_))
+    poolsService.pool(request.user.get, poolName).flatMap(newInstance(_)).recover {
+      case pe: PoolNotFoundException => {
+        debug("Not Found", pe)
+        response.notFound()
+          .body(ErrorResponseBody(ErrorCode.Not_Found, s"$poolName is not a pool"))
+      }
+      case e: Throwable => {
+        error("Internal error", e)
+        response.ok()
+          .body(ErrorResponseBody(ErrorCode.Internal_Error, "Problem occurred when processing the request, check with developers"))
+      }
+    }
   }
 
-  post("/pools/:pool_name") {(request: Request) =>
+  post("/pools/:pool_name") { (request: Request) =>
     val poolName = request.getParam("pool_name")
-    val configuration = PoolConfiguration() // TODO: Deserialize the configuration from the body of the request
     val modelPool = for (
-      walletPool <- poolsService.createPool(request.user.get, poolName, configuration);
+    // TODO: Deserialize the configuration from the body of the request
+      walletPool <- poolsService.createPool(request.user.get, poolName, PoolConfiguration());
       pool = newInstance(walletPool)
     ) yield pool
-    modelPool.flatten
+    modelPool.flatten.recover {
+      case alreadyExist: PoolAlreadyExistsException => {
+        debug("Duplicate request", alreadyExist)
+        response.ok()
+          .body(ErrorResponseBody(ErrorCode.Duplicate_Request, s"Attempt creating $poolName request is ignored"))
+      }
+      case e: Throwable => {
+        error("Internal error", e)
+        response.ok()
+          .body(ErrorResponseBody(ErrorCode.Internal_Error, "Problem occurred when processing the request, check with developers"))
+      }
+    }
   }
 
   delete("/pools/:pool_name") {(request: Request) =>
     val poolName = request.getParam("pool_name")
-    poolsService.removePool(request.user.get, poolName)
+    poolsService.removePool(request.user.get, poolName).recover {
+      case pe: PoolNotFoundException => {
+        debug("Not Found", pe)
+        response.notFound()
+          .body(ErrorResponseBody(ErrorCode.Invalid_Request, s"Attempt deleting $poolName request is ignored"))
+      }
+      case e: Throwable => {
+        error("Internal error", e)
+        response.ok()
+          .body(ErrorResponseBody(ErrorCode.Internal_Error, "Problem occurred when processing the request, check with developers"))
+      }
+    }
   }
 
 }

@@ -1,6 +1,7 @@
 package co.ledger.wallet.daemon.api
 
-import co.ledger.wallet.daemon.models.{Currency, BitcoinLikeNetworkParams, Unit => CurrencyUnit}
+import co.ledger.wallet.daemon.{ErrorCode, ErrorResponseBody}
+import co.ledger.wallet.daemon.models.{BitcoinLikeNetworkParams, Currency, Unit => CurrencyUnit}
 import co.ledger.wallet.daemon.utils.APIFeatureTest
 import com.twitter.finagle.http.{Response, Status}
 
@@ -13,11 +14,15 @@ class CurrenciesApiTest extends APIFeatureTest {
   }
 
   test("CurrenciesApi#Get currency from non-existing pool returns bad request") {
-    assertCurrency(CURRENCY_NON_EXIST_POOL, CURRENCY_BTC, Status.BadRequest)
+    assert(server.mapper.objectMapper.readValue[ErrorResponseBody](
+      assertCurrency(CURRENCY_NON_EXIST_POOL, CURRENCY_BTC, Status.BadRequest).contentString)
+      == ErrorResponseBody(ErrorCode.Invalid_Request,"non_exist_pool is not a pool"))
   }
 
   test("CurrenciesApi#Get non-supported currency from existing pool returns currency not found") {
-    assertCurrency(CURRENCY_POOL, CURRENCY_NON_EXIST, Status.NotFound)
+    assert(server.mapper.objectMapper.readValue[ErrorResponseBody](
+    assertCurrency(CURRENCY_POOL, CURRENCY_NON_EXIST, Status.NotFound).contentString)
+      == ErrorResponseBody(ErrorCode.Not_Found, s"$CURRENCY_NON_EXIST is not a currency"))
   }
 
   test("CurrenciesApi#Get currencies returns all") {
@@ -27,7 +32,9 @@ class CurrenciesApiTest extends APIFeatureTest {
   }
 
   test("CurrenciesApi#Get currencies from non-existing pool returns bad request") {
-    assertCurrencies(CURRENCY_NON_EXIST_POOL, Status.BadRequest)
+    assert(server.mapper.objectMapper.readValue[ErrorResponseBody](
+      assertCurrencies(CURRENCY_NON_EXIST_POOL, Status.BadRequest).contentString)
+      == ErrorResponseBody(ErrorCode.Invalid_Request,"non_exist_pool is not a pool"))
   }
 
   private def assertCurrency(poolName: String, currencyName: String, expected: Status): Response = {
