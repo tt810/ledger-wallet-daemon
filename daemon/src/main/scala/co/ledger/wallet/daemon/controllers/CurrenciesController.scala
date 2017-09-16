@@ -22,7 +22,7 @@ class CurrenciesController @Inject() (currenciesService: CurrenciesService) exte
     val poolName = request.pool_name
     val currencyName = request.currency_name
     currenciesService.currency(request.user, poolName, currencyName).recover {
-      case pnfe: ResourceNotFoundException[ClassTag[Pool]] => {
+      case pnfe: ResourceNotFoundException[ClassTag[Pool] @unchecked] => {
         debug("Not Found", pnfe)
         response.badRequest()
           .body(ErrorResponseBody(ErrorCode.Invalid_Request, s"$poolName is not a pool"))
@@ -43,7 +43,7 @@ class CurrenciesController @Inject() (currenciesService: CurrenciesService) exte
   get("/pools/:pool_name/currencies") {request: GetCurrenciesRequest =>
     val poolName = request.pool_name
     currenciesService.currencies(request.user, poolName).recover {
-      case pnfe: ResourceNotFoundException[ClassTag[Pool]] => {
+      case pnfe: ResourceNotFoundException[ClassTag[Pool] @unchecked] => {
         debug("Not Found", pnfe)
         response.badRequest()
           .body(ErrorResponseBody(ErrorCode.Invalid_Request, s"$poolName is not a pool"))
