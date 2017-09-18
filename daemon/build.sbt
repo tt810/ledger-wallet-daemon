@@ -1,14 +1,12 @@
 name := "daemon"
 
-enablePlugins(JavaServerAppPackaging)
-
 concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
 parallelExecution in Test := false
 parallelExecution in IntegrationTest := false
 testForkedParallel in Test := false
 testForkedParallel in IntegrationTest := false
 
-lazy val versions = new {
+val versions = new {
   val finatra = "2.12.0"
   val guice = "4.0"
   val logback = "1.1.7"
@@ -21,7 +19,7 @@ libraryDependencies ++= Seq(
 
   "org.postgresql" % "postgresql" % "9.3-1100-jdbc4",
   "org.xerial" % "sqlite-jdbc" % "3.7.15-M1",
-  "com.h2database" % "h2" % "1.3.166",
+  "com.h2database" % "h2" % "1.4.192",
 
   "ch.qos.logback" % "logback-classic" % "1.0.9",
 

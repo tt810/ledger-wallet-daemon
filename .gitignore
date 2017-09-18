@@ -18,5 +18,5 @@ project/plugins/project/
 .idea/
 .DS_Store
 
-database.db
+*.db
 *.log
