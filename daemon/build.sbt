@@ -16,17 +16,12 @@ parallelExecution in IntegrationTest := false
 testForkedParallel in Test := false
 testForkedParallel in IntegrationTest := false
 
-lazy val versions = new {
+val versions = new {
   val finatra = "2.12.0"
   val guice = "4.0"
   val logback = "1.1.7"
   val slick = "3.2.1"
 }
-
-resolvers += "maxaf-releases" at s"https://repo.bumnetworks.com/releases/"
-resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/releases/"
-resolvers += Resolver.sonatypeRepo("snapshots")
-resolvers +=  Resolver.sonatypeRepo("releases")
 
 libraryDependencies ++= Seq(
   "com.typesafe.slick" %% "slick" % versions.slick,
@@ -37,7 +32,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.slick" %% "slick-hikaricp" % versions.slick,
   "com.twitter" %% "finatra-http" % versions.finatra,
   "org.bitcoinj" % "bitcoinj-core" % "0.14.4",
-  "io.github.andrebeat" %% "scala-pool" % "0.5.0-SNAPSHOT",
+  "io.github.andrebeat" %% "scala-pool" % "0.4.0",
 
   "com.twitter" %% "finatra-http" % versions.finatra % "test",
   "com.twitter" %% "finatra-jackson" % versions.finatra % "test",
