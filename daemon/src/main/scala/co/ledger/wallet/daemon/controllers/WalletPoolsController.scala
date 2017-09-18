@@ -7,16 +7,16 @@ import co.ledger.wallet.daemon.exceptions.{ResourceAlreadyExistException, Resour
 import co.ledger.wallet.daemon.{ErrorCode, ErrorResponseBody}
 import co.ledger.wallet.daemon.models._
 import co.ledger.wallet.daemon.services.PoolsService
-import co.ledger.wallet.daemon.swagger.DocumentedController
 import com.twitter.finagle.http.Request
 import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
 import co.ledger.wallet.daemon.services.PoolsService.PoolConfiguration
+import com.twitter.finatra.http.Controller
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.reflect.ClassTag
 
-class WalletPoolsController @Inject()(poolsService: PoolsService) extends DocumentedController {
+class WalletPoolsController @Inject()(poolsService: PoolsService) extends Controller {
 
   get("/pools") {(request: Request) =>
     val modelPools  = for (

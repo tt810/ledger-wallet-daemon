@@ -7,15 +7,15 @@ import co.ledger.wallet.daemon.database.Pool
 import co.ledger.wallet.daemon.exceptions.ResourceNotFoundException
 import co.ledger.wallet.daemon.{ErrorCode, ErrorResponseBody}
 import co.ledger.wallet.daemon.services.CurrenciesService
-import co.ledger.wallet.daemon.swagger.DocumentedController
 import co.ledger.wallet.daemon.utils.RichRequest
 import com.twitter.finagle.http.Request
+import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.RouteParam
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.reflect.ClassTag
 
-class CurrenciesController @Inject() (currenciesService: CurrenciesService) extends DocumentedController {
+class CurrenciesController @Inject() (currenciesService: CurrenciesService) extends Controller {
   import CurrenciesController._
 
   get("/pools/:pool_name/currencies/:currency_name") { request: GetCurrencyRequest =>

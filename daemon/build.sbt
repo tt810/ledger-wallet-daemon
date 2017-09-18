@@ -54,4 +54,4 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" %  "3.0.0" % "test",
   "org.specs2" %% "specs2-mock" % "2.4.17" % "test"
 )
-libraryDependencies += "com.jakehschwartz" %% "finatra-swagger" % versions.finatra
+//libraryDependencies += "com.jakehschwartz" %% "finatra-swagger" % versions.finatra

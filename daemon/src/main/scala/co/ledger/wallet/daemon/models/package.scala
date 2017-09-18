@@ -3,7 +3,6 @@ package co.ledger.wallet.daemon
 import co.ledger.core.WalletPool
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.fasterxml.jackson.annotation.JsonProperty
-import io.swagger.annotations.ApiModelProperty
 import co.ledger.core.{BitcoinLikeNetworkParameters, CurrencyUnit, Currency => CoreCurrency}
 import co.ledger.core.implicits._
 
@@ -66,8 +65,8 @@ package object models {
                      )
 
   case class Pool(
-                 @JsonProperty("name") @ApiModelProperty(value = "Name of the pool") name: String,
-                 @JsonProperty("wallet_count") @ApiModelProperty(value = "The number of wallet managed by the pool") walletCount: Int
+                 @JsonProperty("name") name: String,
+                 @JsonProperty("wallet_count") walletCount: Int
                  )
 
   case class Unit(
