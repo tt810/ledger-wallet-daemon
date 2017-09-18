@@ -13,14 +13,6 @@ lazy val root = (project in file("."))
 lazy val binding = (project in file("ledger-core-binding"))
   .settings(commonSettings)
 
-lazy val flyway = (project in file("flyway"))
-  .settings(commonSettings)
-  .enablePlugins(FlywayPlugin)
-
-lazy val slick = (project in file("slick"))
-  .settings(commonSettings)
-  .dependsOn(daemon)
-
 lazy val daemon = (project in file("daemon"))
   .settings(commonSettings)
   .enablePlugins(JavaServerAppPackaging)
