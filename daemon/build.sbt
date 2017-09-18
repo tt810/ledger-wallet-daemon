@@ -1,3 +1,6 @@
+import slick.codegen.SourceCodeGenerator
+import slick.{ model => m }
+
 name := "daemon"
 
 concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
@@ -5,6 +8,18 @@ parallelExecution in Test := false
 parallelExecution in IntegrationTest := false
 testForkedParallel in Test := false
 testForkedParallel in IntegrationTest := false
+
+
+slickCodegenSettings
+slickCodegenDatabaseUrl := "jdbc:h2:./test"
+slickCodegenDatabaseUser := "SA"
+slickCodegenDatabasePassword := ""
+slickCodegenDriver := slick.driver.H2Driver
+slickCodegenJdbcDriver := "org.h2.Driver"
+slickCodegenOutputPackage := "co.ledger.wallet.daemon.database.slick"
+slickCodegenExcludedTables := Seq("schema_version")
+slickCodegenCodeGenerator := { (model: m.Model) => new SourceCodeGenerator(model) }
+sourceGenerators in Compile += slickCodegen.taskValue
 
 val versions = new {
   val finatra = "2.12.0"
@@ -16,6 +31,7 @@ val versions = new {
 libraryDependencies ++= Seq(
   "com.typesafe.slick" %% "slick" % versions.slick,
   "com.typesafe.slick" %% "slick-hikaricp" % versions.slick,
+  "com.zaxxer" % "HikariCP" % "2.6.1",
 
   "org.postgresql" % "postgresql" % "9.3-1100-jdbc4",
   "org.xerial" % "sqlite-jdbc" % "3.7.15-M1",

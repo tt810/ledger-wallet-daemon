@@ -4,6 +4,7 @@ import co.ledger.wallet.daemon.controllers._
 import co.ledger.wallet.daemon.database.DatabaseInitializationRoutine
 import co.ledger.wallet.daemon.filters.{AuthenticationFilter, DemoUserAuthenticationFilter, LWDAutenticationFilter}
 import co.ledger.wallet.daemon.mappers.AuthenticationExceptionMapper
+import co.ledger.wallet.daemon.modules.{ConfigurationModule, DatabaseModule}
 import co.ledger.wallet.daemon.services.PoolsService
 import com.twitter.finatra.http.HttpServer
 import com.twitter.finatra.http.filters.CommonFilters
@@ -21,7 +22,7 @@ object Server extends ServerImpl {
 }
 
 class ServerImpl extends HttpServer {
-  lazy val configuration = ConfigFactory.load()
+  val configuration = ConfigFactory.load()
   val profileName = Try(configuration.getString("database_engine")).toOption.getOrElse("sqlite3")
   val profile = {
     profileName match {
@@ -34,6 +35,11 @@ class ServerImpl extends HttpServer {
       case others => throw new Exception(s"Unknown database backend $others")
     }
   }
+
+  override val modules = Seq(
+    ConfigurationModule,
+    DatabaseModule
+  )
 
   override protected def configureHttp(router: HttpRouter): Unit =
     router

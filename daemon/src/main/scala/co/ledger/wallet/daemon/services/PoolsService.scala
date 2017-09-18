@@ -30,6 +30,7 @@ class PoolsService @Inject()(databaseService: DatabaseService) {
 
   def createPool(user: User, poolName: String, configuration: PoolConfiguration): Future[WalletPool] = {
     implicit val ec = _writeContext
+
     val newPool = database.createPool(poolName, user.id.get, configuration.toString)
     databaseService.database flatMap {(db) =>
       db.run(database.insertPool(newPool).transactionally)

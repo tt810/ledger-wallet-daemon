@@ -7,6 +7,7 @@ import co.ledger.wallet.daemon.database.DBMigrations._
 import co.ledger.wallet.daemon.Server
 import co.ledger.wallet.daemon.Server.profile
 import co.ledger.wallet.daemon.async.SerialExecutionContext
+import co.ledger.wallet.daemon.modules.{ConfigurationModule, DatabaseModule}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -18,7 +19,7 @@ class DatabaseService {
 
   def database: Future[profile.api.Database] = _conn
 
-  private val _conn = migrate(Database.forConfig(Server.profileName)).recover {
+  private val _conn = migrate(DatabaseModule.database(ConfigurationModule.configuration)).recover {
     case all: Throwable =>
       all.printStackTrace()
       throw all
