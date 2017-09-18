@@ -4,10 +4,7 @@ import co.ledger.wallet.daemon.controllers._
 import co.ledger.wallet.daemon.database.DatabaseInitializationRoutine
 import co.ledger.wallet.daemon.filters.{AuthenticationFilter, DemoUserAuthenticationFilter, LWDAutenticationFilter}
 import co.ledger.wallet.daemon.mappers.AuthenticationExceptionMapper
-import co.ledger.wallet.daemon.modules.ServerSwaggerModule
 import co.ledger.wallet.daemon.services.PoolsService
-import com.google.inject.Module
-import com.jakehschwartz.finatra.swagger.DocsController
 import com.twitter.finatra.http.HttpServer
 import com.twitter.finatra.http.filters.CommonFilters
 import com.twitter.finatra.http.routing.HttpRouter
@@ -38,11 +35,6 @@ class ServerImpl extends HttpServer {
     }
   }
 
-  lazy val swagger = ServerSwaggerModule.swagger
-
-  override protected def modules: Seq[Module] = Seq(
-    ServerSwaggerModule
-  )
   override protected def configureHttp(router: HttpRouter): Unit =
     router
           .filter[CommonFilters]
@@ -53,7 +45,6 @@ class ServerImpl extends HttpServer {
           .add[AuthenticationFilter, StatusController]
           .add[AuthenticationFilter, WalletPoolsController]
           .add[AuthenticationFilter, WalletsController]
-          .add[DocsController]
           .exceptionMapper[AuthenticationExceptionMapper]
 
   override protected def warmup(): Unit = {

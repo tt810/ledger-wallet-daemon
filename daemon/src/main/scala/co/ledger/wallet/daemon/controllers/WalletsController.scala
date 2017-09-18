@@ -3,12 +3,12 @@ package co.ledger.wallet.daemon.controllers
 import javax.inject.Inject
 
 import co.ledger.wallet.daemon.services.WalletsService
-import co.ledger.wallet.daemon.swagger.DocumentedController
 import co.ledger.wallet.daemon.utils.RichRequest
 import com.twitter.finagle.http.Request
+import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.{QueryParam, RouteParam}
 
-class WalletsController @Inject()(walletsService: WalletsService) extends DocumentedController {
+class WalletsController @Inject()(walletsService: WalletsService) extends Controller {
   import WalletsController._
 
   get("/pools/:pool_name/wallets") {(request: GetWalletsRequest) =>
