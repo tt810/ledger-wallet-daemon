@@ -1,13 +1,14 @@
 package co.ledger.wallet.daemon.services
 
 import java.util.concurrent.ConcurrentHashMap
-import javax.inject.{Inject, Singleton}
+import javax.inject.Singleton
 
 import co.ledger.core.{DatabaseBackend, DynamicObject, WalletPool, WalletPoolBuilder}
 
 import scala.concurrent.Future
 import co.ledger.core.implicits._
 import co.ledger.wallet.daemon.async.SerialExecutionContext
+import co.ledger.wallet.daemon.database.{Pool, User}
 import co.ledger.wallet.daemon.libledger_core.async.ScalaThreadDispatcher
 import co.ledger.wallet.daemon.libledger_core.crypto.SecureRandomRNG
 import co.ledger.wallet.daemon.libledger_core.debug.NoOpLogPrinter
@@ -15,35 +16,27 @@ import co.ledger.wallet.daemon.libledger_core.filesystem.ScalaPathResolver
 import co.ledger.wallet.daemon.libledger_core.net.{ScalaHttpClient, ScalaWebSocketClient}
 import co.ledger.wallet.daemon.utils.HexUtils
 import org.bitcoinj.core.Sha256Hash
-import co.ledger.wallet.daemon.Server.profile.api._
-import co.ledger.wallet.daemon.database
-import co.ledger.wallet.daemon.database.{Pool, User}
 import co.ledger.wallet.daemon.exceptions.ResourceNotFoundException
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
 @Singleton
-class PoolsService @Inject()(databaseService: DatabaseService) {
+class PoolsService {
   import PoolsService._
   private val _writeContext = SerialExecutionContext.newInstance()
   private val _readContext = scala.concurrent.ExecutionContext.Implicits.global
+  private val dbDao = DatabaseService.dbDao
 
   def createPool(user: User, poolName: String, configuration: PoolConfiguration): Future[WalletPool] = {
     implicit val ec = _writeContext
-    val newPool = database.createPool(poolName, user.id.get, configuration.toString)
-    databaseService.database flatMap {(db) =>
-      db.run(database.insertPool(newPool).transactionally)
-    } flatMap {(_) =>
-      buildPool(newPool)
+    val newPool = Pool(poolName, user.id.get, configuration.toString)
+    dbDao.insertPool(newPool).flatMap { (_) =>
+        buildPool(newPool)
     }
   }
 
   def pools(user: User): Future[Seq[WalletPool]] = {
-    databaseService.database flatMap {(db) =>
-      db.run(database.getPools(user.id.get))
-    } flatMap {p =>
-      Future.sequence(p.map(mapPool).toSeq)
-    }
+    dbDao.getPools(user.id.get).flatMap(p => Future.sequence(p.map(mapPool).toSeq))
   }
 
   def pool(user: User, poolName: String): Future[WalletPool] = Future {
@@ -58,9 +51,7 @@ class PoolsService @Inject()(databaseService: DatabaseService) {
     implicit val ec = _writeContext
     pool(user, poolName) flatMap {(p) =>
       // p.release() TODO once WalletPool#release exists
-      databaseService.database flatMap {(db) =>
-        db.run(database.deletePool(poolName, user.id.get))
-      } map {(_) =>
+      dbDao.deletePool(poolName, user.id.get) map {(_) =>
         _pools.remove(poolIdentifier(user.id.get, poolName))
         ()
       }
@@ -99,14 +90,8 @@ class PoolsService @Inject()(databaseService: DatabaseService) {
 
   private val _pools = new ConcurrentHashMap[String, WalletPool]()
 
-  def initialize(): Future[Unit] = {
-    databaseService.database flatMap {(db) =>
-      db.run(database.getPools).flatMap {(pools) =>
-        Future.sequence(pools.map(buildPool))
-      } map {_ =>
-        ()
-      }
-    }
+  def initialize(): Unit = {
+    dbDao.getPools.map(pools => pools.map(buildPool))
   }
 }
 

@@ -8,32 +8,13 @@ import co.ledger.wallet.daemon.services.PoolsService
 import com.twitter.finatra.http.HttpServer
 import com.twitter.finatra.http.filters.CommonFilters
 import com.twitter.finatra.http.routing.HttpRouter
-import com.typesafe.config.ConfigFactory
 import djinni.NativeLibLoader
-
-import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
 
 object Server extends ServerImpl {
 
 }
 
 class ServerImpl extends HttpServer {
-  lazy val configuration = ConfigFactory.load()
-  val profileName = Try(configuration.getString("database_engine")).toOption.getOrElse("sqlite3")
-  val profile = {
-    profileName match {
-      case "sqlite3" =>
-        slick.jdbc.SQLiteProfile
-      case "postgres" =>
-        slick.jdbc.PostgresProfile
-      case "h2mem1" =>
-        slick.jdbc.H2Profile
-      case others => throw new Exception(s"Unknown database backend $others")
-    }
-  }
 
   override protected def configureHttp(router: HttpRouter): Unit =
     router
@@ -50,15 +31,16 @@ class ServerImpl extends HttpServer {
   override protected def warmup(): Unit = {
     super.warmup()
     NativeLibLoader.loadLibs()
-    injector.instance[DatabaseInitializationRoutine](classOf[DatabaseInitializationRoutine]).perform() onComplete {
-      case Success(_) =>
-        info("Database initialized with routine successfully")
-      case Failure(ex) =>
-        error("Unable to perform database routine")
-        error(ex)
-        exitOnError(ex.getMessage)
+    try {
+      info("Initializing database, start to insert users.....")
+      injector.instance[DatabaseInitializationRoutine](classOf[DatabaseInitializationRoutine]).perform()
+      info("Finished inserting users....., start to obtain pools......")
+      val poolsService = injector.instance[PoolsService](classOf[PoolsService])
+      poolsService.initialize()
+      info("Finished obtaining pools.....")
+    } catch {
+      case _: Throwable => exitOnError(_)
     }
-    val poolsService = injector.instance[PoolsService](classOf[PoolsService])
-    Await.result(poolsService.initialize(), Duration.Inf)
+
   }
 }
