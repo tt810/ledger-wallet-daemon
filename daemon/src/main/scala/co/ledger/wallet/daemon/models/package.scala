@@ -1,6 +1,6 @@
 package co.ledger.wallet.daemon
 
-import co.ledger.core.WalletPool
+import co.ledger.core.{WalletPool => CoreWalletPool}
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.fasterxml.jackson.annotation.JsonProperty
 import co.ledger.core.{BitcoinLikeNetworkParameters, CurrencyUnit, Currency => CoreCurrency}
@@ -34,7 +34,7 @@ package object models {
       newInstance(crCrcy.getBitcoinLikeNetworkParameters)
     )
 
-  def newInstance(pool: WalletPool): Future[Pool] = pool.getWalletCount().map(models.Pool(pool.getName, _))
+  def newInstance(pool: CoreWalletPool): Future[WalletPool] = pool.getWalletCount().map(models.WalletPool(pool.getName, _))
 
   def newInstance(coreCurrencyUnit: CurrencyUnit): Unit =
     Unit(
@@ -64,7 +64,7 @@ package object models {
                      @JsonProperty("network_params") networkParams: BitcoinLikeNetworkParams
                      )
 
-  case class Pool(
+  case class WalletPool(
                  @JsonProperty("name") name: String,
                  @JsonProperty("wallet_count") walletCount: Int
                  )
