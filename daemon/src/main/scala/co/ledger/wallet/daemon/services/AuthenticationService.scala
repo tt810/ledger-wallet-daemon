@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets
 import java.util.Date
 import javax.inject.{Inject, Singleton}
 
-import co.ledger.wallet.daemon.Server
+import co.ledger.wallet.daemon.DaemonConfiguration
 import co.ledger.wallet.daemon.database.User
 import co.ledger.wallet.daemon.services.AuthenticationService.{AuthenticationFailedException, AuthentifiedUserContext}
 import com.twitter.finagle.http.Request
@@ -15,22 +15,20 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.utils._
 
 @Singleton
-class AuthenticationService @Inject()(databaseService: DatabaseService, ecdsa: ECDSAService) {
+class AuthenticationService @Inject()(ecdsa: ECDSAService) {
   import co.ledger.wallet.daemon.services.AuthenticationService.AuthContextContext._
-  import co.ledger.wallet.daemon.database._
+  private val dbDao = DatabaseService.dbDao
 
   def authorize(request: Request): Future[Unit] = {
-    databaseService.database flatMap {(db) =>
-      db.run(getUsers(request.authContext.pubKey)) map { (users) =>
+    dbDao.getUsers(request.authContext.pubKey) map { (users) =>
         if (users.isEmpty)
           throw AuthenticationFailedException()
         users.head
-      }
     } flatMap {user =>
       val time = request.authContext.time
       val date = new Date(time * 1000)
       val now = new Date()
-      if (Math.abs(now.getTime - date.getTime) > _tokenDuration) {
+      if (Math.abs(now.getTime - date.getTime) > DaemonConfiguration.authTokenDuration) {
         throw AuthenticationFailedException()
       }
       val message = Sha256Hash.hash(s"LWD: $time\n".getBytes(StandardCharsets.US_ASCII))
@@ -43,14 +41,6 @@ class AuthenticationService @Inject()(databaseService: DatabaseService, ecdsa: E
       })
     } asTwitter()
   }
-
-  private val _tokenDuration = {
-    if (Server.configuration.hasPath("authentication.token_duration"))
-      Server.configuration.getInt("authentication.token_duration") * 1000
-    else
-      30000
-  }
-
 }
 
 object AuthenticationService {
