@@ -3,7 +3,7 @@ package co.ledger.wallet.daemon.services
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Singleton
 
-import co.ledger.core.{DatabaseBackend, DynamicObject, WalletPool => CoreWalletPool, WalletPoolBuilder}
+import co.ledger.core.{DatabaseBackend, DynamicObject, WalletPoolBuilder, WalletPool => CoreWalletPool}
 
 import scala.concurrent.Future
 import co.ledger.core.implicits._
@@ -17,6 +17,7 @@ import co.ledger.wallet.daemon.libledger_core.net.{ScalaHttpClient, ScalaWebSock
 import co.ledger.wallet.daemon.utils.HexUtils
 import org.bitcoinj.core.Sha256Hash
 import co.ledger.wallet.daemon.exceptions.ResourceNotFoundException
+import co.ledger.wallet.daemon.models
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -27,41 +28,44 @@ class PoolsService extends DaemonService {
   private val _readContext = scala.concurrent.ExecutionContext.Implicits.global
   private val dbDao = DatabaseService.dbDao
 
-  def createPool(user: User, poolName: String, configuration: PoolConfiguration): Future[CoreWalletPool] = {
+  def createPool(user: User, poolName: String, configuration: PoolConfiguration): Future[models.WalletPool] = {
     implicit val ec = _writeContext
     info(s"Start to create pool: poolName=$poolName configuration=$configuration userPubKey=${user.pubKey}")
     val newPool = Pool(poolName, user.id.get, configuration.toString)
-    dbDao.insertPool(newPool).flatMap { (_) =>
-      info(s"Finish creating pool: $newPool")
-      buildPool(newPool)
+    dbDao.insertPool(newPool).flatMap((_) =>buildPool(newPool)).map(models.newInstance(_)).flatten.map { pool =>
+      info(s"Finish creating pool: $pool")
+      pool
     }
   }
 
-  def pools(user: User): Future[Seq[CoreWalletPool]] = {
+  def pools(user: User): Future[Seq[models.WalletPool]] = {
     info(s"Obtain pools with params: userPubKey=${user.pubKey}")
-    dbDao.getPools(user.id.get).flatMap(p => Future.sequence(p.map(mapPool).toSeq))
+    val modelPools  = for {
+      walletPoolsSeq <- dbDao.getPools(user.id.get).flatMap(p => Future.sequence(p.map(mapPool).toSeq))
+      pools = walletPoolsSeq.map { walletPool =>
+        for (pool <- models.newInstance(walletPool)) yield pool
+      }} yield Future.sequence(pools)
+    modelPools.flatten
   }
 
-  def pool(user: User, poolName: String): Future[CoreWalletPool] = Future {
+  def pool(user: User, poolName: String): Future[models.WalletPool] = {
     info(s"Obtain pool with params: poolName=$poolName userPubKey=${user.pubKey}")
-    val p = _pools.getOrDefault(poolIdentifier(user.id.get, poolName), null)
+    val p: CoreWalletPool = _pools.getOrDefault(poolIdentifier(user.id.get, poolName), null)
     if (p != null) {
       info(s"Pool obtained: ${p.getName}")
-      p
-    }
-    else
-      throw ResourceNotFoundException(classOf[CoreWalletPool], poolName)
+      models.newInstance(p)
+    } else
+      Future.failed(ResourceNotFoundException(classOf[CoreWalletPool], poolName))
   }
 
   def removePool(user: User, poolName: String): Future[Unit] = {
     implicit val ec = _writeContext
     info(s"Start to remove pool: poolName=$poolName userPubKey=${user.pubKey}")
-    pool(user, poolName) flatMap {(p) =>
+    pool(user, poolName).map {(p) =>
       // p.release() TODO once WalletPool#release exists
-      dbDao.deletePool(poolName, user.id.get) map {(_) =>
+      dbDao.deletePool(poolName, user.id.get).map {(_) =>
         _pools.remove(poolIdentifier(user.id.get, poolName))
         info(s"Finish removing pool: $p")
-        ()
       }
     }
   }
@@ -78,7 +82,6 @@ class PoolsService extends DaemonService {
   private def poolIdentifier(userId: Long, poolName: String): String = HexUtils.valueOf(Sha256Hash.hash(s"${userId}:${poolName}".getBytes))
 
   private def buildPool(pool: Pool): Future[CoreWalletPool] = {
-    val dispatcher = new ScalaThreadDispatcher(scala.concurrent.ExecutionContext.Implicits.global)
     val identifier = poolIdentifier(pool)
     WalletPoolBuilder.createInstance()
       .setHttpClient(new ScalaHttpClient)
@@ -98,7 +101,7 @@ class PoolsService extends DaemonService {
   }
 
   private val _pools = new ConcurrentHashMap[String, CoreWalletPool]()
-
+  val dispatcher = new ScalaThreadDispatcher(scala.concurrent.ExecutionContext.Implicits.global)
   def initialize(): Unit = {
     dbDao.getPools.map(pools => pools.map(buildPool))
   }

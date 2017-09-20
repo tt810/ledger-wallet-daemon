@@ -2,9 +2,10 @@ package co.ledger.wallet.daemon.services
 
 import javax.inject.{Inject, Singleton}
 
-import co.ledger.core.{DynamicObject, Wallet}
+import co.ledger.core.{DynamicObject, Wallet => CoreWallet}
 import co.ledger.wallet.daemon.database.User
 import co.ledger.core.implicits._
+import com.fasterxml.jackson.annotation.JsonProperty
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
@@ -22,13 +23,13 @@ class WalletsService @Inject()(poolsService: PoolsService) extends DaemonService
         pool.getWallets(offset, bulkSize) map { (wallets) =>
           val walletArr = wallets.asScala.toArray
           info(s"Wallets obtained: totalCount=$count size=${walletArr.size} walletNames=${walletArr.map(_.getName)}")
-          WalletBulk(count, offset, bulkSize, walletArr)
+          WalletBulk(count, walletArr)
         }
       }
     }
   }
 
-  def wallet(user: User, poolName: String, walletName: String): Future[Wallet] = {
+  def wallet(user: User, poolName: String, walletName: String): Future[CoreWallet] = {
     info(s"Obtain wallet with params: poolName=$poolName walletName=$walletName userPubKey=${user.pubKey}")
     poolsService.pool(user, poolName).flatMap { pool =>
       pool.getWallet(walletName).map { wallet =>
@@ -38,7 +39,10 @@ class WalletsService @Inject()(poolsService: PoolsService) extends DaemonService
     }
   }
 
-  def createWallet(user: User, poolName: String, walletName: String, params: WalletCreationParameters): Future[Wallet] = {
+  def createWallet(user: User, poolName: String, walletName: String, currencyName: String): Future[CoreWallet] =
+    createWallet(user, poolName, walletName, WalletCreationParameters(currencyName))
+
+  private def createWallet(user: User, poolName: String, walletName: String, params: WalletCreationParameters): Future[CoreWallet] = {
     info(s"Start to create wallet: poolName=$poolName walletName=$walletName extraParams=$params userPubKey=${user.pubKey}")
     poolsService.pool(user, poolName) flatMap { (pool) =>
       pool.getCurrency(params.currency) flatMap { (currency) =>
@@ -60,7 +64,9 @@ class WalletsService @Inject()(poolsService: PoolsService) extends DaemonService
 
 object WalletsService {
 
-  case class WalletBulk(count: Int, offset: Int, bulkSize: Int, wallets: Array[Wallet])
-  case class WalletCreationParameters(currency: String, configuration: DynamicObject)
+  case class WalletBulk(
+                         @JsonProperty("wallt_count") walltCount: Int,
+                         @JsonProperty("wallets") wallets: Array[CoreWallet])
+  case class WalletCreationParameters(currency: String, configuration: DynamicObject = DynamicObject.newInstance())
 
 }

@@ -11,12 +11,5 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext}
 
 object DatabaseService extends DaemonService {
-  implicit val ec: ExecutionContext = new SerialExecutionContext()(ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor()))
-  lazy val dbDao: DatabaseDao = {
-    val databaseDao = new DatabaseDao(Database.forConfig(DaemonConfiguration.dbProfileName))
-    info("Start migration")
-    Await.result(databaseDao.migrate(), Duration.Inf)
-    info("Finish migration")
-    databaseDao
-  }
+  
 }

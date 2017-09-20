@@ -36,7 +36,7 @@ class WalletPoolsApiTest extends APIFeatureTest {
   test("WalletPoolsApi#Get and delete non-exist pool return not found") {
     assert(
       server.mapper.objectMapper.readValue[ErrorResponseBody](getPool("not_exist_pool", Status.NotFound).contentString)
-        == ErrorResponseBody(ErrorCode.Not_Found, "not_exist_pool is not a pool"))
+        == ErrorResponseBody(ErrorCode.Not_Found, "not_exist_pool doesn't exist"))
     assert(
       server.mapper.objectMapper.readValue[ErrorResponseBody](deletePool("another_not_exist_pool").contentString)
         == ErrorResponseBody(ErrorCode.Invalid_Request, "Attempt deleting another_not_exist_pool request is ignored"))

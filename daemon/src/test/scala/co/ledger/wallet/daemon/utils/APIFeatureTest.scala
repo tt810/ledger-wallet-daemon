@@ -6,6 +6,7 @@ import java.util.Date
 import co.ledger.wallet.daemon.ServerImpl
 import co.ledger.wallet.daemon.libledger_core.filesystem.ScalaPathResolver
 import co.ledger.wallet.daemon.services.ECDSAService
+import com.fasterxml.jackson.databind.SerializationFeature
 import com.lambdaworks.codec.Base64
 import com.twitter.finagle.http.{Response, Status}
 import com.twitter.finatra.http.EmbeddedHttpServer
@@ -21,10 +22,6 @@ trait APIFeatureTest extends FeatureTest {
 
   def defaultHeaders = lwdBasicAuthorisationHeader("whitelisted")
   def parse[A](response: Response)(implicit manifest: Manifest[A]): A = server.mapper.parse[A](response)
-
-  def createWallet(): Unit = {
-
-  }
 
   def getPools(): Response = {
     server.httpGet("/pools", headers = defaultHeaders, andExpect = Status.Ok)

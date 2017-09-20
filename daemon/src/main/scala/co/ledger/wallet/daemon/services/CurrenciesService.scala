@@ -4,7 +4,8 @@ import javax.inject.{Inject, Singleton}
 
 import co.ledger.wallet.daemon.database.User
 import co.ledger.core.implicits._
-import co.ledger.wallet.daemon.models._
+import co.ledger.wallet.daemon.models.newInstance
+import co.ledger.wallet.daemon.models.Currency
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
@@ -38,5 +39,17 @@ class CurrenciesService @Inject()(poolsService: PoolsService) extends DaemonServ
       info(s"Currencies obtained: size=${modelCs.size} currencies=$modelCs")
       modelCs
     }
+  }
+
+  def addCurrency(user: User, poolName: String, currency: Currency): Future[Currency] = {
+    poolsService.pool(user, poolName).flatMap { pool =>
+      // TODO: implement me
+      pool.getCurrency(currency.name).map { coreCurrency => currency }
+    }
+  }
+
+  def removeCurrency(user: User, poolName: String, currencyName: String): Future[Unit] = {
+    //TODO: implement me
+    currency(user, poolName, currencyName).map(currency => ())
   }
 }

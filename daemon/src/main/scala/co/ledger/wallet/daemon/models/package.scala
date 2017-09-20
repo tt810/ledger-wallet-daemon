@@ -1,9 +1,8 @@
 package co.ledger.wallet.daemon
 
-import co.ledger.core.{WalletPool => CoreWalletPool}
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.fasterxml.jackson.annotation.JsonProperty
-import co.ledger.core.{BitcoinLikeNetworkParameters, CurrencyUnit, Currency => CoreCurrency}
+import co.ledger.core.{BitcoinLikeNetworkParameters, CurrencyUnit, Account => CoreAccount, Currency => CoreCurrency, Wallet => CoreWallet, WalletPool => CoreWalletPool}
 import co.ledger.core.implicits._
 
 import scala.collection.JavaConverters._
@@ -34,7 +33,11 @@ package object models {
       newInstance(crCrcy.getBitcoinLikeNetworkParameters)
     )
 
-  def newInstance(pool: CoreWalletPool): Future[WalletPool] = pool.getWalletCount().map(models.WalletPool(pool.getName, _))
+//  def newInstance(coreWallet: CoreWallet): Wallet =
+//    Wallet(coreWallet.getName, _, getBalance(coreWallet), newInstance(coreWallet.getCurrency), getConfiguration(coreWallet))
+
+  def newInstance(pool: CoreWalletPool): Future[WalletPool] =
+    pool.getWalletCount().map(WalletPool(pool.getName, _))
 
   def newInstance(coreCurrencyUnit: CurrencyUnit): Unit =
     Unit(
@@ -43,6 +46,14 @@ package object models {
       coreCurrencyUnit.getCode,
       coreCurrencyUnit.getNumberOfDecimal
     )
+
+  case class Account(
+                    @JsonProperty("wallet_name") walletName: String,
+                    @JsonProperty("index") index: Int,
+                    @JsonProperty("balance") balance: Long,
+                    @JsonProperty("keychain") keychain: String,
+                    @JsonProperty("currency") currency: Currency
+                    )
 
   case class BitcoinLikeNetworkParams(
                                       @JsonProperty("identifier") identifier: String,
@@ -80,8 +91,39 @@ package object models {
                    @JsonProperty("name") name: String,
                    @JsonProperty("account_count") accountCount: Int,
                    @JsonProperty("balance") balance: Long,
-                   @JsonProperty("currency") currency: Currency
-                   //@JsonProperty("configuration") configuration: Map[String, Any]
+                   @JsonProperty("currency") currency: Currency,
+                   @JsonProperty("configuration") configuration: Map[String, Any]
                    )
+
+
+
+//  private  def getBalance(wallet: CoreWallet): Long = {
+//
+//    def sum(balances: Seq[Long]): Long = {
+//      balances match {
+//        case x :: tail => x + sum(tail)
+//        case Nil => 0
+//      }
+//    }
+//
+//    val accounts: Future[List[CoreAccount]] = for (
+//      count <- wallet.getAccountCount();
+//      accountList <- wallet.getAccounts(0, count)
+//    ) yield accountList.toList
+
+//      accounts.flatMap { accountList =>
+//        accountList.map { account =>
+//          val amount: Future[Amount] = account.getBalance()
+//          amount.flatMap(amount => amount.toLong)
+//          account.getBalance() flatMap { amount => amount.toLong() }
+//        }
+//      }
+//    0
+//  }
+//
+//   private def getConfiguration(wallet: CoreWallet): Map[String, Any] = {
+//    Map[String, Any]()
+//  }
+
 
 }

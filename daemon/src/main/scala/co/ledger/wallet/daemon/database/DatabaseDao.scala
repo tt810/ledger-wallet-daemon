@@ -16,28 +16,6 @@ import scala.concurrent.{ExecutionContext, Future}
 class DatabaseDao(db: Database)(implicit ec: ExecutionContext) extends Logging {
   import database.Tables.profile.api._
   import database.Tables._
-  def migrate(): Future[Unit] = {
-    val lastMigrationVersion = databaseVersions.sortBy(_.version.desc).map(_.version).take(1).result.head
-    db.run(lastMigrationVersion) recover {
-      case _ => -1
-    } flatMap { (currentVersion) =>
-      debug(s"Current Database Version $currentVersion")
-      val maxVersion = Migrations.keys.toArray.sortWith(_ > _).head
-      def migrate(version: Int): Future[Unit] = {
-        if (version > maxVersion) {
-          debug(s"Database Version up to date at version $version")
-          Future.successful()
-        } else {
-          val migrationQ = DBIO.seq(Migrations(version), insertDatabaseVersion(version))
-          db.run(migrationQ.transactionally) map { (_) =>
-            debug(s"Finish migrating version $version")
-            migrate(version + 1)
-          }
-        }
-      }
-      migrate(currentVersion + 1)
-    }
-  }
 
   def deletePool(poolName: String, userId: Long): Future[Int] = {
     db.run(filterPool(poolName, userId).delete.transactionally).map { int =>
@@ -126,12 +104,47 @@ class DatabaseDao(db: Database)(implicit ec: ExecutionContext) extends Logging {
   private def createUser(userRow: UserRow): User =
     User(userRow.pubKey, userRow.permissions, userRow.id)
 
-  private def insertDatabaseVersion(version: Int): DBIO[Int] =
-    databaseVersions += (version, new Timestamp(new Date().getTime))
 
   private def filterPool(poolName: String, userId: Long) = {
     pools.filter(pool => pool.userId === userId.bind && pool.name === poolName.bind)
   }
+
+}
+
+object DatabaseDao extends Logging {
+  import slick.jdbc.JdbcBackend.Database
+  import database.Tables.profile.api._
+  import database.Tables._
+
+  def newInstance(db: Database): DatabaseDao = {
+    new DatabaseDao(db)
+  }
+
+  def migrate(db: Database): Future[Unit] = {
+    val lastMigrationVersion = databaseVersions.sortBy(_.version.desc).map(_.version).take(1).result.head
+    db.run(lastMigrationVersion) recover {
+      case _ => -1
+    } flatMap { (currentVersion) =>
+      debug(s"Current Database Version $currentVersion")
+      val maxVersion = Migrations.keys.toArray.sortWith(_ > _).head
+      def migrate(version: Int): Future[Unit] = {
+        if (version > maxVersion) {
+          debug(s"Database Version up to date at version $version")
+          Future.successful()
+        } else {
+          val migrationQ = DBIO.seq(Migrations(version), insertDatabaseVersion(version))
+          db.run(migrationQ.transactionally) map { (_) =>
+            debug(s"Finish migrating version $version")
+            migrate(version + 1)
+          }
+        }
+      }
+      migrate(currentVersion + 1)
+    }
+  }
+
+  private def insertDatabaseVersion(version: Int): DBIO[Int] =
+    databaseVersions += (version, new Timestamp(new Date().getTime))
 
 }
 
