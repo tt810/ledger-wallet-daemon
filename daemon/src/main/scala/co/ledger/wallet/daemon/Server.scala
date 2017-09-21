@@ -32,12 +32,12 @@ class ServerImpl extends HttpServer {
     super.warmup()
     NativeLibLoader.loadLibs()
     try {
-      info("Initializing database, start to insert users.....")
+      info("Initializing database, start to insert users...")
       injector.instance[DatabaseInitializationRoutine](classOf[DatabaseInitializationRoutine]).perform()
-      info("Finished inserting users....., start to obtain pools......")
+      info("Finished inserting users, start to obtain pools...")
       val poolsService = injector.instance[PoolsService](classOf[PoolsService])
       poolsService.initialize()
-      info("Finished obtaining pools.....")
+      info("Finished obtaining pools")
     } catch {
       case _: Throwable => exitOnError(_)
     }

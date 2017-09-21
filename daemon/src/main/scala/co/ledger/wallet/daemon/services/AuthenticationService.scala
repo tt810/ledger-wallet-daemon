@@ -15,7 +15,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.utils._
 
 @Singleton
-class AuthenticationService @Inject()(ecdsa: ECDSAService) {
+class AuthenticationService @Inject()(ecdsa: ECDSAService) extends DaemonService {
   import co.ledger.wallet.daemon.services.AuthenticationService.AuthContextContext._
   private val dbDao = DatabaseService.dbDao
 
@@ -25,6 +25,7 @@ class AuthenticationService @Inject()(ecdsa: ECDSAService) {
           throw AuthenticationFailedException()
         users.head
     } flatMap {user =>
+      debug(s"Authorize request: userPubKey=${user.pubKey}")
       val time = request.authContext.time
       val date = new Date(time * 1000)
       val now = new Date()
