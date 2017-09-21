@@ -1,10 +1,9 @@
 package co.ledger.wallet.daemon
 
 import co.ledger.wallet.daemon.controllers._
-import co.ledger.wallet.daemon.database.DatabaseInitializationRoutine
 import co.ledger.wallet.daemon.filters.{AuthenticationFilter, DemoUserAuthenticationFilter, LWDAutenticationFilter}
 import co.ledger.wallet.daemon.mappers.AuthenticationExceptionMapper
-import co.ledger.wallet.daemon.services.PoolsService
+import co.ledger.wallet.daemon.services.{PoolsService, UsersService}
 import com.twitter.finatra.http.HttpServer
 import com.twitter.finatra.http.filters.CommonFilters
 import com.twitter.finatra.http.routing.HttpRouter
@@ -31,16 +30,7 @@ class ServerImpl extends HttpServer {
   override protected def warmup(): Unit = {
     super.warmup()
     NativeLibLoader.loadLibs()
-    try {
-      info("Initializing database, start to insert users...")
-      injector.instance[DatabaseInitializationRoutine](classOf[DatabaseInitializationRoutine]).perform()
-      info("Finished inserting users, start to obtain pools...")
-      val poolsService = injector.instance[PoolsService](classOf[PoolsService])
-      poolsService.initialize()
-      info("Finished obtaining pools")
-    } catch {
-      case _: Throwable => exitOnError(_)
-    }
-
+    UsersService.initialize(injector.instance[UsersService](classOf[UsersService]))
+    PoolsService.initialize(injector.instance[PoolsService](classOf[PoolsService]))
   }
 }
