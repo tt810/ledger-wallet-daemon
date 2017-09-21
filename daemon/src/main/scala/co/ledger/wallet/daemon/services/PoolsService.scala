@@ -99,15 +99,15 @@ class PoolsService extends DaemonService {
 
   private val _pools = new ConcurrentHashMap[String, CoreWalletPool]()
 
-  def initialize(): Unit = {
-    dbDao.getPools.map(pools => pools.map(buildPool))
-  }
 }
 
 object PoolsService {
 
+  def initialize(poolsService: PoolsService): Unit = {
+    poolsService.dbDao.getPools.map(pools => pools.map(poolsService.buildPool))
+  }
+
   case class PoolConfiguration() {
     override def toString: String = ""
   }
-
 }
