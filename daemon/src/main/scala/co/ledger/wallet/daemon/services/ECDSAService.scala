@@ -8,17 +8,20 @@ import io.github.andrebeat.pool._
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
-class ECDSAService {
+class ECDSAService extends DaemonService {
 
   def sign(data: Array[Byte], privKey: Array[Byte])(implicit ec: ExecutionContext): Future[Array[Byte]] = Future {
+    debug("Sign...")
     lease(_.sign(privKey, data))
   }
 
   def verify(data: Array[Byte], signature: Array[Byte], publicKey: Array[Byte])(implicit ec: ExecutionContext): Future[Boolean] = Future {
+    debug("Verify....")
     lease(_.verify(data, signature, publicKey))
   }
 
   def computePublicKey(privateKey: Array[Byte])(implicit ec: ExecutionContext): Future[Array[Byte]] = Future {
+    debug("Computing public key...")
     lease(_.computePubKey(privateKey, true))
   }
 

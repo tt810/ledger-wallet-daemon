@@ -7,12 +7,13 @@ import javax.inject.Singleton
 import co.ledger.wallet.daemon.database.DBMigrations.Migrations
 import co.ledger.wallet.daemon.exceptions.ResourceAlreadyExistException
 import co.ledger.wallet.daemon.utils.HexUtils
+import com.twitter.inject.Logging
 import slick.jdbc.JdbcBackend.Database
 
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
-class DatabaseDao(db: Database)(implicit ec: ExecutionContext) {
+class DatabaseDao(db: Database)(implicit ec: ExecutionContext) extends Logging {
   import database.Tables.profile.api._
   import database.Tables._
   def migrate(): Future[Unit] = {
@@ -20,14 +21,16 @@ class DatabaseDao(db: Database)(implicit ec: ExecutionContext) {
     db.run(lastMigrationVersion) recover {
       case _ => -1
     } flatMap { (currentVersion) =>
+      debug(s"Current Database Version $currentVersion")
       val maxVersion = Migrations.keys.toArray.sortWith(_ > _).head
-
       def migrate(version: Int): Future[Unit] = {
-        if (version > maxVersion)
+        if (version > maxVersion) {
+          debug(s"Database Version up to date at version $version")
           Future.successful()
-        else {
+        } else {
           val migrationQ = DBIO.seq(Migrations(version), insertDatabaseVersion(version))
           db.run(migrationQ.transactionally) map { (_) =>
+            debug(s"Finish migrating version $version")
             migrate(version + 1)
           }
         }
@@ -37,24 +40,37 @@ class DatabaseDao(db: Database)(implicit ec: ExecutionContext) {
   }
 
   def deletePool(poolName: String, userId: Long): Future[Int] = {
-    db.run(filterPool(poolName, userId).delete.transactionally)
+    db.run(filterPool(poolName, userId).delete.transactionally).map { int =>
+      debug(s"Pool deleted: poolName=$poolName user=$userId returned=$int")
+      int
+    }
   }
 
   def getPools: Future[Seq[Pool]] = {
     val rs = db.run(pools.result.transactionally)
-    rs.map(rows => rows.map(createPool))
+    rs.map { rows =>
+      debug(s"Pools obtained: size=${rows.size} pools=${rows.map(_.name).toString}")
+      rows.map(createPool)
+    }
   }
 
   def getPools(userId: Long): Future[Seq[Pool]] = {
     val query = for {
       p <- pools if p.userId === userId.bind
     } yield p
-    db.run(query.result.transactionally).map(rows => rows.map(createPool))
+    db.run(query.result.transactionally).map { rows =>
+      debug(s"Pools obtained: user=$userId size=${rows.size} pools=${rows.map(_.name)}")
+      rows.map(createPool)
+    }
   }
 
   def getUsers(targetPubKey: Array[Byte]): Future[Seq[User]] = {
-    db.run(users.filter(_.pubKey === HexUtils.valueOf(targetPubKey)).result.transactionally)
-      .map(rows => rows.map(createUser))
+    val pubKey = HexUtils.valueOf(targetPubKey)
+    db.run(users.filter(_.pubKey === pubKey).result.transactionally)
+      .map { rows =>
+        debug(s"Users obtained: pubKey=$pubKey size=${rows.size} userIds=${rows.map(_.id.get).toString}")
+        rows.map(createUser)
+      }
   }
 
 
@@ -72,7 +88,10 @@ class DatabaseDao(db: Database)(implicit ec: ExecutionContext) {
         DBIO.failed(ResourceAlreadyExistException(classOf[Pool], newPool.name))
       }
     }
-    db.run(query.transactionally)
+    db.run(query.transactionally).map { int =>
+      debug(s"Pool inserted: poolName=${newPool.name} returned=$int")
+      int
+    }
   }
 
   /**
@@ -89,7 +108,10 @@ class DatabaseDao(db: Database)(implicit ec: ExecutionContext) {
         DBIO.failed(ResourceAlreadyExistException(classOf[User], newUser.pubKey))
       }
     }
-    db.run(query.transactionally)
+    db.run(query.transactionally).map { int =>
+      debug(s"User inserted: pubKey=${newUser.pubKey} returned=$int")
+      int
+    }
   }
 
   private def createPoolRow(pool: Pool): PoolRow =
