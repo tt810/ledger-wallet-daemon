@@ -1,9 +1,10 @@
 package co.ledger.wallet.daemon
 
 import co.ledger.wallet.daemon.controllers._
+import co.ledger.wallet.daemon.database.{DefaultDaemonCache}
 import co.ledger.wallet.daemon.filters.{AuthenticationFilter, DemoUserAuthenticationFilter, LWDAutenticationFilter}
 import co.ledger.wallet.daemon.mappers.AuthenticationExceptionMapper
-import co.ledger.wallet.daemon.services.{PoolsService, UsersService}
+import co.ledger.wallet.daemon.services.UsersService
 import com.twitter.finatra.http.HttpServer
 import com.twitter.finatra.http.filters.CommonFilters
 import com.twitter.finatra.http.routing.HttpRouter
@@ -31,6 +32,6 @@ class ServerImpl extends HttpServer {
     super.warmup()
     NativeLibLoader.loadLibs()
     UsersService.initialize(injector.instance[UsersService](classOf[UsersService]))
-    PoolsService.initialize(injector.instance[PoolsService](classOf[PoolsService]))
+    DefaultDaemonCache.initialize()
   }
 }

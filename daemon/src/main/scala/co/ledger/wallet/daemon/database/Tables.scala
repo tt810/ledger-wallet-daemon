@@ -32,7 +32,7 @@ trait Tables {
   class Users(tag: Tag) extends Table[UserRow](tag, "users") {
     def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
 
-    def pubKey = column[String]("pub_key", O.Default(null))
+    def pubKey = column[String]("pub_key", O.Unique)
 
     def createdAt = column[Timestamp]("created_at", SqlType("timestamp default CURRENT_TIMESTAMP"))
 
@@ -50,6 +50,8 @@ trait Tables {
 
     def name = column[String]("name")
 
+    def userId = column[Long]("user_id")
+
     def createdAt = column[Timestamp]("created_at", SqlType("timestamp default CURRENT_TIMESTAMP"))
 
     def configuration = column[String]("configuration", O.Default("{}"))
@@ -57,8 +59,6 @@ trait Tables {
     def dbBackend = column[String]("db_backend")
 
     def dbConnectString = column[String]("db_connect")
-
-    def userId = column[Long]("user_id")
 
     def user = foreignKey("user_fk", userId, users)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
 
