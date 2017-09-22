@@ -6,7 +6,7 @@ parallelExecution in IntegrationTest := false
 testForkedParallel in Test := false
 testForkedParallel in IntegrationTest := false
 
-val versions = new {
+lazy val versions = new {
   val finatra = "2.12.0"
   val guice = "4.0"
   val logback = "1.1.7"
@@ -45,6 +45,7 @@ libraryDependencies ++= Seq(
 
   "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
   "org.scalatest" %% "scalatest" %  "3.0.0" % "test",
+  "junit" % "junit" % "4.12" % "test",
   "org.mockito" % "mockito-core" % "1.9.5" % "test",
   "org.specs2" %% "specs2-mock" % "2.4.17" % "test"
 )

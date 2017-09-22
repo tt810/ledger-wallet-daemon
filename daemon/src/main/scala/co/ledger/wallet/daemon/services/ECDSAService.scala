@@ -11,18 +11,30 @@ import scala.concurrent.{ExecutionContext, Future}
 class ECDSAService extends DaemonService {
 
   def sign(data: Array[Byte], privKey: Array[Byte])(implicit ec: ExecutionContext): Future[Array[Byte]] = Future {
-    debug("Sign...")
-    lease(_.sign(privKey, data))
+    lease { instance =>
+      debug("Sign...")
+      val result = instance.sign(privKey, data)
+      debug("Signed")
+      result
+    }
   }
 
   def verify(data: Array[Byte], signature: Array[Byte], publicKey: Array[Byte])(implicit ec: ExecutionContext): Future[Boolean] = Future {
-    debug("Verify....")
-    lease(_.verify(data, signature, publicKey))
+    lease { instance =>
+      debug("Verify....")
+      val result = instance.verify(data, signature, publicKey)
+      debug("Verified")
+      result
+    }
   }
 
   def computePublicKey(privateKey: Array[Byte])(implicit ec: ExecutionContext): Future[Array[Byte]] = Future {
-    debug("Computing public key...")
-    lease(_.computePubKey(privateKey, true))
+    lease { instance =>
+      debug("Computing public key...")
+      val result = instance.computePubKey(privateKey, true)
+      debug("Computed public key")
+      result
+    }
   }
 
   private def lease = _secp256k1Instances.acquire()

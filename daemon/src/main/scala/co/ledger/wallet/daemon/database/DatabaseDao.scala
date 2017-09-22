@@ -5,7 +5,7 @@ import java.util.Date
 import javax.inject.Singleton
 
 import co.ledger.wallet.daemon.database.DBMigrations.Migrations
-import co.ledger.wallet.daemon.exceptions.ResourceAlreadyExistException
+import co.ledger.wallet.daemon.exceptions.{DaemonDatabaseException, DaemonException, ResourceAlreadyExistException}
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.twitter.inject.Logging
 import slick.jdbc.JdbcBackend.Database
@@ -40,37 +40,35 @@ class DatabaseDao(db: Database)(implicit ec: ExecutionContext) extends Logging {
   }
 
   def deletePool(poolName: String, userId: Long): Future[Int] = {
-    db.run(filterPool(poolName, userId).delete.transactionally).map { int =>
+    safeRun(filterPool(poolName, userId).delete).map { int =>
       debug(s"Pool deleted: poolName=$poolName user=$userId returned=$int")
       int
     }
   }
 
-  def getPools: Future[Seq[Pool]] = {
-    val rs = db.run(pools.result.transactionally)
-    rs.map { rows =>
-      debug(s"Pools obtained: size=${rows.size} pools=${rows.map(_.name).toString}")
-      rows.map(createPool)
-    }
-  }
-
   def getPools(userId: Long): Future[Seq[Pool]] = {
-    val query = for {
-      p <- pools if p.userId === userId.bind
-    } yield p
-    db.run(query.result.transactionally).map { rows =>
+    val query = pools.filter(pool => pool.userId === userId.bind).sortBy(_.id.desc)
+    safeRun(query.result.transactionally).map { rows =>
       debug(s"Pools obtained: user=$userId size=${rows.size} pools=${rows.map(_.name)}")
       rows.map(createPool)
     }
   }
 
-  def getUsers(targetPubKey: Array[Byte]): Future[Seq[User]] = {
+  def getUser(targetPubKey: Array[Byte]): Future[Option[User]] = {
     val pubKey = HexUtils.valueOf(targetPubKey)
-    db.run(users.filter(_.pubKey === pubKey).result.transactionally)
-      .map { rows =>
-        debug(s"Users obtained: pubKey=$pubKey size=${rows.size} userIds=${rows.map(_.id.get).toString}")
-        rows.map(createUser)
-      }
+    safeRun(filterUser(pubKey).result).map { rows =>
+      debug(s"Users obtained: pubKey=$pubKey size=${rows.size} userIds=${rows.map(_.id.get).toString}")
+      if(rows.isEmpty) None
+      else Option(createUser(rows.head))
+    }
+  }
+
+  def getUsers(): Future[Seq[User]] = {
+    val query = users.result
+    safeRun(query).map { rows =>
+      debug(s"Users obtained: size=${rows.size}")
+      rows.map(createUser(_))
+    }
   }
 
 
@@ -88,7 +86,7 @@ class DatabaseDao(db: Database)(implicit ec: ExecutionContext) extends Logging {
         DBIO.failed(ResourceAlreadyExistException(classOf[Pool], newPool.name))
       }
     }
-    db.run(query.transactionally).map { int =>
+    safeRun(query).map { int =>
       debug(s"Pool inserted: poolName=${newPool.name} returned=$int")
       int
     }
@@ -101,16 +99,23 @@ class DatabaseDao(db: Database)(implicit ec: ExecutionContext) extends Logging {
     * @return ResourceAlreadyExistException If the given user pubKey already exists.
     */
   def insertUser(newUser: User): Future[Int] = {
-    val query = users.filter(_.pubKey === newUser.pubKey.bind).exists.result.flatMap {(exists) =>
+    val query = filterUser(newUser.pubKey).exists.result.flatMap {(exists) =>
       if (!exists) {
         users += createUserRow(newUser)
       } else {
         DBIO.failed(ResourceAlreadyExistException(classOf[User], newUser.pubKey))
       }
     }
-    db.run(query.transactionally).map { int =>
+    safeRun(query).map { int =>
       debug(s"User inserted: pubKey=${newUser.pubKey} returned=$int")
       int
+    }
+  }
+
+  private def safeRun[R](query: DBIO[R]): Future[R] = {
+    db.run(query.transactionally).recoverWith {
+      case e: DaemonException => Future.failed(e)
+      case others: Throwable => Future.failed(DaemonDatabaseException("Failed to run database query", others))
     }
   }
 
@@ -131,6 +136,10 @@ class DatabaseDao(db: Database)(implicit ec: ExecutionContext) extends Logging {
 
   private def filterPool(poolName: String, userId: Long) = {
     pools.filter(pool => pool.userId === userId.bind && pool.name === poolName.bind)
+  }
+
+  private def filterUser(pubKey: String) = {
+    users.filter(_.pubKey === pubKey.bind)
   }
 
 }
