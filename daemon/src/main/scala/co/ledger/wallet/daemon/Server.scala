@@ -1,7 +1,7 @@
 package co.ledger.wallet.daemon
 
 import co.ledger.wallet.daemon.controllers._
-import co.ledger.wallet.daemon.database.{DefaultDaemonCache}
+import co.ledger.wallet.daemon.database.DefaultDaemonCache
 import co.ledger.wallet.daemon.filters.{AuthenticationFilter, DemoUserAuthenticationFilter, LWDAutenticationFilter}
 import co.ledger.wallet.daemon.mappers.AuthenticationExceptionMapper
 import co.ledger.wallet.daemon.services.UsersService
@@ -32,10 +32,10 @@ class ServerImpl extends HttpServer {
     import scala.concurrent.ExecutionContext.Implicits.global
     super.warmup()
     NativeLibLoader.loadLibs()
-    UsersService
-      .initialize(injector.instance[UsersService](classOf[UsersService]))
-      .onComplete {
-        case success => DefaultDaemonCache.initialize()
+    DefaultDaemonCache.migrateDatabase().flatMap { _ =>
+      UsersService.initialize(injector.instance[UsersService](classOf[UsersService])).flatMap { _ =>
+          DefaultDaemonCache.initialize()
       }
+    }
   }
 }

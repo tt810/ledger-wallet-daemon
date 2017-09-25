@@ -10,5 +10,5 @@ package object exceptions {
   case class UserAlreadyExistException(          pubKey: String) extends DaemonException(s"User $pubKey already exists")
 
   case class DaemonDatabaseException(msg: String, e: Throwable)  extends Exception(msg, e)
-  class DaemonException(msg: String, e: Exception = null)        extends Exception(msg, e)
+  class DaemonException(msg: String, e: Throwable = null)        extends Exception(msg, e)
 }

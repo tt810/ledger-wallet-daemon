@@ -1,17 +1,20 @@
 package co.ledger.wallet.daemon.database
 
+
+import co.ledger.wallet.daemon.DaemonConfiguration
 import co.ledger.wallet.daemon.exceptions.{DaemonDatabaseException, UserAlreadyExistException}
-import co.ledger.wallet.daemon.services.DatabaseService
 import co.ledger.wallet.daemon.utils.HexUtils
+import com.twitter.inject.Logging
 import org.scalatest.junit.AssertionsForJUnit
-import org.junit.Test
+import org.junit.{BeforeClass, Test}
 import org.junit.Assert._
+import slick.jdbc.JdbcBackend.Database
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
-
+import scala.concurrent.ExecutionContext.Implicits.global
 class DatabaseDaoTest extends AssertionsForJUnit {
-
+  import DatabaseDaoTest._
   @Test def verifyCreateUser(): Unit = {
     val pubKey = "A3B4A94D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D"
     val expectedUser = User(pubKey, 0)
@@ -71,5 +74,13 @@ class DatabaseDaoTest extends AssertionsForJUnit {
     assertEquals(0, Await.result(dbDao.getPools(insertedUser.get.id.get), Duration.Inf).size)
   }
 
-  private val dbDao = DatabaseService.dbDao
+}
+
+object DatabaseDaoTest extends Logging {
+  @BeforeClass def initialization(): Unit = {
+    debug("******************************* before class start")
+    Await.result(dbDao.migrate(), Duration.Inf)
+    debug("******************************* before class end")
+  }
+  private val dbDao = new DatabaseDao(Database.forConfig(DaemonConfiguration.dbProfileName))
 }

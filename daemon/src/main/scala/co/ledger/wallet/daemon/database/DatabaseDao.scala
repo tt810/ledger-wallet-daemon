@@ -2,8 +2,10 @@ package co.ledger.wallet.daemon.database
 
 import java.sql.Timestamp
 import java.util.Date
-import javax.inject.Singleton
+import java.util.concurrent.Executors
+import javax.inject.{Inject, Singleton}
 
+import co.ledger.wallet.daemon.async.SerialExecutionContext
 import co.ledger.wallet.daemon.database.DBMigrations.Migrations
 import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.utils.HexUtils
@@ -11,31 +13,38 @@ import com.twitter.inject.Logging
 import slick.jdbc.JdbcBackend.Database
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 @Singleton
-class DatabaseDao(db: Database)(implicit ec: ExecutionContext) extends Logging {
+class DatabaseDao @Inject()(db: Database)(implicit ec: ExecutionContext) extends Logging {
   import database.Tables.profile.api._
   import database.Tables._
+
   def migrate(): Future[Unit] = {
+    info("Start database migration")
     val lastMigrationVersion = databaseVersions.sortBy(_.version.desc).map(_.version).take(1).result.head
-    db.run(lastMigrationVersion) recover {
+    db.run(lastMigrationVersion.transactionally) recover {
       case _ => -1
-    } flatMap { (currentVersion) =>
-      debug(s"Current Database Version $currentVersion")
-      val maxVersion = Migrations.keys.toArray.sortWith(_ > _).head
-      def migrate(version: Int): Future[Unit] = {
-        if (version > maxVersion) {
-          debug(s"Database Version up to date at version $version")
-          Future.successful()
-        } else {
-          val migrationQ = DBIO.seq(Migrations(version), insertDatabaseVersion(version))
-          db.run(migrationQ.transactionally) map { (_) =>
-            debug(s"Finish migrating version $version")
-            migrate(version + 1)
+    } flatMap { currentVersion =>
+      {
+        debug(s"Current database version at ${currentVersion}")
+        val maxVersion = Migrations.keys.toArray.sortWith(_ > _).head
+
+        def migrate(version: Int, maxVersion: Int): Future[Unit] = {
+          if(version > maxVersion) {
+            debug(s"Database version up to date at $version")
+            Future.successful()
+          } else {
+            debug(s"Migrating version $version / $maxVersion")
+            val rollbackMigrate = DBIO.seq(Migrations(version), insertDatabaseVersion(version))
+            db.run(rollbackMigrate.transactionally).flatMap { _ =>
+              debug(s"version $version / $maxVersion migration done")
+              migrate(version + 1, maxVersion)
+            }
           }
         }
+        migrate(currentVersion + 1, maxVersion)
       }
-      migrate(currentVersion + 1)
     }
   }
 
@@ -119,7 +128,7 @@ class DatabaseDao(db: Database)(implicit ec: ExecutionContext) extends Logging {
     User(userRow.pubKey, userRow.permissions, userRow.id)
 
   private def insertDatabaseVersion(version: Int): DBIO[Int] =
-    databaseVersions += (version, new Timestamp(new Date().getTime))
+    databaseVersions += (0, new Timestamp(new Date().getTime))
 
   private def filterPool(poolName: String, userId: Long) = {
     pools.filter(pool => pool.userId === userId.bind && pool.name === poolName.bind)
