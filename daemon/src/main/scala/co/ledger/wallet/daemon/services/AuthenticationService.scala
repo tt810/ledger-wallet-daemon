@@ -21,9 +21,9 @@ class AuthenticationService @Inject()(ecdsa: ECDSAService) extends DaemonService
 
   def authorize(request: Request): Future[Unit] = {
     dbDao.getUser(request.authContext.pubKey) map { (usr) =>
-        if (usr.isEmpty)
-          throw AuthenticationFailedException()
-        usr.get
+      if (usr.isEmpty)
+        throw AuthenticationFailedException()
+      usr.get
     } flatMap {user =>
       debug(s"Authorize request: userPubKey=${user.pubKey}")
       val time = request.authContext.time
