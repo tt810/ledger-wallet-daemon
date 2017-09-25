@@ -29,9 +29,13 @@ class ServerImpl extends HttpServer {
           .exceptionMapper[AuthenticationExceptionMapper]
 
   override protected def warmup(): Unit = {
+    import scala.concurrent.ExecutionContext.Implicits.global
     super.warmup()
     NativeLibLoader.loadLibs()
-    UsersService.initialize(injector.instance[UsersService](classOf[UsersService]))
-    DefaultDaemonCache.initialize()
+    UsersService
+      .initialize(injector.instance[UsersService](classOf[UsersService]))
+      .onComplete {
+        case success => DefaultDaemonCache.initialize()
+      }
   }
 }

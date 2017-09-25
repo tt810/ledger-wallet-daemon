@@ -23,9 +23,9 @@ object DaemonConfiguration {
     users.toList
   } else List[String]()
 
-  val whiteListUsers: Seq[(String, Int)] = if (config.hasPath("whitelist")){
+  val whiteListUsers: Seq[(String, Long)] = if (config.hasPath("whitelist")){
     val usersConfig = config.getConfigList("whitelist")
-    var users = new ListBuffer[(String, Int)]()
+    var users = new ListBuffer[(String, Long)]()
     for (i <- 0 until usersConfig.size()) {
       val userConfig = usersConfig.get(i)
       val pubKey = userConfig.getString("key")
@@ -33,7 +33,7 @@ object DaemonConfiguration {
       users += ((pubKey, permissions))
     }
     users.toList
-  } else List[(String, Int)]()
+  } else List[(String, Long)]()
 
   val authTokenDuration: Int =
     if (config.hasPath("authentication.token_duration")) config.getInt("authentication.token_duration") * 1000

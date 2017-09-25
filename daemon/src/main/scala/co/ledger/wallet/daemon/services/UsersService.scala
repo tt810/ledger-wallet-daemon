@@ -10,13 +10,10 @@ import org.bitcoinj.core.Sha256Hash
 import org.spongycastle.util.encoders.Base64
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future}
-import scala.util.Try
+import scala.concurrent.Future
 
 @Singleton
 class UsersService @Inject()(ecdsa: ECDSAService) extends DaemonService {
-  private val dbDao = DatabaseService.dbDao
 
   def createUser(publicKey: String, permissions: Long = 0): Future[Unit] = {
     info(s"Start to insert user with params: permissions=$permissions pubKey=$publicKey")
@@ -31,34 +28,47 @@ class UsersService @Inject()(ecdsa: ECDSAService) extends DaemonService {
     createUser(user.getBytes)
   }
 
+
   private def createUser(user: Array[Byte]): Future[Unit] = {
     val privKey = Sha256Hash.hash(user)
-    createUser(pubKey(privKey))
+    pubKey(privKey).flatMap { publicKey =>
+      createUser(publicKey)
+    }
   }
 
-  private def pubKey(privKey: Array[Byte]) = {
-    HexUtils.valueOf(Await.result(ecdsa.computePublicKey(privKey), Duration.Inf))
+  private def pubKey(privKey: Array[Byte]): Future[String] = {
+    ecdsa.computePublicKey(privKey).map {pubKey =>
+      HexUtils.valueOf(pubKey)
+    }
   }
 
+  private val dbDao = DatabaseService.dbDao
 }
 
 object UsersService extends Logging {
-  def initialize(usersService: UsersService) = {
+
+  def initialize(usersService: UsersService): Future[Unit] = Future {
     insertDemoUsers(usersService)
     insertWhitelistedUsers(usersService)
   }
 
-  private def insertDemoUsers(usersService: UsersService) = {
+  private def insertDemoUsers(usersService: UsersService) = Future.sequence {
     debug("Start insert demo users...")
-    val users = DaemonConfiguration.adminUsers
-    users.foreach(user =>
-      Try(Await.result(usersService.createUser(user.getBytes), Duration.Inf))
-    )
+    DaemonConfiguration.adminUsers.map { user =>
+      usersService.createUser(user.getBytes())
+    }
+  }.onComplete {
+    case success => debug("Finish inserting demo users")
   }
 
-  private def insertWhitelistedUsers(usersService: UsersService) = {
+
+  private def insertWhitelistedUsers(usersService: UsersService) = Future.sequence {
     debug("Start insert whitelist users...")
-    DaemonConfiguration.whiteListUsers.foreach( user =>
-      Try(Await.result(usersService.createUser(user._1, user._2), Duration.Inf)))
+    DaemonConfiguration.whiteListUsers.map { user =>
+      usersService.createUser(user._1, user._2)
+    }
+  }.onComplete {
+    case success => debug("Finish inserting whitelist users")
   }
+
 }
