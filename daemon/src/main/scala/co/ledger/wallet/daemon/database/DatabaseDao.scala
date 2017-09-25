@@ -5,7 +5,7 @@ import java.util.Date
 import javax.inject.Singleton
 
 import co.ledger.wallet.daemon.database.DBMigrations.Migrations
-import co.ledger.wallet.daemon.exceptions.{DaemonDatabaseException, DaemonException, ResourceAlreadyExistException}
+import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.twitter.inject.Logging
 import slick.jdbc.JdbcBackend.Database
@@ -71,19 +71,12 @@ class DatabaseDao(db: Database)(implicit ec: ExecutionContext) extends Logging {
     }
   }
 
-
-  /**
-    * Insert pool if not exists, throw <code>ResourceAlreadyExistException</code> otherwise.
-    *
-    * @param newPool The new pool instance.
-    * @throws ResourceAlreadyExistException If the given pool name and user id are already taken.
-    */
   def insertPool(newPool: Pool): Future[Int] = {
     val query = filterPool(newPool.name, newPool.userId).exists.result.flatMap { exists =>
       if (!exists) {
         pools += createPoolRow(newPool)
       } else {
-        DBIO.failed(ResourceAlreadyExistException(classOf[Pool], newPool.name))
+        DBIO.failed(WalletPoolAlreadyExistException(newPool.name))
       }
     }
     safeRun(query).map { int =>
@@ -92,18 +85,12 @@ class DatabaseDao(db: Database)(implicit ec: ExecutionContext) extends Logging {
     }
   }
 
-  /**
-    * Insert user if not exists, throw <code>ResourceAlreadyExistException</code> otherwise.
-    *
-    * @param newUser The new user instance.
-    * @return ResourceAlreadyExistException If the given user pubKey already exists.
-    */
   def insertUser(newUser: User): Future[Int] = {
     val query = filterUser(newUser.pubKey).exists.result.flatMap {(exists) =>
       if (!exists) {
         users += createUserRow(newUser)
       } else {
-        DBIO.failed(ResourceAlreadyExistException(classOf[User], newUser.pubKey))
+        DBIO.failed(UserAlreadyExistException(newUser.pubKey))
       }
     }
     safeRun(query).map { int =>

@@ -2,8 +2,7 @@ package co.ledger.wallet.daemon.database
 
 import java.util.UUID
 
-import co.ledger.core.WalletPool
-import co.ledger.wallet.daemon.exceptions.ResourceNotFoundException
+import co.ledger.wallet.daemon.exceptions._
 import org.junit.Assert._
 import co.ledger.wallet.daemon.services.DatabaseService
 import djinni.NativeLibLoader
@@ -12,7 +11,6 @@ import org.scalatest.junit.AssertionsForJUnit
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
-import scala.reflect.ClassTag
 import scala.concurrent.ExecutionContext.Implicits.global
 
 
@@ -21,27 +19,27 @@ class DaemonCacheTest extends AssertionsForJUnit {
 
   @Test def verifyGetPoolNotFound(): Unit = {
     try {
-      Await.result(cache.getPool(0, "pool_not_exist"), Duration.Inf)
+      Await.result(cache.getPool(PUB_KEY_1, "pool_not_exist"), Duration.Inf)
       fail()
     } catch {
-      case e: ResourceNotFoundException[ClassTag[WalletPool] @unchecked] => // expected
+      case e: WalletPoolNotFoundException => // expected
     }
   }
 
   @Test def verifyGetPoolsWithNotExistUser(): Unit = {
     try {
-      Await.result(cache.getPools(0L), Duration.Inf)
+      Await.result(cache.getPools(UUID.randomUUID().toString), Duration.Inf)
       fail()
     } catch {
-      case e: ResourceNotFoundException[ClassTag[User] @unchecked] => // expected
+      case e: UserNotFoundException => // expected
     }
   }
 
   @Test def verifyCreateAndGetPools(): Unit = {
-    val pool11 = Await.result(cache.getPool(1L, "pool_1"), Duration.Inf)
-    val pool12 = Await.result(cache.getPool(1L, "pool_2"), Duration.Inf)
-    val pool13 = Await.result(cache.createPool(1L, "pool_3", "config"), Duration.Inf)
-    val pool1s = Await.result(cache.getPools(1L), Duration.Inf)
+    val pool11 = Await.result(cache.getPool(PUB_KEY_1, "pool_1"), Duration.Inf)
+    val pool12 = Await.result(cache.getPool(PUB_KEY_1, "pool_2"), Duration.Inf)
+    val pool13 = Await.result(cache.createPool(User(PUB_KEY_1, 0, Option(1L)), "pool_3", "config"), Duration.Inf)
+    val pool1s = Await.result(cache.getPools(PUB_KEY_1), Duration.Inf)
     assertEquals(3, pool1s.size)
     assertTrue(pool1s.contains(pool11))
     assertTrue(pool1s.contains(pool12))
@@ -49,13 +47,20 @@ class DaemonCacheTest extends AssertionsForJUnit {
   }
 
   @Test def verifyCreateAndDeletePool(): Unit = {
-    val poolRandom = Await.result(cache.createPool(2L, UUID.randomUUID().toString, "config"), Duration.Inf)
-    val beforeDeletion = Await.result(cache.getPools(2L), Duration.Inf)
+    val poolRandom = Await.result(cache.createPool(User(PUB_KEY_2, 0, Option(2L)),UUID.randomUUID().toString, "config"), Duration.Inf)
+    val beforeDeletion = Await.result(cache.getPools(PUB_KEY_2), Duration.Inf)
     assertEquals(3, beforeDeletion.size)
     assertTrue(beforeDeletion.contains(poolRandom))
 
-    val afterDeletion = Await.result(cache.deletePool(2L, poolRandom.getName).flatMap(_=>cache.getPools(2L)), Duration.Inf)
+    val afterDeletion = Await.result(cache.deletePool(User(PUB_KEY_2, 0, Option(2L)), poolRandom.getName).flatMap(_=>cache.getPools(PUB_KEY_2)), Duration.Inf)
     assertFalse(afterDeletion.contains(poolRandom))
+  }
+
+  @Test def verifyGetCurrencies(): Unit = {
+    val currencies = Await.result(cache.getCurrencies("pool_1"), Duration.Inf)
+    assertEquals(1, currencies.size)
+    val currency = Await.result(cache.getCurrency("pool_2", "bitcoin"), Duration.Inf)
+    assertEquals(currency.getName, currencies(0).getName)
   }
 
 }
@@ -63,8 +68,8 @@ class DaemonCacheTest extends AssertionsForJUnit {
 object DaemonCacheTest {
   @BeforeClass def initialization(): Unit = {
     NativeLibLoader.loadLibs()
-    Await.result(dbDao.insertUser(User(UUID.randomUUID().toString, 0)), Duration.Inf)
-    Await.result(dbDao.insertUser(User(UUID.randomUUID().toString, 0)), Duration.Inf)
+    Await.result(dbDao.insertUser(User(PUB_KEY_1, 0)), Duration.Inf)
+    Await.result(dbDao.insertUser(User(PUB_KEY_2, 0)), Duration.Inf)
     Await.result(dbDao.insertPool(Pool("pool_1", 1L, "")), Duration.Inf)
     Await.result(dbDao.insertPool(Pool("pool_2", 1L, "")), Duration.Inf)
     Await.result(dbDao.insertPool(Pool("pool_1", 2L, "")), Duration.Inf)
@@ -73,4 +78,6 @@ object DaemonCacheTest {
   }
   private val cache: DefaultDaemonCache = new DefaultDaemonCache()
   private val dbDao: DatabaseDao = DatabaseService.dbDao
+  private val PUB_KEY_1 = UUID.randomUUID().toString
+  private val PUB_KEY_2 = UUID.randomUUID().toString
 }

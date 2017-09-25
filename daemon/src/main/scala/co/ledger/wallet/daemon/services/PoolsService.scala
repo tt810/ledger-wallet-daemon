@@ -14,24 +14,24 @@ class PoolsService @Inject()(daemonCache: DefaultDaemonCache) extends DaemonServ
 
   def createPool(user: User, poolName: String, configuration: PoolConfiguration): Future[models.WalletPool] = {
     info(s"Start to create pool: poolName=$poolName configuration=$configuration userPubKey=${user.pubKey}")
-    daemonCache.createPool(user.id.get, poolName, configuration.toString).flatMap(corePool => models.newInstance(corePool))
+    daemonCache.createPool(user, poolName, configuration.toString).flatMap(corePool => models.newInstance(corePool))
   }
 
   def pools(user: User): Future[Seq[models.WalletPool]] = {
     info(s"Obtain pools with params: userPubKey=${user.pubKey}")
-    daemonCache.getPools(user.id.get).flatMap { pools =>
+    daemonCache.getPools(user.pubKey).flatMap { pools =>
       Future.sequence(pools.map(corePool => models.newInstance(corePool)))
     }
   }
 
   def pool(user: User, poolName: String): Future[models.WalletPool] = {
     info(s"Obtain pool with params: poolName=$poolName userPubKey=${user.pubKey}")
-    daemonCache.getPool(user.id.get, poolName).flatMap(models.newInstance(_))
+    daemonCache.getPool(user.pubKey, poolName).flatMap(models.newInstance(_))
   }
 
   def removePool(user: User, poolName: String): Future[Unit] = {
     info(s"Start to remove pool: poolName=$poolName userPubKey=${user.pubKey}")
-    daemonCache.deletePool(user.id.get, poolName)
+    daemonCache.deletePool(user, poolName)
   }
 
 }
