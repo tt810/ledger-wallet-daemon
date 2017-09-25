@@ -4,7 +4,6 @@ import java.util.UUID
 
 import co.ledger.wallet.daemon.exceptions._
 import org.junit.Assert._
-import co.ledger.wallet.daemon.services.DatabaseService
 import djinni.NativeLibLoader
 import org.junit.{BeforeClass, Test}
 import org.scalatest.junit.AssertionsForJUnit
@@ -68,16 +67,18 @@ class DaemonCacheTest extends AssertionsForJUnit {
 object DaemonCacheTest {
   @BeforeClass def initialization(): Unit = {
     NativeLibLoader.loadLibs()
-    Await.result(dbDao.insertUser(User(PUB_KEY_1, 0)), Duration.Inf)
-    Await.result(dbDao.insertUser(User(PUB_KEY_2, 0)), Duration.Inf)
-    Await.result(dbDao.insertPool(Pool("pool_1", 1L, "")), Duration.Inf)
-    Await.result(dbDao.insertPool(Pool("pool_2", 1L, "")), Duration.Inf)
-    Await.result(dbDao.insertPool(Pool("pool_1", 2L, "")), Duration.Inf)
-    Await.result(dbDao.insertPool(Pool("pool_3", 2L, "")), Duration.Inf)
+    Await.result(DefaultDaemonCache.migrateDatabase(), Duration.Inf)
+    val user1 = User(PUB_KEY_1, 0, Option(1L))
+    val user2 = User(PUB_KEY_2, 0, Option(2L))
+    Await.result(cache.createUser(user1), Duration.Inf)
+    Await.result(cache.createUser(user2), Duration.Inf)
+    Await.result(cache.createPool(user1, "pool_1", ""), Duration.Inf)
+    Await.result(cache.createPool(user1, "pool_2", ""), Duration.Inf)
+    Await.result(cache.createPool(user2, "pool_1", ""), Duration.Inf)
+    Await.result(cache.createPool(user2, "pool_3", ""), Duration.Inf)
     DefaultDaemonCache.initialize()
   }
   private val cache: DefaultDaemonCache = new DefaultDaemonCache()
-  private val dbDao: DatabaseDao = DatabaseService.dbDao
   private val PUB_KEY_1 = UUID.randomUUID().toString
   private val PUB_KEY_2 = UUID.randomUUID().toString
 }

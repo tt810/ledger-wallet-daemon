@@ -3,7 +3,7 @@ package co.ledger.wallet.daemon.services
 import javax.inject.{Inject, Singleton}
 
 import co.ledger.wallet.daemon.DaemonConfiguration
-import co.ledger.wallet.daemon.database.User
+import co.ledger.wallet.daemon.database.{DefaultDaemonCache, User}
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.twitter.inject.Logging
 import org.bitcoinj.core.Sha256Hash
@@ -13,13 +13,11 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 @Singleton
-class UsersService @Inject()(ecdsa: ECDSAService) extends DaemonService {
+class UsersService @Inject()(daemonCache: DefaultDaemonCache, ecdsa: ECDSAService) extends DaemonService {
 
   def createUser(publicKey: String, permissions: Long = 0): Future[Unit] = {
     info(s"Start to insert user with params: permissions=$permissions pubKey=$publicKey")
-    dbDao.insertUser(User(publicKey, permissions)) map {_ =>
-      ()
-    }
+    daemonCache.createUser(User(publicKey, permissions)).map(_ => ())
   }
 
   def createUser(username: String, password: String): Future[Unit] = {
@@ -27,7 +25,6 @@ class UsersService @Inject()(ecdsa: ECDSAService) extends DaemonService {
     val user = s"Basic ${Base64.toBase64String(s"$username:$password".getBytes)}"
     createUser(user.getBytes)
   }
-
 
   private def createUser(user: Array[Byte]): Future[Unit] = {
     val privKey = Sha256Hash.hash(user)
@@ -42,14 +39,16 @@ class UsersService @Inject()(ecdsa: ECDSAService) extends DaemonService {
     }
   }
 
-  private val dbDao = DatabaseService.dbDao
 }
 
 object UsersService extends Logging {
 
-  def initialize(usersService: UsersService): Future[Unit] = Future {
-    insertDemoUsers(usersService)
-    insertWhitelistedUsers(usersService)
+  def initialize(usersService: UsersService): Future[Unit] = {
+    insertDemoUsers(usersService).flatMap { _ =>
+      insertWhitelistedUsers(usersService).map { _ =>
+        ()
+      }
+    }
   }
 
   private def insertDemoUsers(usersService: UsersService) = Future.sequence {
@@ -57,18 +56,13 @@ object UsersService extends Logging {
     DaemonConfiguration.adminUsers.map { user =>
       usersService.createUser(user.getBytes())
     }
-  }.onComplete {
-    case success => debug("Finish inserting demo users")
   }
-
 
   private def insertWhitelistedUsers(usersService: UsersService) = Future.sequence {
     debug("Start insert whitelist users...")
     DaemonConfiguration.whiteListUsers.map { user =>
       usersService.createUser(user._1, user._2)
     }
-  }.onComplete {
-    case success => debug("Finish inserting whitelist users")
   }
 
 }

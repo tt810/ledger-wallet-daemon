@@ -5,7 +5,7 @@ import java.util.Date
 import javax.inject.{Inject, Singleton}
 
 import co.ledger.wallet.daemon.DaemonConfiguration
-import co.ledger.wallet.daemon.database.User
+import co.ledger.wallet.daemon.database.{DefaultDaemonCache, User}
 import co.ledger.wallet.daemon.services.AuthenticationService.{AuthenticationFailedException, AuthentifiedUserContext}
 import com.twitter.finagle.http.Request
 import com.twitter.util.Future
@@ -15,12 +15,11 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.utils._
 
 @Singleton
-class AuthenticationService @Inject()(ecdsa: ECDSAService) extends DaemonService {
+class AuthenticationService @Inject()(daemonCache: DefaultDaemonCache, ecdsa: ECDSAService) extends DaemonService {
   import co.ledger.wallet.daemon.services.AuthenticationService.AuthContextContext._
-  private val dbDao = DatabaseService.dbDao
 
   def authorize(request: Request): Future[Unit] = {
-    dbDao.getUser(request.authContext.pubKey) map { (usr) =>
+    daemonCache.getUser(request.authContext.pubKey) map { (usr) =>
       if (usr.isEmpty)
         throw AuthenticationFailedException()
       usr.get
