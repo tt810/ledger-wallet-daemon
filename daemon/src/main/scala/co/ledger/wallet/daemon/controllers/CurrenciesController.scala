@@ -2,9 +2,8 @@ package co.ledger.wallet.daemon.controllers
 
 import javax.inject.Inject
 
-import co.ledger.core.implicits.CurrencyNotFoundException
 import co.ledger.wallet.daemon.database.Pool
-import co.ledger.wallet.daemon.exceptions.ResourceNotFoundException
+import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.{ErrorCode, ErrorResponseBody}
 import co.ledger.wallet.daemon.services.CurrenciesService
 import co.ledger.wallet.daemon.utils.RichRequest
@@ -21,8 +20,8 @@ class CurrenciesController @Inject() (currenciesService: CurrenciesService) exte
   get("/pools/:pool_name/currencies/:currency_name") { request: GetCurrencyRequest =>
     val poolName = request.pool_name
     val currencyName = request.currency_name
-    currenciesService.currency(request.user, poolName, currencyName).recover {
-      case pnfe: ResourceNotFoundException[ClassTag[Pool] @unchecked] => {
+    currenciesService.currency(currencyName, poolName).recover {
+      case pnfe: WalletPoolNotFoundException => {
         debug("Not Found", pnfe)
         response.badRequest()
           .body(ErrorResponseBody(ErrorCode.Invalid_Request, s"$poolName is not a pool"))
@@ -42,8 +41,8 @@ class CurrenciesController @Inject() (currenciesService: CurrenciesService) exte
 
   get("/pools/:pool_name/currencies") {request: GetCurrenciesRequest =>
     val poolName = request.pool_name
-    currenciesService.currencies(request.user, poolName).recover {
-      case pnfe: ResourceNotFoundException[ClassTag[Pool] @unchecked] => {
+    currenciesService.currencies(poolName).recover {
+      case pnfe: WalletPoolNotFoundException => {
         debug("Not Found", pnfe)
         response.badRequest()
           .body(ErrorResponseBody(ErrorCode.Invalid_Request, s"$poolName is not a pool"))

@@ -3,7 +3,7 @@ package co.ledger.wallet.daemon.controllers
 import javax.inject.Inject
 
 import co.ledger.wallet.daemon.database.Pool
-import co.ledger.wallet.daemon.exceptions.{ResourceAlreadyExistException, ResourceNotFoundException}
+import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.{ErrorCode, ErrorResponseBody}
 import co.ledger.wallet.daemon.models._
 import co.ledger.wallet.daemon.services.PoolsService
@@ -31,7 +31,7 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
   get("/pools/:pool_name") {(request: Request) =>
     val poolName = request.getParam("pool_name")
     poolsService.pool(request.user.get, poolName).recover {
-      case pe: ResourceNotFoundException[ClassTag[Pool] @unchecked] => {
+      case pe: WalletPoolNotFoundException => {
         debug("Not Found", pe)
         response.notFound()
           .body(ErrorResponseBody(ErrorCode.Not_Found, s"$poolName is not a pool"))
@@ -48,7 +48,7 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
     val poolName = request.getParam("pool_name")
     // TODO: Deserialize the configuration from the body of the request
     poolsService.createPool(request.user.get, poolName, PoolConfiguration()).recover {
-      case alreadyExist: ResourceAlreadyExistException[ClassTag[Pool] @unchecked] => {
+      case alreadyExist: WalletPoolAlreadyExistException => {
         debug("Duplicate request", alreadyExist)
         response.ok()
           .body(ErrorResponseBody(ErrorCode.Duplicate_Request, s"Attempt creating $poolName request is ignored"))
@@ -64,7 +64,7 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
   delete("/pools/:pool_name") {(request: Request) =>
     val poolName = request.getParam("pool_name")
     poolsService.removePool(request.user.get, poolName).recover {
-      case pe: ResourceNotFoundException[ClassTag[Pool] @unchecked] => {
+      case pe: WalletPoolNotFoundException => {
        debug("Not Found", pe)
        response.notFound()
           .body(ErrorResponseBody(ErrorCode.Invalid_Request, s"Attempt deleting $poolName request is ignored"))

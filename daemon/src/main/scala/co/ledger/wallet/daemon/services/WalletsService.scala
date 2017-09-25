@@ -17,7 +17,7 @@ class WalletsService @Inject()(daemonCache: DefaultDaemonCache) extends DaemonSe
 
   def wallets(user: User, poolName: String, offset: Int, bulkSize: Int): Future[WalletBulk] = {
     info(s"Obtain wallets with params: poolName=$poolName offset=$offset bulkSize=$bulkSize userPubKey=${user.pubKey}")
-    daemonCache.getPool(user.id.get, poolName).flatMap { corePool =>
+    daemonCache.getPool(user.pubKey, poolName).flatMap { corePool =>
       corePool.getWalletCount().flatMap { (count) =>
         corePool.getWallets(offset, bulkSize) map { (wallets) =>
           val walletArr = wallets.asScala.toArray
@@ -30,7 +30,7 @@ class WalletsService @Inject()(daemonCache: DefaultDaemonCache) extends DaemonSe
 
   def wallet(user: User, poolName: String, walletName: String): Future[CoreWallet] = {
     info(s"Obtain wallet with params: poolName=$poolName walletName=$walletName userPubKey=${user.pubKey}")
-    daemonCache.getPool(user.id.get, poolName).flatMap {corePool =>
+    daemonCache.getPool(user.pubKey, poolName).flatMap {corePool =>
       corePool.getWallet(walletName).map { wallet =>
         info(s"wallet obtained: wallet=$wallet")
         wallet
@@ -40,7 +40,7 @@ class WalletsService @Inject()(daemonCache: DefaultDaemonCache) extends DaemonSe
 
   def createWallet(user: User, poolName: String, walletName: String, params: WalletCreationParameters): Future[CoreWallet] = {
     info(s"Start to create wallet: poolName=$poolName walletName=$walletName extraParams=$params userPubKey=${user.pubKey}")
-    daemonCache.getPool(user.id.get, poolName).flatMap {corePool =>
+    daemonCache.getPool(user.pubKey, poolName).flatMap {corePool =>
       corePool.getCurrency(params.currency) flatMap { (currency) =>
         corePool.createWallet(walletName, currency, params.configuration).map { wallet =>
           info(s"Finish creating wallet: $wallet")

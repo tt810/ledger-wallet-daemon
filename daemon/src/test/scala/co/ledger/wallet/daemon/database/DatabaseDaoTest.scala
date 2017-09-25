@@ -1,6 +1,6 @@
 package co.ledger.wallet.daemon.database
 
-import co.ledger.wallet.daemon.exceptions.{DaemonDatabaseException, ResourceAlreadyExistException}
+import co.ledger.wallet.daemon.exceptions.{DaemonDatabaseException, UserAlreadyExistException}
 import co.ledger.wallet.daemon.services.DatabaseService
 import co.ledger.wallet.daemon.utils.HexUtils
 import org.scalatest.junit.AssertionsForJUnit
@@ -9,7 +9,6 @@ import org.junit.Assert._
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
-import scala.reflect.ClassTag
 
 class DatabaseDaoTest extends AssertionsForJUnit {
 
@@ -32,7 +31,7 @@ class DatabaseDaoTest extends AssertionsForJUnit {
       Await.result(dbDao.insertUser(user2), Duration.Inf)
       fail()
     } catch {
-      case e: ResourceAlreadyExistException[ClassTag[User] @unchecked] => // Excepted
+      case e: UserAlreadyExistException => // Excepted
     }
   }
 
