@@ -15,11 +15,13 @@ import co.ledger.core.implicits._
 import co.ledger.wallet.daemon.DaemonConfiguration
 import co.ledger.wallet.daemon.async.SerialExecutionContext
 import co.ledger.wallet.daemon.exceptions._
+import co.ledger.wallet.daemon.exceptions.CurrencyNotFoundException
 import slick.jdbc.JdbcBackend.Database
 
 import scala.concurrent.Future
 import collection.JavaConverters._
 import scala.concurrent.ExecutionContext
+
 
 /**
   * TODO: Add wallets and accounts to cache
@@ -34,22 +36,33 @@ class DefaultDaemonCache extends DaemonCache {
     debug(s"Create pool with params: poolName=$poolName user=$user configuration=$configuration")
     val newPool = Pool(poolName, user.id.get, configuration)
 
-    dbDao.insertPool(newPool).flatMap { (_) =>
+    dbDao.insertPool(newPool).map { (_) =>
       addToCache(user,newPool).map { walletPool =>
         info(s"Finish creating pool: $newPool")
         walletPool
       }
-    }
+    }.recover {
+      case e: WalletPoolAlreadyExistException => {
+        debug(s"Wallet pool already exist: ${e.getMessage}")
+        getPool(user.pubKey, poolName)
+      }
+    }.flatten
   }
 
   def createWallet(walletName: String, currencyName: String, poolName: String, user: User): Future[core.Wallet] = {
     debug(s"Create wallet with params: wallet=${walletName} currency=$currencyName poolName=$poolName userPubKey=${user.pubKey}")
     getPool(user.pubKey, poolName).flatMap { corePool =>
       getCurrency(corePool.getName, currencyName).flatMap { currency =>
-        corePool.createWallet(walletName, currency, core.DynamicObject.newInstance()).map { wallet =>
+        val coreW = corePool.createWallet(walletName, currency, core.DynamicObject.newInstance()).map { wallet =>
           debug(s"Core wallet created: $wallet")
-          wallet
+          Future.successful(wallet)
+        }.recover {
+          case e: WalletAlreadyExistsException => {
+            debug(s"Core wallet already exist: ${e.getMessage}")
+            corePool.getWallet(walletName)
+          }
         }
+        coreW.flatten
       }
     }
   }
@@ -67,10 +80,8 @@ class DefaultDaemonCache extends DaemonCache {
     debug(s"Remove pool with params: poolName=$poolName user=$user")
     // p.release() TODO once WalletPool#release exists
     dbDao.deletePool(poolName, user.id.get) map { deletedRowCount =>
-      if(deletedRowCount == 0)
-        throw new WalletPoolNotFoundException(poolName)
-      else
-        getNamedPools(user.pubKey).remove(poolName)
+      debug(s"Pool deleted: name=$poolName count=$deletedRowCount")
+      getNamedPools(user.pubKey).remove(poolName)
     }
   }
 
@@ -79,7 +90,7 @@ class DefaultDaemonCache extends DaemonCache {
     val namedCurrencies = getNamedCurrencies(poolName)
     val currency = namedCurrencies.getOrDefault(currencyName, null)
     if(currency == null)
-      throw new co.ledger.wallet.daemon.exceptions.CurrencyNotFoundException(currencyName)
+      throw new CurrencyNotFoundException(currencyName)
     else
       currency
   }
