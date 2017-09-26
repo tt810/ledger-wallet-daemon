@@ -2,7 +2,7 @@ package co.ledger.wallet.daemon.controllers
 
 import javax.inject.Inject
 
-import co.ledger.wallet.daemon.exceptions.{CurrencyNotFoundException, WalletAlreadyExistException, WalletNotFoundException, WalletPoolNotFoundException}
+import co.ledger.wallet.daemon.exceptions.{CurrencyNotFoundException, WalletNotFoundException, WalletPoolNotFoundException}
 import co.ledger.wallet.daemon.{ErrorCode, ErrorResponseBody}
 import co.ledger.wallet.daemon.services.WalletsService
 import co.ledger.wallet.daemon.utils.RichRequest
@@ -21,10 +21,10 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
       request.user,
       request.pool_name,
       request.offset.getOrElse(0),
-      request.offset.getOrElse(20))
+      request.count.getOrElse(20))
       .recover {
         case pnfe: WalletPoolNotFoundException => {
-          debug("Not Found", pnfe)
+          debug("Invalid Request", pnfe)
           response.badRequest()
             .body(ErrorResponseBody(ErrorCode.Invalid_Request, s"Wallet pool ${request.pool_name} doesn't exist"))
         }
@@ -39,7 +39,7 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
   get("/pools/:pool_name/wallets/:wallet_name") { request: GetWalletRequest =>
     walletsService.wallet(request.user, request.pool_name, request.wallet_name).recover {
       case pnfe: WalletPoolNotFoundException => {
-        debug("Not Found", pnfe)
+        debug("Invalid Request", pnfe)
         response.badRequest()
           .body(ErrorResponseBody(ErrorCode.Invalid_Request, s"Wallet pool ${request.pool_name} doesn't exist"))
       }
@@ -60,18 +60,13 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
     walletsService.createWallet(request.user, request.pool_name, request.wallet_name, request.currency_name).recover {
       case cnfe: CurrencyNotFoundException => {
         debug("Invalid Request", cnfe)
-        response.notFound()
+        response.badRequest()
           .body(ErrorResponseBody(ErrorCode.Invalid_Request, s"Currency ${request.currency_name} is not supported"))
       }
       case pnfe: WalletPoolNotFoundException => {
-        debug("Not Found", pnfe)
+        debug("Invalid Request", pnfe)
         response.badRequest()
           .body(ErrorResponseBody(ErrorCode.Invalid_Request, s"Wallet pool ${request.pool_name} doesn't exist"))
-      }
-      case alreadyExist: WalletAlreadyExistException => {
-        debug("Duplicate request", alreadyExist)
-        response.ok()
-          .body(ErrorResponseBody(ErrorCode.Duplicate_Request, s"Attempt creating wallet ${request.wallet_name} request is ignored"))
       }
       case e: Throwable =>
         error("Internal error", e)

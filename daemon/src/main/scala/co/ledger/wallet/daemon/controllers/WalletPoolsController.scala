@@ -48,11 +48,6 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
     val poolName = request.getParam("pool_name")
     // TODO: Deserialize the configuration from the body of the request
     poolsService.createPool(request.user.get, poolName, PoolConfiguration()).recover {
-      case alreadyExist: WalletPoolAlreadyExistException => {
-        debug("Duplicate request", alreadyExist)
-        response.ok()
-          .body(ErrorResponseBody(ErrorCode.Duplicate_Request, s"Attempt creating wallet pool $poolName request is ignored"))
-      }
       case e: Throwable => {
         error("Internal error", e)
         response.ok()
