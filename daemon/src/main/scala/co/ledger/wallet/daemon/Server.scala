@@ -4,6 +4,7 @@ import co.ledger.wallet.daemon.controllers._
 import co.ledger.wallet.daemon.database.DefaultDaemonCache
 import co.ledger.wallet.daemon.filters.{AuthenticationFilter, DemoUserAuthenticationFilter, LWDAutenticationFilter}
 import co.ledger.wallet.daemon.mappers.AuthenticationExceptionMapper
+import co.ledger.wallet.daemon.modules.DaemonJacksonModule
 import co.ledger.wallet.daemon.services.UsersService
 import com.twitter.finatra.http.HttpServer
 import com.twitter.finatra.http.filters.CommonFilters
@@ -15,6 +16,8 @@ object Server extends ServerImpl {
 }
 
 class ServerImpl extends HttpServer {
+
+  override def jacksonModule = DaemonJacksonModule
 
   override protected def configureHttp(router: HttpRouter): Unit =
     router
