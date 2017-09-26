@@ -16,13 +16,13 @@ class CurrenciesApiTest extends APIFeatureTest {
   test("CurrenciesApi#Get currency from non-existing pool returns bad request") {
     assert(server.mapper.objectMapper.readValue[ErrorResponseBody](
       assertCurrency(CURRENCY_NON_EXIST_POOL, CURRENCY_BTC, Status.BadRequest).contentString)
-      == ErrorResponseBody(ErrorCode.Invalid_Request,"non_exist_pool is not a pool"))
+      == ErrorResponseBody(ErrorCode.Invalid_Request,"Wallet pool non_exist_pool doesn't exist"))
   }
 
   test("CurrenciesApi#Get non-supported currency from existing pool returns currency not found") {
     assert(server.mapper.objectMapper.readValue[ErrorResponseBody](
     assertCurrency(CURRENCY_POOL, CURRENCY_NON_EXIST, Status.NotFound).contentString)
-      == ErrorResponseBody(ErrorCode.Not_Found, s"$CURRENCY_NON_EXIST is not a currency"))
+      == ErrorResponseBody(ErrorCode.Not_Found, s"Currency $CURRENCY_NON_EXIST is not supported"))
   }
 
   test("CurrenciesApi#Get currencies returns all") {
@@ -34,7 +34,7 @@ class CurrenciesApiTest extends APIFeatureTest {
   test("CurrenciesApi#Get currencies from non-existing pool returns bad request") {
     assert(server.mapper.objectMapper.readValue[ErrorResponseBody](
       assertCurrencies(CURRENCY_NON_EXIST_POOL, Status.BadRequest).contentString)
-      == ErrorResponseBody(ErrorCode.Invalid_Request,"non_exist_pool is not a pool"))
+      == ErrorResponseBody(ErrorCode.Invalid_Request,"Wallet pool non_exist_pool doesn't exist"))
   }
 
   private def assertCurrency(poolName: String, currencyName: String, expected: Status): Response = {

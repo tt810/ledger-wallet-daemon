@@ -34,7 +34,7 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
       case pe: WalletPoolNotFoundException => {
         debug("Not Found", pe)
         response.notFound()
-          .body(ErrorResponseBody(ErrorCode.Not_Found, s"$poolName is not a pool"))
+          .body(ErrorResponseBody(ErrorCode.Not_Found, s"Wallet pool $poolName doesn't exist"))
       }
       case e: Throwable => {
         error("Internal error", e)
@@ -51,7 +51,7 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
       case alreadyExist: WalletPoolAlreadyExistException => {
         debug("Duplicate request", alreadyExist)
         response.ok()
-          .body(ErrorResponseBody(ErrorCode.Duplicate_Request, s"Attempt creating $poolName request is ignored"))
+          .body(ErrorResponseBody(ErrorCode.Duplicate_Request, s"Attempt creating wallet pool $poolName request is ignored"))
       }
       case e: Throwable => {
         error("Internal error", e)
@@ -67,7 +67,7 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
       case pe: WalletPoolNotFoundException => {
        debug("Not Found", pe)
        response.notFound()
-          .body(ErrorResponseBody(ErrorCode.Invalid_Request, s"Attempt deleting $poolName request is ignored"))
+          .body(ErrorResponseBody(ErrorCode.Invalid_Request, s"Attempt deleting wallet pool $poolName request is ignored"))
       }
       case e: Throwable => {
         error("Internal error", e)

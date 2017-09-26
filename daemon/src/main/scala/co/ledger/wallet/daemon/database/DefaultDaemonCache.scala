@@ -3,7 +3,7 @@ package co.ledger.wallet.daemon.database
 import java.util.concurrent.{ConcurrentHashMap, Executors}
 import javax.inject.Singleton
 
-import co.ledger.core._
+import co.ledger.core
 import co.ledger.wallet.daemon.libledger_core.async.ScalaThreadDispatcher
 import co.ledger.wallet.daemon.libledger_core.crypto.SecureRandomRNG
 import co.ledger.wallet.daemon.libledger_core.debug.NoOpLogPrinter
@@ -21,12 +21,15 @@ import scala.concurrent.Future
 import collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 
+/**
+  * TODO: Add wallets and accounts to cache
+  */
 @Singleton
 class DefaultDaemonCache extends DaemonCache {
   import DefaultDaemonCache._
   private val _writeContext = SerialExecutionContext.newInstance()
 
-  def createPool(user: User, poolName: String, configuration: String): Future[WalletPool] = {
+  def createPool(user: User, poolName: String, configuration: String): Future[core.WalletPool] = {
     implicit val ec = _writeContext
     debug(s"Create pool with params: poolName=$poolName user=$user configuration=$configuration")
     val newPool = Pool(poolName, user.id.get, configuration)
@@ -39,8 +42,24 @@ class DefaultDaemonCache extends DaemonCache {
     }
   }
 
+  def createWallet(walletName: String, currencyName: String, poolName: String, user: User): Future[core.Wallet] = {
+    debug(s"Create wallet with params: wallet=${walletName} currency=$currencyName poolName=$poolName userPubKey=${user.pubKey}")
+    getPool(user.pubKey, poolName).flatMap { corePool =>
+      getCurrency(corePool.getName, currencyName).flatMap { currency =>
+        corePool.createWallet(walletName, currency, core.DynamicObject.newInstance()).map { wallet =>
+          debug(s"Core wallet created: $wallet")
+          wallet
+        }
+      }
+    }
+  }
+
   def createUser(user: User): Future[Int] = {
-    dbDao.insertUser(user)
+    debug(s"Create user with params: user=$user")
+    dbDao.insertUser(user).map { int =>
+      userPools.put(user.pubKey, new ConcurrentHashMap[String, core.WalletPool]())
+      int
+    }
   }
 
   def deletePool(user: User, poolName: String): Future[Unit] = {
@@ -55,22 +74,7 @@ class DefaultDaemonCache extends DaemonCache {
     }
   }
 
-  def getPool(pubKey: String, poolName: String): Future[WalletPool] = Future {
-    debug(s"Retrieve core wallet pool with params: poolName=$poolName userPubKey=$pubKey")
-    val namedPools = getNamedPools(pubKey)
-    val pool = namedPools.getOrDefault(poolName, null)
-    if(pool == null)
-      throw new WalletPoolNotFoundException(poolName)
-    else
-      pool
-  }
-
-  def getPools(pubKey: String): Future[Seq[WalletPool]] = Future {
-    debug(s"Retrieve core wallet pools with params: userPubKey=$pubKey")
-    getNamedPools(pubKey).values().asScala.toList
-  }
-
-  def getCurrency(poolName: String, currencyName: String): Future[Currency] = Future {
+  def getCurrency(poolName: String, currencyName: String): Future[core.Currency] = Future {
     debug(s"Retrieve core currency with params: currencyName=$currencyName poolName=$poolName")
     val namedCurrencies = getNamedCurrencies(poolName)
     val currency = namedCurrencies.getOrDefault(currencyName, null)
@@ -80,16 +84,49 @@ class DefaultDaemonCache extends DaemonCache {
       currency
   }
 
-  def getCurrencies(poolName: String): Future[Seq[Currency]] = Future {
+  def getCurrencies(poolName: String): Future[Seq[core.Currency]] = Future {
     debug(s"Retrieve core currencies with params: poolName=$poolName")
     getNamedCurrencies(poolName).values().asScala.toList
   }
 
-  def getUser(pubKey: Array[Byte]): Future[Option[User]] =  {
+  def getPool(pubKey: String, poolName: String): Future[core.WalletPool] = Future {
+    debug(s"Retrieve core wallet pool with params: poolName=$poolName userPubKey=$pubKey")
+    val namedPools = getNamedPools(pubKey)
+    val pool = namedPools.getOrDefault(poolName, null)
+    if(pool == null)
+      throw new WalletPoolNotFoundException(poolName)
+    else
+      pool
+  }
+
+  def getPools(pubKey: String): Future[Seq[core.WalletPool]] = Future {
+    debug(s"Retrieve core wallet pools with params: userPubKey=$pubKey")
+    getNamedPools(pubKey).values().asScala.toList
+  }
+
+  def getWallets(walletBulk: Bulk, poolName: String, pubKey: String): Future[WalletsWithCount] = {
+    debug(s"Retrieve core wallet with params: (offset, bulkSize=$walletBulk poolName=$poolName userPubKey=$pubKey")
+    getPool(pubKey, poolName).flatMap { corePool =>
+      corePool.getWalletCount().flatMap { count =>
+        corePool.getWallets(walletBulk.offset, walletBulk.bulkSize) map { wallets =>
+          WalletsWithCount(count, wallets.asScala.toArray)
+        }
+      }
+    }
+  }
+
+  def getWallet(walletName: String, poolName: String, pubKey: String): Future[core.Wallet] = {
+    debug(s"Retrieve core wallet with params: walletName=$walletName poolName=$poolName userPubKey=$pubKey")
+    getPool(pubKey, poolName).flatMap { corePool =>
+      corePool.getWallet(walletName)
+    }
+  }
+
+  def getUserFromDB(pubKey: Array[Byte]): Future[Option[User]] =  {
     dbDao.getUser(pubKey)
   }
 
-  private def getNamedCurrencies(poolName: String): ConcurrentHashMap[String, Currency] = {
+  private def getNamedCurrencies(poolName: String): ConcurrentHashMap[String, core.Currency] = {
     val namedCurrencies = pooledCurrencies.getOrDefault(poolName, null)
     if(namedCurrencies == null)
       throw new WalletPoolNotFoundException(poolName)
@@ -97,7 +134,7 @@ class DefaultDaemonCache extends DaemonCache {
       namedCurrencies
   }
 
-  private def getNamedPools(pubKey: String): ConcurrentHashMap[String, WalletPool] = {
+  private def getNamedPools(pubKey: String): ConcurrentHashMap[String, core.WalletPool] = {
     val namedPools = userPools.getOrDefault(pubKey, null)
     if(namedPools == null)
       throw new UserNotFoundException(pubKey)
@@ -132,44 +169,50 @@ object DefaultDaemonCache extends DaemonCache {
 
   private def poolIdentifier(userId: Long, poolName: String): String = HexUtils.valueOf(Sha256Hash.hash(s"${userId}:${poolName}".getBytes))
 
-  private def buildPool(pool: Pool): Future[WalletPool] = {
+  private def buildPool(pool: Pool): Future[core.WalletPool] = {
     val identifier = poolIdentifier(pool.userId, pool.name)
-    WalletPoolBuilder.createInstance()
+    core.WalletPoolBuilder.createInstance()
       .setHttpClient(new ScalaHttpClient)
       .setWebsocketClient(new ScalaWebSocketClient)
       .setLogPrinter(new NoOpLogPrinter(dispatcher.getMainExecutionContext))
       .setThreadDispatcher(dispatcher)
       .setPathResolver(new ScalaPathResolver(identifier))
       .setRandomNumberGenerator(new SecureRandomRNG)
-      .setDatabaseBackend(DatabaseBackend.getSqlite3Backend)
-      .setConfiguration(DynamicObject.newInstance())
+      .setDatabaseBackend(core.DatabaseBackend.getSqlite3Backend)
+      .setConfiguration(core.DynamicObject.newInstance())
       .setName(pool.name)
       .build()
   }
 
-  private def addToCache(user: User, pool: Pool): Future[WalletPool] = {
-    val namedPools = userPools.getOrDefault(user.pubKey, new ConcurrentHashMap[String, WalletPool]())
+  private def addToCache(user: User, pool: Pool): Future[core.WalletPool] = {
+
     buildPool(pool).map { p =>
       debug(s"Built core wallet pool: poolName=${p.getName} userId=${pool.userId}")
+      val namedPools = userPools.getOrDefault(user.pubKey, new ConcurrentHashMap[String, core.WalletPool]())
       // Add wallet pool to cache
       namedPools.put(pool.name, p)
       userPools.put(user.pubKey, namedPools)
       // Add currencies to cache TODO: remove this part after create currency function is supported
       p.getCurrencies().map { currencies =>
         debug(s"Retrieve currencies for wallet pool walletPool=${p.getName} currenciesSize=${currencies.size}")
-        currencies.forEach { currency =>
-          val crcies = pooledCurrencies.getOrDefault(p.getName, new ConcurrentHashMap[String, Currency]())
-          crcies.put(currency.getName, currency)
-          pooledCurrencies.put(p.getName, crcies)
-          debug(s"Currency added to cache currency=${currency.getName} walletPool=${p.getName}")
-        }
+        currencies.forEach(addToCache(_, p))
       }
       p
     }
   }
 
+  private def addToCache(currency: core.Currency, pool: core.WalletPool): Unit = {
+    val crcies = pooledCurrencies.getOrDefault(pool.getName, new ConcurrentHashMap[String, core.Currency]())
+    crcies.put(currency.getName, currency)
+    pooledCurrencies.put(pool.getName, crcies)
+    debug(s"Currency added to cache currency=${currency.getName} walletPool=${pool.getName}")
+  }
+
   private val dbDao             =   new DatabaseDao(Database.forConfig(DaemonConfiguration.dbProfileName))
   private val dispatcher        =   new ScalaThreadDispatcher(scala.concurrent.ExecutionContext.Implicits.global)
-  private val pooledCurrencies  =   new ConcurrentHashMap[String, ConcurrentHashMap[String, Currency]]()
-  private val userPools         =   new ConcurrentHashMap[String, ConcurrentHashMap[String, WalletPool]]()
+  private val pooledCurrencies  =   new ConcurrentHashMap[String, ConcurrentHashMap[String, core.Currency]]()
+  private val userPools         =   new ConcurrentHashMap[String, ConcurrentHashMap[String, core.WalletPool]]()
 }
+
+case class Bulk(offset: Int = 0, bulkSize: Int = 20)
+case class WalletsWithCount(count: Int, wallets: Array[core.Wallet])
