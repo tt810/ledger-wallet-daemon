@@ -19,7 +19,7 @@ class AuthenticationService @Inject()(daemonCache: DefaultDaemonCache, ecdsa: EC
   import co.ledger.wallet.daemon.services.AuthenticationService.AuthContextContext._
 
   def authorize(request: Request): Future[Unit] = {
-    daemonCache.getUser(request.authContext.pubKey) map { (usr) =>
+    daemonCache.getUserFromDB(request.authContext.pubKey) map { (usr) =>
       if (usr.isEmpty)
         throw AuthenticationFailedException()
       usr.get

@@ -24,12 +24,12 @@ class CurrenciesController @Inject() (currenciesService: CurrenciesService) exte
       case pnfe: WalletPoolNotFoundException => {
         debug("Not Found", pnfe)
         response.badRequest()
-          .body(ErrorResponseBody(ErrorCode.Invalid_Request, s"$poolName is not a pool"))
+          .body(ErrorResponseBody(ErrorCode.Invalid_Request, s"Wallet pool $poolName doesn't exist"))
       }
       case cnfe: CurrencyNotFoundException => {
         debug("Not Found", cnfe)
         response.notFound()
-          .body(ErrorResponseBody(ErrorCode.Not_Found, s"$currencyName is not a currency"))
+          .body(ErrorResponseBody(ErrorCode.Not_Found, s"Currency $currencyName is not supported"))
       }
       case e: Throwable => {
         error("Internal error", e)
@@ -45,7 +45,7 @@ class CurrenciesController @Inject() (currenciesService: CurrenciesService) exte
       case pnfe: WalletPoolNotFoundException => {
         debug("Not Found", pnfe)
         response.badRequest()
-          .body(ErrorResponseBody(ErrorCode.Invalid_Request, s"$poolName is not a pool"))
+          .body(ErrorResponseBody(ErrorCode.Invalid_Request, s"Wallet pool $poolName doesn't exist"))
       }
       case e: Throwable => {
         error("Internal error", e)

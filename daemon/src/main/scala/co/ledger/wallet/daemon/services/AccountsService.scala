@@ -38,19 +38,20 @@ class AccountsService @Inject()(walletsService: WalletsService) extends DaemonSe
     }
   }
 
-  def getNextAccountInfo(user: User, poolName: String, walletName: String): Future[NextAccountInformation] = {
-    info(s"Obtain next account information: poolName=$poolName walletName=$walletName userPubKey=${user.pubKey}")
-    walletsService.wallet(user, poolName, walletName).flatMap { (wallet) =>
-      wallet.getWalletType match {
-        case WalletType.BITCOIN => getBitcoinLikeNextAccountInfo(wallet)
-        case WalletType.ETHEREUM => ???
-        case WalletType.RIPPLE => ???
-        case WalletType.MONERO => ???
-      }
-    }
-  }
-  private def getBitcoinLikeNextAccountInfo(wallet: Wallet) =
-    wallet.asBitcoinLikeWallet().getNextAccountInfo().map(new BLNextAccountInformation(_))
+  def getNextAccountInfo(user: User, poolName: String, walletName: String): Future[NextAccountInformation] = ???
+//  {
+//    info(s"Obtain next account information: poolName=$poolName walletName=$walletName userPubKey=${user.pubKey}")
+//    walletsService.wallet(user, poolName, walletName).flatMap { (wallet) =>
+//      wallet.getWalletType match {
+//        case WalletType.BITCOIN => getBitcoinLikeNextAccountInfo(wallet)
+//        case WalletType.ETHEREUM => ???
+//        case WalletType.RIPPLE => ???
+//        case WalletType.MONERO => ???
+//      }
+//    }
+//  }
+//  private def getBitcoinLikeNextAccountInfo(wallet: Wallet) =
+//    wallet.asBitcoinLikeWallet().getNextAccountInfo().map(new BLNextAccountInformation(_))
 
 
 //  def removeAccount(user: User, poolName: String, walletName: String, accountIndex: Int) = TODO implement once exists on the lib

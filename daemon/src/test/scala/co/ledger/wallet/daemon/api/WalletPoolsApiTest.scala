@@ -36,10 +36,10 @@ class WalletPoolsApiTest extends APIFeatureTest {
   test("WalletPoolsApi#Get and delete non-exist pool return not found") {
     assert(
       server.mapper.objectMapper.readValue[ErrorResponseBody](getPool("not_exist_pool", Status.NotFound).contentString)
-        == ErrorResponseBody(ErrorCode.Not_Found, "not_exist_pool is not a pool"))
+        == ErrorResponseBody(ErrorCode.Not_Found, "Wallet pool not_exist_pool doesn't exist"))
     assert(
       server.mapper.objectMapper.readValue[ErrorResponseBody](deletePool("another_not_exist_pool").contentString)
-        == ErrorResponseBody(ErrorCode.Invalid_Request, "Attempt deleting another_not_exist_pool request is ignored"))
+        == ErrorResponseBody(ErrorCode.Invalid_Request, "Attempt deleting wallet pool another_not_exist_pool request is ignored"))
   }
 
   test("WalletPoolsApi#Create same pool twice return ok") {
@@ -48,7 +48,7 @@ class WalletPoolsApiTest extends APIFeatureTest {
         == WalletPool("same_pool", 0))
     assert(
       server.mapper.objectMapper.readValue[ErrorResponseBody](createPool("same_pool").contentString)
-        == ErrorResponseBody(ErrorCode.Duplicate_Request, "Attempt creating same_pool request is ignored"))
+        == ErrorResponseBody(ErrorCode.Duplicate_Request, "Attempt creating wallet pool same_pool request is ignored"))
     deletePool("same_pool")
   }
 

@@ -2,52 +2,28 @@ package co.ledger.wallet.daemon.services
 
 import javax.inject.{Inject, Singleton}
 
-import co.ledger.core.{DynamicObject, Wallet => CoreWallet}
-import co.ledger.wallet.daemon.database.{DefaultDaemonCache, User}
-import co.ledger.core.implicits._
+import co.ledger.core.{Wallet => CoreWallet}
+import co.ledger.wallet.daemon.database.{Bulk, DefaultDaemonCache, User, WalletsWithCount}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.Future
-import scala.concurrent.ExecutionContext.Implicits.global
+
 
 @Singleton
 class WalletsService @Inject()(daemonCache: DefaultDaemonCache) extends DaemonService {
 
-  import WalletsService._
-
-  def wallets(user: User, poolName: String, offset: Int, bulkSize: Int): Future[WalletBulk] = {
+  def wallets(user: User, poolName: String, offset: Int, bulkSize: Int): Future[WalletsWithCount] = {
     info(s"Obtain wallets with params: poolName=$poolName offset=$offset bulkSize=$bulkSize userPubKey=${user.pubKey}")
-    daemonCache.getPool(user.pubKey, poolName).flatMap { corePool =>
-      corePool.getWalletCount().flatMap { (count) =>
-        corePool.getWallets(offset, bulkSize) map { (wallets) =>
-          val walletArr = wallets.asScala.toArray
-          info(s"Wallets obtained: totalCount=$count size=${walletArr.size} walletNames=${walletArr.map(_.getName)}")
-          WalletBulk(count, offset, bulkSize, walletArr)
-        }
-      }
-    }
+    daemonCache.getWallets(Bulk(offset, bulkSize), poolName, user.pubKey)
   }
 
   def wallet(user: User, poolName: String, walletName: String): Future[CoreWallet] = {
     info(s"Obtain wallet with params: poolName=$poolName walletName=$walletName userPubKey=${user.pubKey}")
-    daemonCache.getPool(user.pubKey, poolName).flatMap {corePool =>
-      corePool.getWallet(walletName).map { wallet =>
-        info(s"wallet obtained: wallet=$wallet")
-        wallet
-      }
-    }
+    daemonCache.getWallet(walletName, poolName, user.pubKey)
   }
 
-  def createWallet(user: User, poolName: String, walletName: String, params: WalletCreationParameters): Future[CoreWallet] = {
-    info(s"Start to create wallet: poolName=$poolName walletName=$walletName extraParams=$params userPubKey=${user.pubKey}")
-    daemonCache.getPool(user.pubKey, poolName).flatMap {corePool =>
-      corePool.getCurrency(params.currency) flatMap { (currency) =>
-        corePool.createWallet(walletName, currency, params.configuration).map { wallet =>
-          info(s"Finish creating wallet: $wallet")
-          wallet
-        }
-      }
-    }
+  def createWallet(user: User, poolName: String, walletName: String, currencyName: String): Future[CoreWallet] = {
+    info(s"Start to create wallet: poolName=$poolName walletName=$walletName extraParams=none userPubKey=${user.pubKey}")
+    daemonCache.createWallet(walletName, currencyName, poolName, user)
   }
 
 //  def removeWallet(user: User, poolName: String, walletName: String) = TODO once the method exists on the library
@@ -55,12 +31,5 @@ class WalletsService @Inject()(daemonCache: DefaultDaemonCache) extends DaemonSe
 //      pool.
 //
 //    }
-
-}
-
-object WalletsService {
-
-  case class WalletBulk(count: Int, offset: Int, bulkSize: Int, wallets: Array[CoreWallet])
-  case class WalletCreationParameters(currency: String, configuration: DynamicObject)
 
 }

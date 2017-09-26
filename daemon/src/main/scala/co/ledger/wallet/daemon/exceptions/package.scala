@@ -2,6 +2,8 @@ package co.ledger.wallet.daemon
 
 package object exceptions {
 
+  case class WalletNotFoundException(        walletName: String) extends DaemonException(s"Wallet $walletName doesn't exist")
+  case class WalletAlreadyExistException(    walletName: String) extends DaemonException(s"Wallet $walletName already exists")
   case class WalletPoolNotFoundException(      poolName: String) extends DaemonException(s"Wallet pool $poolName doesn't exist")
   case class WalletPoolAlreadyExistException(  poolName: String) extends DaemonException(s"Wallet pool $poolName already exists")
   case class CurrencyNotFoundException(    currencyName: String) extends DaemonException(s"Currency $currencyName is not supported")

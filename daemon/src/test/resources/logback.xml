@@ -28,7 +28,7 @@
             <pattern>%date %thread [%level] %logger : %message%n</pattern>
         </encoder>
     </appender>
-    <logger name="co.ledger.wallet" level="info" />
+    <logger name="co.ledger.wallet.daemon.libledger_core" level="debug" />
     <logger name="co.ledger.wallet.daemon" level="debug" />
     <logger name="slick" level="warn" />
     <logger name="io.netty" level="warn" />
