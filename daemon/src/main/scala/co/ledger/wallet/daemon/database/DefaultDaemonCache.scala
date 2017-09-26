@@ -19,7 +19,6 @@ import slick.jdbc.JdbcBackend.Database
 
 import scala.concurrent.Future
 import collection.JavaConverters._
-import scala.util.Success
 import scala.concurrent.ExecutionContext
 
 @Singleton
