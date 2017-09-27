@@ -27,6 +27,7 @@ libraryDependencies ++= Seq(
   "io.github.andrebeat" %% "scala-pool" % "0.4.0",
 
   "com.twitter" %% "finatra-http" % versions.finatra,
+  "com.twitter" %% "finatra-jackson" % versions.finatra,
 
   "com.twitter" %% "finatra-http" % versions.finatra % "test",
   "com.twitter" %% "finatra-jackson" % versions.finatra % "test",

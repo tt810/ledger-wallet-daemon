@@ -5,9 +5,10 @@ import com.twitter.finatra.json.modules.FinatraJacksonModule
 
 object DaemonJacksonModule extends FinatraJacksonModule {
 
-//  override val additionalJacksonModules = Seq(
-//    new DaemonDeserializersModule
-//  )
+  override val additionalJacksonModules = Seq(
+    new DaemonDeserializersModule
+  )
+
 
   override def additionalMapperConfiguration(mapper: ObjectMapper): Unit = {
     mapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false)
