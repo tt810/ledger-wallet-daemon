@@ -1,9 +1,8 @@
 package co.ledger.wallet.daemon
 
-import co.ledger.core.{WalletPool => CoreWalletPool}
+import co.ledger.core.{BitcoinLikeNetworkParameters, CurrencyUnit, DynamicObject, Currency => CoreCurrency, WalletPool => CoreWalletPool, Wallet => CoreWallet}
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.fasterxml.jackson.annotation.JsonProperty
-import co.ledger.core.{BitcoinLikeNetworkParameters, CurrencyUnit, Currency => CoreCurrency}
 import co.ledger.core.implicits._
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.databind.{DeserializationContext, JsonDeserializer}
@@ -38,6 +37,11 @@ package object models {
 
   def newInstance(pool: CoreWalletPool): Future[WalletPool] =
     pool.getWalletCount().map(models.WalletPool(pool.getName, _))
+
+  def newInstance(coreWallet: CoreWallet): Unit = ???
+//  {
+//    Wallet(coreWallet.getName, newInstance(coreWallet.getCurrency), coreWallet.getAccountCount(), core)
+//  }
 
   def newInstance(coreCurrencyUnit: CurrencyUnit): Unit =
     Unit(
@@ -89,10 +93,10 @@ package object models {
 
   case class Wallet(
                      @JsonProperty("name") name: String,
+                     @JsonProperty("currency") currency: Currency,
                      @JsonProperty("account_count") accountCount: Int,
                      @JsonProperty("balance") balance: Long,
-                     @JsonProperty("currency") currency: Currency
-                     //@JsonProperty("configuration")              configuration:              Map[String, Any]
+                     @JsonProperty("configuration") configuration: Map[String, Any]
                    )
 
   trait NetworkParams

@@ -2,11 +2,9 @@ package co.ledger.wallet.daemon.services
 
 import javax.inject.{Inject, Singleton}
 
-import co.ledger.wallet.daemon.database.{DefaultDaemonCache, User}
-import co.ledger.core.implicits._
+import co.ledger.wallet.daemon.database.{DefaultDaemonCache}
 import co.ledger.wallet.daemon.models._
 
-import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
