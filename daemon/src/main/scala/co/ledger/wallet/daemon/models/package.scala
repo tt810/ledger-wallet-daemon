@@ -1,11 +1,9 @@
 package co.ledger.wallet.daemon
 
-import co.ledger.core.{BitcoinLikeNetworkParameters, CurrencyUnit, DynamicObject, Currency => CoreCurrency, WalletPool => CoreWalletPool, Wallet => CoreWallet}
+import co.ledger.core.{CurrencyUnit, Currency => CoreCurrency, Wallet => CoreWallet, WalletPool => CoreWalletPool}
 import co.ledger.wallet.daemon.utils.HexUtils
-import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.annotation._
 import co.ledger.core.implicits._
-import com.fasterxml.jackson.core.JsonParser
-import com.fasterxml.jackson.databind.{DeserializationContext, JsonDeserializer}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -13,27 +11,34 @@ import scala.concurrent.Future
 
 package object models {
 
-  def newInstance(coreCrcyNetworkPrms: BitcoinLikeNetworkParameters): BitcoinLikeNetworkParams =
-    BitcoinLikeNetworkParams(
-      coreCrcyNetworkPrms.getIdentifier,
-      utils.HexUtils.valueOf(coreCrcyNetworkPrms.getP2PKHVersion),
-      HexUtils.valueOf(coreCrcyNetworkPrms.getP2SHVersion),
-      HexUtils.valueOf(coreCrcyNetworkPrms.getXPUBVersion),
-      coreCrcyNetworkPrms.getFeePolicy.name,
-      coreCrcyNetworkPrms.getDustAmount,
-      coreCrcyNetworkPrms.getMessagePrefix,
-      coreCrcyNetworkPrms.getUsesTimestampedTransaction
-    )
+  def newInstance(crcyFamily: CurrencyFamily, coreCurrency: CoreCurrency): NetworkParams = crcyFamily match {
+    case CurrencyFamily.BITCOIN => {
+      val coreCrcyNetworkPrms = coreCurrency.getBitcoinLikeNetworkParameters
+      BitcoinLikeNetworkParams(
+        coreCrcyNetworkPrms.getIdentifier,
+        utils.HexUtils.valueOf(coreCrcyNetworkPrms.getP2PKHVersion),
+        HexUtils.valueOf(coreCrcyNetworkPrms.getP2SHVersion),
+        HexUtils.valueOf(coreCrcyNetworkPrms.getXPUBVersion),
+        coreCrcyNetworkPrms.getFeePolicy.name,
+        coreCrcyNetworkPrms.getDustAmount,
+        coreCrcyNetworkPrms.getMessagePrefix,
+        coreCrcyNetworkPrms.getUsesTimestampedTransaction
+      )
+    }
+    case _ => ???
+  }
 
-  def newInstance(crCrcy: CoreCurrency): Currency =
+  def newInstance(crCrcy: CoreCurrency): Currency = {
+    val currencyFamily = CurrencyFamily.valueOf(crCrcy.getWalletType.name())
     Currency(
       crCrcy.getName,
-      CurrencyFamily.valueOf(crCrcy.getWalletType.name),
+      currencyFamily,
       crCrcy.getBip44CoinType,
       crCrcy.getPaymentUriScheme,
       crCrcy.getUnits.asScala.toList.map(newInstance(_)),
-      newInstance(crCrcy.getBitcoinLikeNetworkParameters)
+      newInstance(currencyFamily, crCrcy)
     )
+  }
 
   def newInstance(pool: CoreWalletPool): Future[WalletPool] =
     pool.getWalletCount().map(models.WalletPool(pool.getName, _))
@@ -72,11 +77,11 @@ package object models {
 
   case class Currency(
                        @JsonProperty("name") name: String,
-                       @JsonProperty("family") family: CurrencyFamily,
+                       @JsonIgnore family: CurrencyFamily,
                        @JsonProperty("bip_44_coin_type") bip44CoinType: Int,
                        @JsonProperty("payment_uri_scheme") paymentUriScheme: String,
-                       @JsonProperty("units") units: List[Unit],
-                       @JsonProperty("network_params") networkParams: BitcoinLikeNetworkParams
+                       @JsonProperty("units") units: Seq[Unit],
+                       @JsonProperty("network_params") networkParams: NetworkParams
                      )
 
   case class WalletPool(
@@ -100,9 +105,5 @@ package object models {
                    )
 
   trait NetworkParams
-
-  class NetworkParamsDeserializer extends JsonDeserializer[NetworkParams] {
-    override def deserialize(p: JsonParser, ctxt: DeserializationContext): NetworkParams = ???
-  }
 
 }
