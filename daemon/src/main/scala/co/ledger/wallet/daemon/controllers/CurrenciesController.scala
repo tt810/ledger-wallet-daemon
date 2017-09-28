@@ -5,7 +5,7 @@ import javax.inject.Inject
 import co.ledger.wallet.daemon.database.Pool
 import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.{ErrorCode, ErrorResponseBody}
-import co.ledger.wallet.daemon.services.CurrenciesService
+import co.ledger.wallet.daemon.services.{CurrenciesService, LogMsgMaker}
 import co.ledger.wallet.daemon.utils.RichRequest
 import com.twitter.finagle.http.Request
 import com.twitter.finatra.http.Controller
@@ -20,6 +20,9 @@ class CurrenciesController @Inject() (currenciesService: CurrenciesService) exte
   get("/pools/:pool_name/currencies/:currency_name") { request: GetCurrencyRequest =>
     val poolName = request.pool_name
     val currencyName = request.currency_name
+    info(LogMsgMaker.newInstance("Receive get currencies request")
+      .append("request", request)
+      .toString())
     currenciesService.currency(currencyName, poolName).recover {
       case pnfe: WalletPoolNotFoundException => {
         debug("Not Found", pnfe)
@@ -40,6 +43,9 @@ class CurrenciesController @Inject() (currenciesService: CurrenciesService) exte
   }
 
   get("/pools/:pool_name/currencies") {request: GetCurrenciesRequest =>
+    info(LogMsgMaker.newInstance("Receive get currency request")
+      .append("request", request)
+      .toString())
     val poolName = request.pool_name
     currenciesService.currencies(poolName).recover {
       case pnfe: WalletPoolNotFoundException => {

@@ -6,7 +6,7 @@ import co.ledger.wallet.daemon.database.Pool
 import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.{ErrorCode, ErrorResponseBody}
 import co.ledger.wallet.daemon.models._
-import co.ledger.wallet.daemon.services.PoolsService
+import co.ledger.wallet.daemon.services.{LogMsgMaker, PoolsService}
 import com.twitter.finagle.http.Request
 import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
 import co.ledger.wallet.daemon.services.PoolsService.PoolConfiguration
@@ -20,6 +20,9 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
   import WalletPoolsController._
 
   get("/pools") {(request: Request) =>
+    info(LogMsgMaker.newInstance("Receive get wallet pools request")
+      .append("request", request)
+      .toString())
     poolsService.pools(request.user.get).recover {
       case e: Throwable => {
         error("Internal error", e)
@@ -30,6 +33,9 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
   }
 
   get("/pools/:pool_name") {(request: Request) =>
+    info(LogMsgMaker.newInstance("Receive get wallet pool request")
+      .append("request", request)
+      .toString())
     val poolName = request.getParam("pool_name")
     poolsService.pool(request.user.get, poolName).recover {
       case pe: WalletPoolNotFoundException => {
@@ -46,6 +52,9 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
   }
 
   post("/pools") { (request: CreationRequest) =>
+    info(LogMsgMaker.newInstance("Receive create wallet pool request")
+      .append("request", request)
+      .toString())
     val poolName = request.pool_name
     // TODO: Deserialize the configuration from the body of the request
     poolsService.createPool(request.user, poolName, PoolConfiguration()).recover {
@@ -58,6 +67,9 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
   }
 
   delete("/pools/:pool_name") {(request: Request) =>
+    info(LogMsgMaker.newInstance("Receive delete wallet pools request")
+      .append("request", request)
+      .toString())
     val poolName = request.getParam("pool_name")
     poolsService.removePool(request.user.get, poolName).recover {
       case pe: WalletPoolNotFoundException => {

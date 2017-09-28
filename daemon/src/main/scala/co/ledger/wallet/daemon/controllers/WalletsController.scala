@@ -4,7 +4,7 @@ import javax.inject.Inject
 
 import co.ledger.wallet.daemon.exceptions.{CurrencyNotFoundException, WalletNotFoundException, WalletPoolNotFoundException}
 import co.ledger.wallet.daemon.{ErrorCode, ErrorResponseBody}
-import co.ledger.wallet.daemon.services.WalletsService
+import co.ledger.wallet.daemon.services.{LogMsgMaker, WalletsService}
 import co.ledger.wallet.daemon.utils.RichRequest
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.finagle.http.Request
@@ -17,6 +17,9 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
   import WalletsController._
 
   get("/pools/:pool_name/wallets") {(request: GetWalletsRequest) =>
+    info(LogMsgMaker.newInstance("Receive get wallets request")
+      .append("request", request)
+      .toString())
     walletsService.wallets(
       request.user,
       request.pool_name,
@@ -37,6 +40,9 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
   }
 
   get("/pools/:pool_name/wallets/:wallet_name") { request: GetWalletRequest =>
+    info(LogMsgMaker.newInstance("Receive get wallet request")
+      .append("request", request)
+      .toString())
     walletsService.wallet(request.user, request.pool_name, request.wallet_name).recover {
       case pnfe: WalletPoolNotFoundException => {
         debug("Invalid Request", pnfe)
@@ -57,6 +63,9 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
   }
 
   post("/pools/:pool_name/wallets") {(request: CreateWalletRequest) =>
+    info(LogMsgMaker.newInstance("Receive create wallet request")
+      .append("request", request)
+      .toString())
     walletsService.createWallet(request.user, request.pool_name, request.wallet_name, request.currency_name).recover {
       case cnfe: CurrencyNotFoundException => {
         debug("Invalid Request", cnfe)

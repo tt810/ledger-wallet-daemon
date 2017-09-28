@@ -5,14 +5,13 @@ import javax.inject.Inject
 import co.ledger.wallet.daemon.{ErrorCode, ErrorResponseBody}
 import co.ledger.wallet.daemon.exceptions.{WalletNotFoundException, WalletPoolNotFoundException}
 import co.ledger.wallet.daemon.filters.AccountCreationFilter
-import co.ledger.wallet.daemon.services.AccountsService
+import co.ledger.wallet.daemon.services.{AccountsService, LogMsgMaker}
 import co.ledger.wallet.daemon.utils.RichRequest
 import com.twitter.finagle.http.Request
 import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.RouteParam
 import co.ledger.wallet.daemon.filters.AccountCreationContext._
 import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
-import com.twitter.finatra.http.exceptions.BadRequestException
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -20,6 +19,9 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
   import AccountsController._
 
   get("/pools/:pool_name/wallets/:wallet_name/accounts") { request: AccountRequest =>
+    info(LogMsgMaker.newInstance("Receive get accounts request")
+      .append("request", request)
+      .toString())
     accountsService.accounts(request.user, request.pool_name, request.wallet_name).recover {
       case pnfe: WalletPoolNotFoundException => {
         debug("Invalid Request", pnfe)
@@ -40,20 +42,26 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
   }
 
   get("/pools/:pool_name/wallets/:wallet_name/accounts/:account_index") { request: AccountRequest =>
+    info(LogMsgMaker.newInstance("Receive get account request")
+      .append("request", request)
+      .toString())
     accountsService.account(request.account_index.get, request.user, request.pool_name, request.wallet_name)
   }
 
   get("/pools/:pool_name/wallets/:wallet_name/accounts/next") { request: AccountRequest =>
-
+    info(LogMsgMaker.newInstance("Receive get next account request")
+      .append("request", request)
+      .toString())
   }
 
   filter[AccountCreationFilter]
     .post("/pools/:pool_name/wallets/:wallet_name/accounts") { request: Request =>
-      info(s"Receive create account request $request body=${request.contentString}")
-      val accountDerivations = request.accountCreationBody
-
+      info(LogMsgMaker.newInstance("Receive create account request")
+        .append("request", request)
+        .append("body", request.contentString)
+        .toString())
       accountsService.createAccount(
-        accountDerivations,
+        request.accountCreationBody,
         request.user.get,
         request.getParam("pool_name"),
         request.getParam("wallet_name")
@@ -61,7 +69,9 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
   }
 
   delete("/pools/:pool_name/wallets/:wallet_name/accounts") { request: AccountRequest =>
-
+    info(LogMsgMaker.newInstance("Receive delete account request")
+      .append("request", request)
+      .toString())
   }
 }
 

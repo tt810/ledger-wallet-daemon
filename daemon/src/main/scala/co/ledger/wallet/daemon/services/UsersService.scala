@@ -16,12 +16,18 @@ import scala.concurrent.Future
 class UsersService @Inject()(daemonCache: DefaultDaemonCache, ecdsa: ECDSAService) extends DaemonService {
 
   def createUser(publicKey: String, permissions: Long = 0): Future[Unit] = {
-    info(s"Start to insert user with params: permissions=$permissions pubKey=$publicKey")
+    info(LogMsgMaker.newInstance("Create user with params")
+      .append("pubKey", publicKey)
+      .append("permissions", permissions)
+      .toString())
     daemonCache.createUser(User(publicKey, permissions)).map(_ => ())
   }
 
   def createUser(username: String, password: String): Future[Unit] = {
-    info(s"Start to insert user with params: username=$username password=XXXX")
+    info(LogMsgMaker.newInstance("Create user with params")
+      .append("username", username)
+      .append("password", if(password.isEmpty) "XXXXXXX" else "none")
+      .toString())
     val user = s"Basic ${Base64.toBase64String(s"$username:$password".getBytes)}"
     createUser(user.getBytes)
   }
@@ -52,15 +58,15 @@ object UsersService extends Logging {
   }
 
   private def insertDemoUsers(usersService: UsersService) = Future.sequence {
-    debug("Start insert demo users...")
     DaemonConfiguration.adminUsers.map { user =>
+      debug(LogMsgMaker.newInstance("Insert demo user").toString())
       usersService.createUser(user.getBytes())
     }
   }
 
   private def insertWhitelistedUsers(usersService: UsersService) = Future.sequence {
-    debug("Start insert whitelist users...")
     DaemonConfiguration.whiteListUsers.map { user =>
+      debug(LogMsgMaker.newInstance("Insert whitelist user").toString())
       usersService.createUser(user._1, user._2)
     }
   }

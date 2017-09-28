@@ -24,20 +24,17 @@
 
 <configuration>
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>%d %-4level [%logger{0}]: %msg%n</pattern>
+        <encoder immediateFlush="true">
+            <pattern>%date %thread TraceId=%-16X{traceId} [%level] %logger : %msg%n</pattern>
         </encoder>
     </appender>
-    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-        <file>daemon.log</file>
-        <append>true</append>
-        <encoder>
-            <pattern>%d %-4level [%logger{0}]: %msg%n</pattern>
-            <outputPatternAsHeader>true</outputPatternAsHeader>
-        </encoder>
-    </appender>
-    <root level="${log.root:-info}">
+    <logger name="co.ledger.wallet.daemon.libledger_core" level="debug" />
+    <logger name="co.ledger.wallet.daemon" level="debug" />
+    <logger name="slick" level="warn" />
+    <logger name="io.netty" level="warn" />
+    <logger name="com.twitter" level="warn" />
+    <logger name="djinni" level="warn" />
+    <root level="debug">
         <appender-ref ref="STDOUT" />
-        <appender-ref ref="FILE" />
     </root>
 </configuration>
