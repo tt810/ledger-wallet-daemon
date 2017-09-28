@@ -25,10 +25,10 @@
 <configuration>
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder immediateFlush="true">
-            <pattern>%date %thread [%level] %logger : %message%n</pattern>
+            <pattern>%date %thread TraceId=%X{traceId} [%level] %logger : %msg%n</pattern>
         </encoder>
     </appender>
-    <logger name="co.ledger.wallet.daemon.libledger_core" level="debug" />
+    <logger name="co.ledger.wallet.daemon.libledger_core" level="warn" />
     <logger name="co.ledger.wallet.daemon" level="debug" />
     <logger name="slick" level="warn" />
     <logger name="io.netty" level="warn" />

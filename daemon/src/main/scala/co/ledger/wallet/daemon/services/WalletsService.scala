@@ -12,17 +12,31 @@ import scala.concurrent.Future
 class WalletsService @Inject()(daemonCache: DefaultDaemonCache) extends DaemonService {
 
   def wallets(user: User, poolName: String, offset: Int, bulkSize: Int): Future[WalletsWithCount] = {
-    info(s"Obtain wallets with params: poolName=$poolName offset=$offset bulkSize=$bulkSize userPubKey=${user.pubKey}")
+    info(LogMsgMaker.newInstance("Obtain wallets with params")
+      .append("poolName", poolName)
+      .append("offset", offset)
+      .append("bulkSize", bulkSize)
+      .append("userPubKey", user.pubKey)
+      .toString())
     daemonCache.getWallets(Bulk(offset, bulkSize), poolName, user.pubKey)
   }
 
   def wallet(user: User, poolName: String, walletName: String): Future[CoreWallet] = {
-    info(s"Obtain wallet with params: poolName=$poolName walletName=$walletName userPubKey=${user.pubKey}")
+    info(LogMsgMaker.newInstance("Obtain wallet with params")
+      .append("walletName", walletName)
+      .append("poolName", poolName)
+      .append("userPubKey", user.pubKey)
+      .toString())
     daemonCache.getWallet(walletName, poolName, user.pubKey)
   }
 
   def createWallet(user: User, poolName: String, walletName: String, currencyName: String): Future[CoreWallet] = {
-    info(s"Start to create wallet: poolName=$poolName walletName=$walletName extraParams=none userPubKey=${user.pubKey}")
+    info(LogMsgMaker.newInstance("Create wallet with params")
+      .append("walletName", walletName)
+      .append("poolName", poolName)
+      .append("extraParams", None)
+      .append("userPubKey", user.pubKey)
+      .toString())
     daemonCache.createWallet(walletName, currencyName, poolName, user)
   }
 

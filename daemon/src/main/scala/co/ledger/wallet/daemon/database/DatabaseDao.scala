@@ -2,18 +2,16 @@ package co.ledger.wallet.daemon.database
 
 import java.sql.Timestamp
 import java.util.Date
-import java.util.concurrent.Executors
 import javax.inject.{Inject, Singleton}
 
-import co.ledger.wallet.daemon.async.SerialExecutionContext
 import co.ledger.wallet.daemon.database.DBMigrations.Migrations
 import co.ledger.wallet.daemon.exceptions._
+import co.ledger.wallet.daemon.services.LogMsgMaker
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.twitter.inject.Logging
 import slick.jdbc.JdbcBackend.Database
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
 
 @Singleton
 class DatabaseDao @Inject()(db: Database)(implicit ec: ExecutionContext) extends Logging {
@@ -50,7 +48,11 @@ class DatabaseDao @Inject()(db: Database)(implicit ec: ExecutionContext) extends
 
   def deletePool(poolName: String, userId: Long): Future[Int] = {
     safeRun(filterPool(poolName, userId).delete).map { int =>
-      debug(s"Pool deleted: poolName=$poolName user=$userId returned=$int")
+      debug(LogMsgMaker.newInstance("Daemon wallet pool deleted")
+        .append("poolName", poolName)
+        .append("userId", userId)
+        .append("resultRow", int)
+        .toString())
       int
     }
   }
@@ -58,7 +60,11 @@ class DatabaseDao @Inject()(db: Database)(implicit ec: ExecutionContext) extends
   def getPools(userId: Long): Future[Seq[Pool]] = {
     val query = pools.filter(pool => pool.userId === userId.bind).sortBy(_.id.desc)
     safeRun(query.result.transactionally).map { rows =>
-      debug(s"Pools obtained: user=$userId size=${rows.size} pools=${rows.map(_.name)}")
+      debug(LogMsgMaker.newInstance("Daemon wallet pools retrieved")
+        .append("userId", userId)
+        .append("resultRow", rows.size)
+        .append("result", rows.map(_.name))
+        .toString())
       rows.map(createPool)
     }
   }
@@ -66,7 +72,11 @@ class DatabaseDao @Inject()(db: Database)(implicit ec: ExecutionContext) extends
   def getUser(targetPubKey: Array[Byte]): Future[Option[User]] = {
     val pubKey = HexUtils.valueOf(targetPubKey)
     safeRun(filterUser(pubKey).result).map { rows =>
-      debug(s"Users obtained: pubKey=$pubKey size=${rows.size} userIds=${rows.map(_.id.get).toString}")
+      debug(LogMsgMaker.newInstance("Daemon users retrieved")
+        .append("pubKey", targetPubKey)
+        .append("resultRow", rows.size)
+        .append("result", rows.map(_.id.get))
+        .toString())
       if(rows.isEmpty) None
       else Option(createUser(rows.head))
     }
@@ -75,7 +85,10 @@ class DatabaseDao @Inject()(db: Database)(implicit ec: ExecutionContext) extends
   def getUsers(): Future[Seq[User]] = {
     val query = users.result
     safeRun(query).map { rows =>
-      debug(s"Users obtained: size=${rows.size}")
+      debug(LogMsgMaker.newInstance("Daemon users retrieved")
+        .append("resultRow", rows.size)
+        .append("result", rows.map(_.id.get))
+        .toString())
       rows.map(createUser(_))
     }
   }
@@ -89,7 +102,10 @@ class DatabaseDao @Inject()(db: Database)(implicit ec: ExecutionContext) extends
       }
     }
     safeRun(query).map { int =>
-      debug(s"Pool inserted: poolName=${newPool.name} returned=$int")
+      debug(LogMsgMaker.newInstance("Daemon wallet pool inserted")
+        .append("walletPool", newPool)
+        .append("result", int)
+        .toString())
       int
     }
   }
@@ -104,6 +120,10 @@ class DatabaseDao @Inject()(db: Database)(implicit ec: ExecutionContext) extends
     }
     safeRun(query).map { int =>
       debug(s"User inserted: pubKey=${newUser.pubKey} returned=$int")
+      debug(LogMsgMaker.newInstance("Daemon user inserted")
+        .append("user", newUser)
+        .append("result", int)
+        .toString())
       int
     }
   }

@@ -24,7 +24,9 @@ class AuthenticationService @Inject()(daemonCache: DefaultDaemonCache, ecdsa: EC
         throw AuthenticationFailedException()
       usr.get
     } flatMap {user =>
-      debug(s"Authorize request: userPubKey=${user.pubKey}")
+      debug(LogMsgMaker.newInstance("Authorize request")
+        .append("userPubKey", user.pubKey)
+        .toString())
       val time = request.authContext.time
       val date = new Date(time * 1000)
       val now = new Date()

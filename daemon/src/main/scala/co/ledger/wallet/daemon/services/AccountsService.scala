@@ -13,17 +13,31 @@ class AccountsService @Inject()(defaultDaemonCache: DefaultDaemonCache) extends 
   import AccountsService._
 
   def accounts(user: User, poolName: String, walletName: String): Future[Seq[Account]] = {
-    info(s"Obtain accounts with params: poolName=$poolName walletName=$walletName userPubKey=${user.pubKey}")
+    info(LogMsgMaker.newInstance("Obtain accounts with params")
+      .append("poolName", poolName)
+      .append("walletName", walletName)
+      .append("userPubKey", user.pubKey)
+      .toString())
     defaultDaemonCache.getAccounts(user.pubKey, poolName, walletName)
   }
 
   def account(accountIndex: Int, user: User, poolName: String, walletName: String): Future[Account] = {
-    info(s"Obtain account with params: accountIndex=$accountIndex poolName=$poolName walletName=$walletName userPubKey=${user.pubKey}")
+    info(LogMsgMaker.newInstance("Obtain account with params")
+      .append("accountIndex", accountIndex)
+      .append("poolName", poolName)
+      .append("walletName", walletName)
+      .append("userPubKey", user.pubKey)
+      .toString())
     defaultDaemonCache.getAccount(accountIndex, user.pubKey, poolName, walletName)
   }
 
   def createAccount(accountCreationBody: AccountDerivation, user: User, poolName: String, walletName: String): Future[Account] = {
-    info(s"Start to create account: accountDerivations=$accountCreationBody poolName=$poolName walletName=$walletName userPubKey=${user.pubKey}")
+    info(LogMsgMaker.newInstance("Create account with params")
+      .append("accountDerivations", accountCreationBody)
+      .append("poolName", poolName)
+      .append("walletName", walletName)
+      .append("userPubKey", user.pubKey)
+      .toString())
     defaultDaemonCache.createAccount(accountCreationBody, user, poolName, walletName)
   }
 
