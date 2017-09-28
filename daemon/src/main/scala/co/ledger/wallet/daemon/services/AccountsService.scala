@@ -2,41 +2,37 @@ package co.ledger.wallet.daemon.services
 
 import javax.inject.{Inject, Singleton}
 
-import co.ledger.core.{Account, BitcoinLikeNextAccountInfo, Wallet, WalletType}
-import co.ledger.wallet.daemon.database.User
-import co.ledger.core.implicits._
+import co.ledger.core.{Account, BitcoinLikeNextAccountInfo}
+import co.ledger.wallet.daemon.database.{DefaultDaemonCache, User}
+import co.ledger.wallet.daemon.models.{AccountDerivation}
 
-import scala.collection.JavaConverters._
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 @Singleton
-class AccountsService @Inject()(walletsService: WalletsService) extends DaemonService {
-
+class AccountsService @Inject()(defaultDaemonCache: DefaultDaemonCache) extends DaemonService {
   import AccountsService._
 
-  def accounts(user: User, poolName: String, walletName: String, offset: Int, bulkSize: Int) = {
-    info(s"Obtain accounts with params: poolName=$poolName walletName=$walletName offset=$offset bulkSize=$bulkSize userPubKey=${user.pubKey}")
-    walletsService.wallet(user, poolName, walletName) flatMap { (wallet) =>
-      wallet.getAccountCount() flatMap { (count) =>
-        wallet.getAccounts(offset, bulkSize) map { (accounts) =>
-          AccountBulk(count, offset, bulkSize, accounts.asScala.toArray)
-        }
-      }
-    }
+  def accounts(user: User, poolName: String, walletName: String): Future[Seq[Account]] = {
+    info(s"Obtain accounts with params: poolName=$poolName walletName=$walletName userPubKey=${user.pubKey}")
+    defaultDaemonCache.getAccounts(user.pubKey, poolName, walletName)
   }
 
-  def account(user: User, poolName: String, walletName: String, accountIndex: Int) = {
-    info(s"Obtain account with params: poolName=$poolName walletName=$walletName accountIndex=$accountIndex userPubKey=${user.pubKey}")
-    walletsService.wallet(user, poolName, walletName).flatMap(_.getAccount(accountIndex))
+  def account(accountIndex: Int, user: User, poolName: String, walletName: String): Future[Account] = {
+    info(s"Obtain account with params: accountIndex=$accountIndex poolName=$poolName walletName=$walletName userPubKey=${user.pubKey}")
+    defaultDaemonCache.getAccount(accountIndex, user.pubKey, poolName, walletName)
   }
 
-  def createBitcoinAccount(user: User, poolName: String, walletName: String, params: BitcoinAccountCreationParameters) = {
-    info(s"Start to create Bitcoin account: poolName=$poolName walletName=$walletName extraParams=$params userPubKey=${user.pubKey}")
-    walletsService.wallet(user, poolName, walletName) flatMap { (wallet) =>
-      null
-    }
+  def createAccount(accountCreationBody: AccountDerivation, user: User, poolName: String, walletName: String): Future[Account] = {
+    info(s"Start to create account: accountDerivations=$accountCreationBody poolName=$poolName walletName=$walletName userPubKey=${user.pubKey}")
+    defaultDaemonCache.createAccount(accountCreationBody, user, poolName, walletName)
   }
+
+//  def createBitcoinAccount(user: User, poolName: String, walletName: String, params: BitcoinAccountCreationParameters) = {
+//    info(s"Start to create Bitcoin account: poolName=$poolName walletName=$walletName extraParams=$params userPubKey=${user.pubKey}")
+//    walletsService.wallet(user, poolName, walletName) flatMap { (wallet) =>
+//      null
+//    }
+//  }
 
   def getNextAccountInfo(user: User, poolName: String, walletName: String): Future[NextAccountInformation] = ???
 //  {
