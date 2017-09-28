@@ -5,6 +5,7 @@ package object utils {
   import com.twitter.util.{Future => TwitterFuture, Promise => TwitterPromise, Return, Throw}
   import scala.concurrent.{Future => ScalaFuture, Promise => ScalaPromise, ExecutionContext}
   import scala.util.{Success, Failure}
+  import scala.collection.JavaConverters._
 
   /** Convert from a Twitter Future to a Scala Future */
   implicit class RichTwitterFuture[A](val tf: TwitterFuture[A]) extends AnyVal {
@@ -28,6 +29,10 @@ package object utils {
       }
       promise
     }
+  }
+
+  class AsArrayList[T](input: Seq[T]) {
+    def asArrayList : java.util.ArrayList[T] = new java.util.ArrayList[T](input.asJava)
   }
 
 }

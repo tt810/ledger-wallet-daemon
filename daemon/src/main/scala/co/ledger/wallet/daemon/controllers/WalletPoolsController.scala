@@ -10,13 +10,14 @@ import co.ledger.wallet.daemon.services.PoolsService
 import com.twitter.finagle.http.Request
 import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
 import co.ledger.wallet.daemon.services.PoolsService.PoolConfiguration
+import co.ledger.wallet.daemon.utils.RichRequest
+import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.finatra.http.Controller
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.reflect.ClassTag
 
 class WalletPoolsController @Inject()(poolsService: PoolsService) extends Controller {
+  import WalletPoolsController._
 
   get("/pools") {(request: Request) =>
     poolsService.pools(request.user.get).recover {
@@ -44,10 +45,10 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
     }
   }
 
-  post("/pools/:pool_name") { (request: Request) =>
-    val poolName = request.getParam("pool_name")
+  post("/pools") { (request: CreationRequest) =>
+    val poolName = request.pool_name
     // TODO: Deserialize the configuration from the body of the request
-    poolsService.createPool(request.user.get, poolName, PoolConfiguration()).recover {
+    poolsService.createPool(request.user, poolName, PoolConfiguration()).recover {
       case e: Throwable => {
         error("Internal error", e)
         response.ok()
@@ -75,5 +76,8 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
 }
 
 object WalletPoolsController {
-  case class WalletPoolResult(test: String)
+  case class CreationRequest(
+                            @JsonProperty pool_name: String,
+                            request: Request
+                            ) extends RichRequest(request)
 }

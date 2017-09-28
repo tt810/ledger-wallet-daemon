@@ -4,18 +4,20 @@ import java.util.concurrent.{ConcurrentHashMap, Executors}
 import javax.inject.Singleton
 
 import co.ledger.core
+import co.ledger.core.{Account, AccountCreationInfo, implicits}
 import co.ledger.wallet.daemon.libledger_core.async.ScalaThreadDispatcher
 import co.ledger.wallet.daemon.libledger_core.crypto.SecureRandomRNG
 import co.ledger.wallet.daemon.libledger_core.debug.NoOpLogPrinter
 import co.ledger.wallet.daemon.libledger_core.filesystem.ScalaPathResolver
 import co.ledger.wallet.daemon.libledger_core.net.{ScalaHttpClient, ScalaWebSocketClient}
-import co.ledger.wallet.daemon.utils.HexUtils
+import co.ledger.wallet.daemon.utils.{AsArrayList, HexUtils}
 import org.bitcoinj.core.Sha256Hash
 import co.ledger.core.implicits._
-import co.ledger.wallet.daemon.DaemonConfiguration
+import co.ledger.wallet.daemon.{DaemonConfiguration, exceptions}
 import co.ledger.wallet.daemon.async.SerialExecutionContext
 import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.exceptions.CurrencyNotFoundException
+import co.ledger.wallet.daemon.models.{AccountDerivation}
 import slick.jdbc.JdbcBackend.Database
 
 import scala.concurrent.Future
@@ -28,8 +30,26 @@ import scala.concurrent.ExecutionContext
   */
 @Singleton
 class DefaultDaemonCache extends DaemonCache {
+  implicit def asArrayList[T](input: Seq[T]) = new AsArrayList[T](input)
   import DefaultDaemonCache._
   private val _writeContext = SerialExecutionContext.newInstance()
+
+  def createAccount(accountDerivations: AccountDerivation, user: User, poolName: String, walletName: String): Future[Account] = {
+    getWallet(walletName, poolName, user.pubKey).flatMap { wallet =>
+      val derivations = accountDerivations.derivations
+      val accountCreationInfo = new AccountCreationInfo(
+        accountDerivations.accountIndex,
+        (for (derivationResult <- derivations) yield derivationResult.owner).asArrayList,
+        (for (derivationResult <- derivations) yield derivationResult.path).asArrayList,
+        (for (derivationResult <- derivations) yield HexUtils.valueOf(derivationResult.pubKey.get)).asArrayList,
+        (for (derivationResult <- derivations) yield HexUtils.valueOf(derivationResult.chainCode.get)).asArrayList
+      )
+      wallet.newAccountWithInfo(accountCreationInfo).map { account =>
+        debug(s"Created account with params: accountDerivations=$accountDerivations userPubKey=${user.pubKey} poolName=$poolName walletName=$walletName result=$account")
+        account
+      }
+    }
+  }
 
   def createPool(user: User, poolName: String, configuration: String): Future[core.WalletPool] = {
     implicit val ec = _writeContext
@@ -68,9 +88,9 @@ class DefaultDaemonCache extends DaemonCache {
   }
 
   def createUser(user: User): Future[Int] = {
-    debug(s"Create user with params: user=$user")
     dbDao.insertUser(user).map { int =>
       userPools.put(user.pubKey, new ConcurrentHashMap[String, core.WalletPool]())
+      debug(s"Created user with params: user=$user")
       int
     }
   }
@@ -85,10 +105,31 @@ class DefaultDaemonCache extends DaemonCache {
     }
   }
 
+  def getAccount(accountIndex: Int, pubKey: String, poolName: String, walletName: String): Future[core.Account] = {
+    getWallet(walletName, poolName, pubKey).flatMap { wallet =>
+      wallet.getAccount(accountIndex).map { account =>
+        debug(s"Retrieved core account with params: index=$accountIndex walletName=$walletName poolName=$poolName userPubKey=$pubKey result=$account")
+        account
+      }
+    }
+  }
+
+  def getAccounts(pubKey: String, poolName: String, walletName: String): Future[Seq[core.Account]] = {
+    getWallet(walletName, poolName, pubKey).flatMap { wallet =>
+      wallet.getAccountCount() flatMap { (count) =>
+        debug(s"Retrieved core accounts count result=$count")
+        wallet.getAccounts(0, Int.MaxValue) map { (accounts) =>
+          debug(s"Retrieved core accounts with params: (offset, bulkSize)=(0, ${Int.MaxValue}) poolName=$poolName walletName=$walletName pubKey=$pubKey result=$accounts")
+          accounts.asScala.toSeq
+        }
+      }
+    }
+  }
+
   def getCurrency(poolName: String, currencyName: String): Future[core.Currency] = Future {
-    debug(s"Retrieve core currency with params: currencyName=$currencyName poolName=$poolName")
     val namedCurrencies = getNamedCurrencies(poolName)
     val currency = namedCurrencies.getOrDefault(currencyName, null)
+    debug(s"Retrieved core currency with params: currencyName=$currencyName poolName=$poolName result=$currency")
     if(currency == null)
       throw new CurrencyNotFoundException(currencyName)
     else
@@ -96,14 +137,13 @@ class DefaultDaemonCache extends DaemonCache {
   }
 
   def getCurrencies(poolName: String): Future[Seq[core.Currency]] = Future {
-    debug(s"Retrieve core currencies with params: poolName=$poolName")
     getNamedCurrencies(poolName).values().asScala.toList
   }
 
   def getPool(pubKey: String, poolName: String): Future[core.WalletPool] = Future {
-    debug(s"Retrieve core wallet pool with params: poolName=$poolName userPubKey=$pubKey")
     val namedPools = getNamedPools(pubKey)
     val pool = namedPools.getOrDefault(poolName, null)
+    debug(s"Retrieved core wallet pool with params: poolName=$poolName userPubKey=$pubKey result=$pool")
     if(pool == null)
       throw new WalletPoolNotFoundException(poolName)
     else
@@ -111,25 +151,29 @@ class DefaultDaemonCache extends DaemonCache {
   }
 
   def getPools(pubKey: String): Future[Seq[core.WalletPool]] = Future {
-    debug(s"Retrieve core wallet pools with params: userPubKey=$pubKey")
     getNamedPools(pubKey).values().asScala.toList
   }
 
   def getWallets(walletBulk: Bulk, poolName: String, pubKey: String): Future[WalletsWithCount] = {
-    debug(s"Retrieve core wallet with params: (offset, bulkSize=$walletBulk poolName=$poolName userPubKey=$pubKey")
     getPool(pubKey, poolName).flatMap { corePool =>
       corePool.getWalletCount().flatMap { count =>
+        debug(s"Retrieved core wallet count result=$count")
         corePool.getWallets(walletBulk.offset, walletBulk.bulkSize) map { wallets =>
-          WalletsWithCount(count, wallets.asScala.toArray)
+          debug(s"Retrieved core wallet with params: (offset, bulkSize)=$walletBulk poolName=$poolName userPubKey=$pubKey result=$wallets")
+          WalletsWithCount(count, wallets.asScala.toSeq)
         }
       }
     }
   }
 
   def getWallet(walletName: String, poolName: String, pubKey: String): Future[core.Wallet] = {
-    debug(s"Retrieve core wallet with params: walletName=$walletName poolName=$poolName userPubKey=$pubKey")
     getPool(pubKey, poolName).flatMap { corePool =>
-      corePool.getWallet(walletName)
+      corePool.getWallet(walletName).map {wallet =>
+        debug(s"Retrieved core wallet with params: walletName=$walletName poolName=$poolName userPubKey=$pubKey result=$wallet")
+        wallet
+      }.recover {
+        case e: implicits.WalletNotFoundException => throw new exceptions.WalletNotFoundException(walletName)
+      }
     }
   }
 
@@ -139,6 +183,7 @@ class DefaultDaemonCache extends DaemonCache {
 
   private def getNamedCurrencies(poolName: String): ConcurrentHashMap[String, core.Currency] = {
     val namedCurrencies = pooledCurrencies.getOrDefault(poolName, null)
+    debug(s"Retrieved core currencies with params: poolName=$poolName result=$namedCurrencies")
     if(namedCurrencies == null)
       throw new WalletPoolNotFoundException(poolName)
     else
@@ -147,6 +192,7 @@ class DefaultDaemonCache extends DaemonCache {
 
   private def getNamedPools(pubKey: String): ConcurrentHashMap[String, core.WalletPool] = {
     val namedPools = userPools.getOrDefault(pubKey, null)
+    debug(s"Retrieved core wallet pools with params: userPubKey=$pubKey result=$namedPools")
     if(namedPools == null)
       throw new UserNotFoundException(pubKey)
     else
@@ -226,4 +272,4 @@ object DefaultDaemonCache extends DaemonCache {
 }
 
 case class Bulk(offset: Int = 0, bulkSize: Int = 20)
-case class WalletsWithCount(count: Int, wallets: Array[core.Wallet])
+case class WalletsWithCount(count: Int, wallets: Seq[core.Wallet])

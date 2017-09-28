@@ -1,6 +1,6 @@
 package co.ledger.wallet.daemon
 
-import co.ledger.core.{CurrencyUnit, Currency => CoreCurrency, Wallet => CoreWallet, WalletPool => CoreWalletPool}
+import co.ledger.core.{Account => CoreAccount, CurrencyUnit, Currency => CoreCurrency, Wallet => CoreWallet, WalletPool => CoreWalletPool}
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.fasterxml.jackson.annotation._
 import co.ledger.core.implicits._
@@ -27,6 +27,13 @@ package object models {
     }
     case _ => ???
   }
+
+//  def newInstance(account: CoreAccount, walletName: String): Account = {
+//    account.getBalance().map { balance =>
+//      Account(walletName, account.getIndex, balance, account.get)
+//    }
+//
+//  }
 
   def newInstance(crCrcy: CoreCurrency): Currency = {
     val currencyFamily = CurrencyFamily.valueOf(crCrcy.getWalletType.name())
@@ -84,9 +91,21 @@ package object models {
                        @JsonProperty("network_params") networkParams: NetworkParams
                      )
 
+  case class Derivation(
+                       @JsonProperty("path") path: String,
+                       @JsonProperty("owner") owner: String,
+                       @JsonProperty("pub_key") pubKey: Option[String],
+                       @JsonProperty("chain_code") chainCode: Option[String]
+                       )
+
+  case class AccountDerivation(
+                              @JsonProperty("account_index") accountIndex: Int,
+                              @JsonProperty("derivations") derivations: Seq[Derivation]
+                              )
+
   case class WalletPool(
-                         @JsonProperty("name") name: String,
-                         @JsonProperty("wallet_count") walletCount: Int
+                       @JsonProperty("name") name: String,
+                       @JsonProperty("wallet_count") walletCount: Int
                        )
 
   case class Unit(

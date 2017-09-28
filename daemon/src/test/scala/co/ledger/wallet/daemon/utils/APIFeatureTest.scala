@@ -22,8 +22,11 @@ trait APIFeatureTest extends FeatureTest {
   def defaultHeaders = lwdBasicAuthorisationHeader("whitelisted")
   def parse[A](response: Response)(implicit manifest: Manifest[A]): A = server.mapper.parse[A](response)
 
-  def createWallet(): Unit = {
-
+  def assertWalletCreation(poolName: String, walletName: String, currencyName: String, expected: Status): Response = {
+    server.httpPost(path = s"/pools/$poolName/wallets",
+      postBody = s"""{\"currency_name\":\"$currencyName\",\"wallet_name\":\"$walletName\"}""",
+      headers = defaultHeaders,
+      andExpect = expected)
   }
 
   def getPools(): Response = {
@@ -39,7 +42,7 @@ trait APIFeatureTest extends FeatureTest {
   }
 
   def createPool(poolName: String): Response = {
-    server.httpPost(s"/pools/$poolName", "", headers = defaultHeaders, andExpect = Status.Ok)
+    server.httpPost("/pools", s"""{"pool_name":"$poolName"}""", headers = defaultHeaders, andExpect = Status.Ok)
   }
 
   def deletePool(poolName: String): Response = {
