@@ -3,7 +3,7 @@ package co.ledger.wallet.daemon.controllers
 import javax.inject.Inject
 
 import co.ledger.wallet.daemon.{ErrorCode, ErrorResponseBody}
-import co.ledger.wallet.daemon.exceptions.{WalletNotFoundException, WalletPoolNotFoundException}
+import co.ledger.wallet.daemon.exceptions.{InvalidArgumentException, WalletNotFoundException, WalletPoolNotFoundException}
 import co.ledger.wallet.daemon.filters.AccountCreationFilter
 import co.ledger.wallet.daemon.services.{AccountsService, LogMsgMaker}
 import co.ledger.wallet.daemon.utils.RichRequest
@@ -68,7 +68,18 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
         request.user.get,
         request.getParam("pool_name"),
         request.getParam("wallet_name")
-      )
+      ).recover {
+        case iae: InvalidArgumentException => {
+          debug("Invalid Request", iae)
+          response.badRequest()
+            .body(ErrorResponseBody(ErrorCode.Invalid_Request, iae.msg))
+        }
+        case e: Throwable => {
+          error("Internal error", e)
+          response.ok()
+            .body(ErrorResponseBody(ErrorCode.Internal_Error, "Problem occurred when processing the request, check with developers"))
+        }
+      }
   }
 
   delete("/pools/:pool_name/wallets/:wallet_name/accounts") { request: AccountRequest =>

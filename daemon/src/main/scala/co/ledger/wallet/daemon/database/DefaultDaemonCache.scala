@@ -17,6 +17,7 @@ import co.ledger.wallet.daemon.{DaemonConfiguration, exceptions}
 import co.ledger.wallet.daemon.async.{MDCPropagatingExecutionContext, SerialExecutionContext}
 import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.exceptions.CurrencyNotFoundException
+import co.ledger.wallet.daemon.exceptions.InvalidArgumentException
 import co.ledger.wallet.daemon.models.AccountDerivation
 import co.ledger.wallet.daemon.services.LogMsgMaker
 import slick.jdbc.JdbcBackend.Database
@@ -60,6 +61,8 @@ class DefaultDaemonCache() extends DaemonCache {
           .append("result", account)
           .toString())
         account
+      }.recover {
+        case e: implicits.InvalidArgumentException => throw new InvalidArgumentException(e.getMessage, e)
       }
     }
   }
