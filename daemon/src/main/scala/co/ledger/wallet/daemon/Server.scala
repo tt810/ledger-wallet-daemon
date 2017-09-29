@@ -8,9 +8,11 @@ import co.ledger.wallet.daemon.modules.DaemonJacksonModule
 import co.ledger.wallet.daemon.services.UsersService
 import com.twitter.finagle.http.{Request, Response}
 import com.twitter.finatra.http.HttpServer
-import com.twitter.finatra.http.filters.CommonFilters
+import com.twitter.finatra.http.filters.{AccessLoggingFilter, CommonFilters}
 import com.twitter.finatra.http.routing.HttpRouter
 import djinni.NativeLibLoader
+
+import scala.concurrent.ExecutionContext.Implicits.global
 
 object Server extends ServerImpl {
 
@@ -25,6 +27,7 @@ class ServerImpl extends HttpServer {
       .filter[LoggingMDCFilter[Request, Response]]
       .filter[TraceIdMDCFilter[Request, Response]]
       .filter[CommonFilters]
+      .filter[AccessLoggingFilter[Request]]
       .filter[DemoUserAuthenticationFilter]
       .filter[LWDAutenticationFilter]
       .add[AuthenticationFilter, AccountsController]
@@ -35,7 +38,6 @@ class ServerImpl extends HttpServer {
       .exceptionMapper[AuthenticationExceptionMapper]
 
   override protected def warmup(): Unit = {
-    import scala.concurrent.ExecutionContext.Implicits.global
     super.warmup()
     NativeLibLoader.loadLibs()
     DefaultDaemonCache.migrateDatabase().flatMap { _ =>

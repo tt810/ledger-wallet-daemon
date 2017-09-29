@@ -19,6 +19,7 @@ import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.exceptions.CurrencyNotFoundException
 import co.ledger.wallet.daemon.models.AccountDerivation
 import co.ledger.wallet.daemon.services.LogMsgMaker
+import org.slf4j.MDC
 import slick.jdbc.JdbcBackend.Database
 
 import scala.concurrent.Future
@@ -293,7 +294,7 @@ class DefaultDaemonCache extends DaemonCache {
     val namedPools = userPools.getOrDefault(pubKey, null)
     debug(LogMsgMaker.newInstance("Retrieved wallet pools")
       .append("userPubKey", pubKey)
-      .append("resultSize", namedPools)
+      .append("result", namedPools)
       .toString())
     if(namedPools == null)
       throw new UserNotFoundException(pubKey)

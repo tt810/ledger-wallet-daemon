@@ -2,7 +2,6 @@ package co.ledger.wallet.daemon.controllers
 
 import javax.inject.Inject
 
-import co.ledger.wallet.daemon.database.Pool
 import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.{ErrorCode, ErrorResponseBody}
 import co.ledger.wallet.daemon.services.{CurrenciesService, LogMsgMaker}
@@ -12,7 +11,6 @@ import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.RouteParam
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.reflect.ClassTag
 
 class CurrenciesController @Inject() (currenciesService: CurrenciesService) extends Controller {
   import CurrenciesController._
