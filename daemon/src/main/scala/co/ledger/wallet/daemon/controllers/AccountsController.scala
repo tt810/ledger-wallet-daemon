@@ -12,10 +12,13 @@ import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.RouteParam
 import co.ledger.wallet.daemon.filters.AccountCreationContext._
 import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 
 class AccountsController @Inject()(accountsService: AccountsService) extends Controller {
+  implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
+
   import AccountsController._
 
   get("/pools/:pool_name/wallets/:wallet_name/accounts") { request: AccountRequest =>

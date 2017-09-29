@@ -1,6 +1,6 @@
 package co.ledger.wallet.daemon.database
 
-import java.util.concurrent.{ConcurrentHashMap, Executors}
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Singleton
 
 import co.ledger.core
@@ -14,7 +14,7 @@ import co.ledger.wallet.daemon.utils.{AsArrayList, HexUtils}
 import org.bitcoinj.core.Sha256Hash
 import co.ledger.core.implicits._
 import co.ledger.wallet.daemon.{DaemonConfiguration, exceptions}
-import co.ledger.wallet.daemon.async.SerialExecutionContext
+import co.ledger.wallet.daemon.async.{MDCPropagatingExecutionContext, SerialExecutionContext}
 import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.exceptions.CurrencyNotFoundException
 import co.ledger.wallet.daemon.models.AccountDerivation
@@ -25,13 +25,13 @@ import scala.concurrent.Future
 import collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 
-
 /**
   * TODO: Add wallets and accounts to cache
   */
 @Singleton
-class DefaultDaemonCache extends DaemonCache {
+class DefaultDaemonCache() extends DaemonCache {
   implicit def asArrayList[T](input: Seq[T]) = new AsArrayList[T](input)
+  implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
   import DefaultDaemonCache._
   private val _writeContext = SerialExecutionContext.Implicits.global
 
@@ -129,6 +129,7 @@ class DefaultDaemonCache extends DaemonCache {
   }
 
   def createUser(user: User): Future[Int] = {
+    implicit val ec = _writeContext
     dbDao.insertUser(user).map { int =>
       userPools.put(user.pubKey, new ConcurrentHashMap[String, core.WalletPool]())
       debug(LogMsgMaker.newInstance("User created")
@@ -304,12 +305,15 @@ class DefaultDaemonCache extends DaemonCache {
 }
 
 object DefaultDaemonCache extends DaemonCache {
-  implicit val ec: ExecutionContext = SerialExecutionContext.Implicits.single
+  private val _singleExecuter: ExecutionContext = SerialExecutionContext.Implicits.single
+
   def migrateDatabase(): Future[Unit] = {
+    implicit val ec = _singleExecuter
     dbDao.migrate().map(_ => ())
   }
 
   def initialize(): Future[Unit] = {
+    implicit val ec = _singleExecuter
     info("Start initializing cache...")
     dbDao.getUsers().flatMap { users =>
       debug(LogMsgMaker.newInstance("Retrieved users")
@@ -333,7 +337,7 @@ object DefaultDaemonCache extends DaemonCache {
 
   private def poolIdentifier(userId: Long, poolName: String): String = HexUtils.valueOf(Sha256Hash.hash(s"${userId}:${poolName}".getBytes))
 
-  private def buildPool(pool: Pool): Future[core.WalletPool] = {
+  private def buildPool(pool: Pool)(implicit ec: ExecutionContext): Future[core.WalletPool] = {
     val identifier = poolIdentifier(pool.userId, pool.name)
     core.WalletPoolBuilder.createInstance()
       .setHttpClient(new ScalaHttpClient)
@@ -348,7 +352,7 @@ object DefaultDaemonCache extends DaemonCache {
       .build()
   }
 
-  private def addToCache(user: User, pool: Pool): Future[core.WalletPool] = {
+  private def addToCache(user: User, pool: Pool)(implicit ec: ExecutionContext): Future[core.WalletPool] = {
 
     buildPool(pool).map { p =>
       debug(LogMsgMaker.newInstance("Built core wallet pool")

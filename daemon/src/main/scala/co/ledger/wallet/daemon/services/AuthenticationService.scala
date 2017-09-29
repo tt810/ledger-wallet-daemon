@@ -10,15 +10,15 @@ import co.ledger.wallet.daemon.services.AuthenticationService.{AuthenticationFai
 import com.twitter.finagle.http.Request
 import com.twitter.util.Future
 import org.bitcoinj.core.Sha256Hash
-
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.utils._
+
+import scala.concurrent.ExecutionContext
 
 @Singleton
 class AuthenticationService @Inject()(daemonCache: DefaultDaemonCache, ecdsa: ECDSAService) extends DaemonService {
   import co.ledger.wallet.daemon.services.AuthenticationService.AuthContextContext._
 
-  def authorize(request: Request): Future[Unit] = {
+  def authorize(request: Request)(implicit ec: ExecutionContext): Future[Unit] = {
     daemonCache.getUserFromDB(request.authContext.pubKey) map { (usr) =>
       if (usr.isEmpty)
         throw AuthenticationFailedException()

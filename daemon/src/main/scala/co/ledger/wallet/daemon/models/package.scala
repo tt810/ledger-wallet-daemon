@@ -1,13 +1,12 @@
 package co.ledger.wallet.daemon
 
-import co.ledger.core.{Account => CoreAccount, CurrencyUnit, Currency => CoreCurrency, Wallet => CoreWallet, WalletPool => CoreWalletPool}
+import co.ledger.core.{CurrencyUnit, Account => CoreAccount, Currency => CoreCurrency, Wallet => CoreWallet, WalletPool => CoreWalletPool}
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.fasterxml.jackson.annotation._
 import co.ledger.core.implicits._
 
 import scala.collection.JavaConverters._
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 package object models {
 
@@ -47,7 +46,7 @@ package object models {
     )
   }
 
-  def newInstance(pool: CoreWalletPool): Future[WalletPool] =
+  def newInstance(pool: CoreWalletPool)(implicit ec: ExecutionContext): Future[WalletPool] =
     pool.getWalletCount().map(models.WalletPool(pool.getName, _))
 
   def newInstance(coreWallet: CoreWallet): Unit = ???
