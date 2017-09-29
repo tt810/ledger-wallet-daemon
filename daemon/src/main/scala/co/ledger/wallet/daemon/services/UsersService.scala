@@ -5,8 +5,10 @@ import javax.inject.{Inject, Singleton}
 import co.ledger.wallet.daemon.DaemonConfiguration
 import co.ledger.wallet.daemon.database.{DefaultDaemonCache, User}
 import co.ledger.wallet.daemon.utils.HexUtils
+import com.twitter.finagle.tracing.Trace
 import com.twitter.inject.Logging
 import org.bitcoinj.core.Sha256Hash
+import org.slf4j.MDC
 import org.spongycastle.util.encoders.Base64
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -26,7 +28,7 @@ class UsersService @Inject()(daemonCache: DefaultDaemonCache, ecdsa: ECDSAServic
   def createUser(username: String, password: String): Future[Unit] = {
     info(LogMsgMaker.newInstance("Create user with params")
       .append("username", username)
-      .append("password", if(password.isEmpty) "XXXXXXX" else "none")
+      .append("password", if(password.isEmpty) "XXXXXXX" else "")
       .toString())
     val user = s"Basic ${Base64.toBase64String(s"$username:$password".getBytes)}"
     createUser(user.getBytes)
