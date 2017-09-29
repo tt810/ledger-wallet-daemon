@@ -14,7 +14,7 @@ import co.ledger.wallet.daemon.utils.RichRequest
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.finatra.http.Controller
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 
 class WalletPoolsController @Inject()(poolsService: PoolsService) extends Controller {
   import WalletPoolsController._

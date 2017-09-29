@@ -12,7 +12,7 @@ import com.twitter.finatra.http.filters.{AccessLoggingFilter, CommonFilters}
 import com.twitter.finatra.http.routing.HttpRouter
 import djinni.NativeLibLoader
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 
 object Server extends ServerImpl {
 

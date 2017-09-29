@@ -19,7 +19,6 @@ import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.exceptions.CurrencyNotFoundException
 import co.ledger.wallet.daemon.models.AccountDerivation
 import co.ledger.wallet.daemon.services.LogMsgMaker
-import org.slf4j.MDC
 import slick.jdbc.JdbcBackend.Database
 
 import scala.concurrent.Future
@@ -34,7 +33,7 @@ import scala.concurrent.ExecutionContext
 class DefaultDaemonCache extends DaemonCache {
   implicit def asArrayList[T](input: Seq[T]) = new AsArrayList[T](input)
   import DefaultDaemonCache._
-  private val _writeContext = SerialExecutionContext.newInstance()
+  private val _writeContext = SerialExecutionContext.Implicits.global
 
   def createAccount(accountDerivations: AccountDerivation, user: User, poolName: String, walletName: String): Future[Account] = {
     debug(LogMsgMaker.newInstance("Creating account")
@@ -305,7 +304,7 @@ class DefaultDaemonCache extends DaemonCache {
 }
 
 object DefaultDaemonCache extends DaemonCache {
-  implicit val ec: ExecutionContext = new SerialExecutionContext()(ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor()))
+  implicit val ec: ExecutionContext = SerialExecutionContext.Implicits.single
   def migrateDatabase(): Future[Unit] = {
     dbDao.migrate().map(_ => ())
   }

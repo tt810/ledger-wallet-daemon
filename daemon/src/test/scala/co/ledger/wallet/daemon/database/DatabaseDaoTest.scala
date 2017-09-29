@@ -1,6 +1,5 @@
 package co.ledger.wallet.daemon.database
 
-
 import co.ledger.wallet.daemon.DaemonConfiguration
 import co.ledger.wallet.daemon.exceptions.{DaemonDatabaseException, UserAlreadyExistException}
 import co.ledger.wallet.daemon.utils.HexUtils
@@ -12,7 +11,8 @@ import slick.jdbc.JdbcBackend.Database
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
-import scala.concurrent.ExecutionContext.Implicits.global
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
+
 class DatabaseDaoTest extends AssertionsForJUnit {
   import DatabaseDaoTest._
   @Test def verifyCreateUser(): Unit = {

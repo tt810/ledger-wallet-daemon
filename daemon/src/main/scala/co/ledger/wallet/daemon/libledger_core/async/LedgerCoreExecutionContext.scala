@@ -3,7 +3,7 @@ package co.ledger.wallet.daemon.libledger_core.async
 import java.util.{Timer, TimerTask}
 
 import co.ledger.core
-import co.ledger.wallet.daemon.async.SerialExecutionContext
+import co.ledger.wallet.daemon.async.{MDCPropagatingExecutionContext, SerialExecutionContext}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -23,6 +23,6 @@ class LedgerCoreExecutionContext(val ec: ExecutionContext) extends co.ledger.cor
 
 object LedgerCoreExecutionContext {
   def apply(ec: ExecutionContext) = new LedgerCoreExecutionContext(ec)
-  def newThreadPool() = apply(scala.concurrent.ExecutionContext.global)
-  def newSerialQueue() = apply(SerialExecutionContext.newInstance())
+  def newThreadPool() = apply(MDCPropagatingExecutionContext.Implicits.global)
+  def newSerialQueue() = apply(SerialExecutionContext.Implicits.global)
 }
