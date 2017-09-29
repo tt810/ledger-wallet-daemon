@@ -41,7 +41,14 @@ class AccountsApiTest extends APIFeatureTest {
   test("AccountsApi#Create account with invalid request body") {
     createPool("account_pool")
     assertWalletCreation("account_pool", "accounts_wallet", "bitcoin", Status.Ok)
-    assertCreateAccount(INVALID_BODY, "account_pool", "accounts_wallet", Status.BadRequest)
+    assertCreateAccount(MISSING_PATH_BODY, "account_pool", "accounts_wallet", Status.BadRequest)
+    deletePool("account_pool")
+  }
+
+  test("AccountsApi#Create account fail core lib validation") {
+    createPool("account_pool")
+    assertWalletCreation("account_pool", "accounts_wallet", "bitcoin", Status.Ok)
+    assertCreateAccount(INVALID_ARGUMENT_BODY, "account_pool", "accounts_wallet", Status.BadRequest)
     deletePool("account_pool")
   }
 
@@ -80,16 +87,34 @@ class AccountsApiTest extends APIFeatureTest {
       """"account_index": 0,""" +
       """"derivations": [""" +
       """{""" +
-      """"path": "path to brightness",""" +
-      """"owner": "whoever owns",""" +
-      """"pub_key": "03B4A94D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D",""" +
-      """"chain_code": "234A94D8E33308DD08A3A8C937822"""" +
+      """"owner": "main",""" +
+      """"path": "44'/0'/0'",""" +
+      """"pub_key": "0437bc83a377ea025e53eafcd18f299268d1cecae89b4f15401926a0f8b006c0f7ee1b995047b3e15959c5d10dd1563e22a2e6e4be9572aa7078e32f317677a901",""" +
+      """"chain_code": "d1bb833ecd3beed6ec5f6aa79d3a424d53f5b99147b21dbc00456b05bc978a71"""" +
       """},""" +
       """{""" +
-      """"path": "path to darkness",""" +
-      """"owner": "nobody owns",""" +
-      """"pub_key": "03B4A94D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D",""" +
-      """"chain_code": "D85A2C0DFABC236A8C6A82E58076D"""" +
+      """"owner": "main",""" +
+      """"path": "44'/0'",""" +
+      """"pub_key": "04fb60043afe80ee1aeb0160e2aafc94690fb4427343e8d4bf410105b1121f7a44a311668fa80a7a341554a4ef5262bc6ebd8cc981b8b600dafd40f7682edb5b3b",""" +
+      """"chain_code": "88c2281acd51737c912af74cc1d1a8ba564eb7925e0d58a5500b004ba76099cb"""" +
+      """}""" +
+      """]""" +
+      """}"""
+  private val INVALID_ARGUMENT_BODY =
+    """{""" +
+      """"account_index": 0,""" +
+      """"derivations": [""" +
+      """{""" +
+      """"owner": "different than next owner",""" +
+      """"path": "44'/0'/0'",""" +
+      """"pub_key": "0437bc83a377ea025e53eafcd18f299268d1cecae89b4f15401926a0f8b006c0f7ee1b995047b3e15959c5d10dd1563e22a2e6e4be9572aa7078e32f317677a901",""" +
+      """"chain_code": "d1bb833ecd3beed6ec5f6aa79d3a424d53f5b99147b21dbc00456b05bc978a71"""" +
+      """},""" +
+      """{""" +
+      """"owner": "main",""" +
+      """"path": "44'/0'",""" +
+      """"pub_key": "04fb60043afe80ee1aeb0160e2aafc94690fb4427343e8d4bf410105b1121f7a44a311668fa80a7a341554a4ef5262bc6ebd8cc981b8b600dafd40f7682edb5b3b",""" +
+      """"chain_code": "88c2281acd51737c912af74cc1d1a8ba564eb7925e0d58a5500b004ba76099cb"""" +
       """}""" +
       """]""" +
       """}"""
@@ -98,32 +123,32 @@ class AccountsApiTest extends APIFeatureTest {
       """"account_index": 0,""" +
       """"derivations": [""" +
       """{""" +
-      """"path": "path to brightness",""" +
-      """"owner": "whoever owns",""" +
-      """"chain_code": "234A94D8E33308DD08A3A8C937822"""" +
+      """"owner": "main",""" +
+      """"path": "44'/0'/0'",""" +
+      """"chain_code": "d1bb833ecd3beed6ec5f6aa79d3a424d53f5b99147b21dbc00456b05bc978a71"""" +
       """},""" +
       """{""" +
-      """"path": "path to darkness",""" +
-      """"owner": "nobody owns",""" +
-      """"pub_key": "03B4A94D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D",""" +
-      """"chain_code": "D85A2C0DFABC236A8C6A82E58076D"""" +
+      """"owner": "main",""" +
+      """"path": "44'/0'",""" +
+      """"pub_key": "04fb60043afe80ee1aeb0160e2aafc94690fb4427343e8d4bf410105b1121f7a44a311668fa80a7a341554a4ef5262bc6ebd8cc981b8b600dafd40f7682edb5b3b",""" +
+      """"chain_code": "88c2281acd51737c912af74cc1d1a8ba564eb7925e0d58a5500b004ba76099cb"""" +
       """}""" +
       """]""" +
       """}"""
-  private val INVALID_BODY =
+  private val MISSING_PATH_BODY =
     """{""" +
       """"account_index": 0,""" +
       """"derivations": [""" +
       """{""" +
-      """"owner": "whoever owns",""" +
-      """"pub_key": "03B4A94D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D",""" +
-      """"chain_code": "234A94D8E33308DD08A3A8C937822"""" +
+      """"owner": "main",""" +
+      """"pub_key": "0437bc83a377ea025e53eafcd18f299268d1cecae89b4f15401926a0f8b006c0f7ee1b995047b3e15959c5d10dd1563e22a2e6e4be9572aa7078e32f317677a901",""" +
+      """"chain_code": "d1bb833ecd3beed6ec5f6aa79d3a424d53f5b99147b21dbc00456b05bc978a71"""" +
       """},""" +
       """{""" +
-      """"path": "path to darkness",""" +
-      """"owner": "nobody owns",""" +
-      """"pub_key": "03B4A94D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D",""" +
-      """"chain_code": "D85A2C0DFABC236A8C6A82E58076D"""" +
+      """"owner": "main",""" +
+      """"path": "44'/0'",""" +
+      """"pub_key": "04fb60043afe80ee1aeb0160e2aafc94690fb4427343e8d4bf410105b1121f7a44a311668fa80a7a341554a4ef5262bc6ebd8cc981b8b600dafd40f7682edb5b3b",""" +
+      """"chain_code": "88c2281acd51737c912af74cc1d1a8ba564eb7925e0d58a5500b004ba76099cb"""" +
       """}""" +
       """]""" +
       """}"""
@@ -132,17 +157,16 @@ class AccountsApiTest extends APIFeatureTest {
       """"account_index": 0,""" +
       """"derivations": [""" +
       """{""" +
-      """"path": "path to brightness",""" +
-      """"owner": "whoever owns",""" +
-      """"pub_key": "03B4A94D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D",""" +
-      """"chain_code": "234A94D8E33308DD08A3A8C937822"""" +
+      """"owner": "main",""" +
+      """"path": "44'/0'/0'",""" +
+      """"pub_key": "0437bc83a377ea025e53eafcd18f299268d1cecae89b4f15401926a0f8b006c0f7ee1b995047b3e15959c5d10dd1563e22a2e6e4be9572aa7078e32f317677a901",""" +
+      """"chain_code": "d1bb833ecd3beed6ec5f6aa79d3a424d53f5b99147b21dbc00456b05bc978a71"""" +
       """},""" +
       """{""" +
-      """"path": "path to darkness",""" +
-      """"owner": "nobody owns",""" +
-      """"pub_key": "03B4A94D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D",""" +
-      """"chain_code": "D85A2C0DFABC236A8C6A82E58076D"""" +
+      """"owner": "main",""" +
+      """"path": "44'/0'",""" +
+      """"pub_key": "04fb60043afe80ee1aeb0160e2aafc94690fb4427343e8d4bf410105b1121f7a44a311668fa80a7a341554a4ef5262bc6ebd8cc981b8b600dafd40f7682edb5b3b",""" +
+      """"chain_code": "88c2281acd51737c912af74cc1d1a8ba564eb7925e0d58a5500b004ba76099cb"""" +
       """}""" +
-      """]""" +
-      """"""
+      """]"""
 }
