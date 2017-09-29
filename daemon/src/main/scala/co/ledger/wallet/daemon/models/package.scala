@@ -6,7 +6,7 @@ import com.fasterxml.jackson.annotation._
 import co.ledger.core.implicits._
 
 import scala.collection.JavaConverters._
-import scala.concurrent.ExecutionContext.Implicits.global
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 package object models {

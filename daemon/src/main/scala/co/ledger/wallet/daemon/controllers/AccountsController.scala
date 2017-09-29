@@ -13,7 +13,7 @@ import com.twitter.finatra.request.RouteParam
 import co.ledger.wallet.daemon.filters.AccountCreationContext._
 import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 
 class AccountsController @Inject()(accountsService: AccountsService) extends Controller {
   import AccountsController._

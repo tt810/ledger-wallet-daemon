@@ -11,7 +11,7 @@ import com.twitter.finagle.http.Request
 import com.twitter.util.Future
 import org.bitcoinj.core.Sha256Hash
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.utils._
 
 @Singleton

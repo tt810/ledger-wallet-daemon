@@ -6,7 +6,7 @@ import co.ledger.wallet.daemon.database.{DefaultDaemonCache}
 import co.ledger.wallet.daemon.models._
 
 import scala.concurrent.Future
-import scala.concurrent.ExecutionContext.Implicits.global
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 
 @Singleton
 class CurrenciesService @Inject()(daemonCache: DefaultDaemonCache) extends DaemonService {

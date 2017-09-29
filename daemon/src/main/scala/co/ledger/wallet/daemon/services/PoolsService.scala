@@ -6,7 +6,7 @@ import scala.concurrent.Future
 import co.ledger.wallet.daemon.database.{DefaultDaemonCache, User}
 import co.ledger.wallet.daemon.models
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 
 @Singleton
 class PoolsService @Inject()(daemonCache: DefaultDaemonCache) extends DaemonService {

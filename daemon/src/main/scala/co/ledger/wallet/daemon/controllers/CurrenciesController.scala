@@ -10,7 +10,7 @@ import com.twitter.finagle.http.Request
 import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.RouteParam
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 
 class CurrenciesController @Inject() (currenciesService: CurrenciesService) extends Controller {
   import CurrenciesController._

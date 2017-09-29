@@ -5,13 +5,11 @@ import javax.inject.{Inject, Singleton}
 import co.ledger.wallet.daemon.DaemonConfiguration
 import co.ledger.wallet.daemon.database.{DefaultDaemonCache, User}
 import co.ledger.wallet.daemon.utils.HexUtils
-import com.twitter.finagle.tracing.Trace
 import com.twitter.inject.Logging
 import org.bitcoinj.core.Sha256Hash
-import org.slf4j.MDC
 import org.spongycastle.util.encoders.Base64
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 @Singleton

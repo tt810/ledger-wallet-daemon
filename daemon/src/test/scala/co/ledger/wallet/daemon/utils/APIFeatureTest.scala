@@ -13,7 +13,7 @@ import com.twitter.inject.server.FeatureTest
 import org.bitcoinj.core.Sha256Hash
 
 import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.global
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 
 trait APIFeatureTest extends FeatureTest {
