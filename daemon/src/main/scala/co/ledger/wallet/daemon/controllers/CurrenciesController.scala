@@ -2,6 +2,7 @@ package co.ledger.wallet.daemon.controllers
 
 import javax.inject.Inject
 
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.{ErrorCode, ErrorResponseBody}
 import co.ledger.wallet.daemon.services.{CurrenciesService, LogMsgMaker}
@@ -10,9 +11,10 @@ import com.twitter.finagle.http.Request
 import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.RouteParam
 
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 
-class CurrenciesController @Inject() (currenciesService: CurrenciesService) extends Controller {
+class CurrenciesController @Inject()(currenciesService: CurrenciesService) extends Controller {
+  implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
   import CurrenciesController._
 
   get("/pools/:pool_name/currencies/:currency_name") { request: GetCurrencyRequest =>

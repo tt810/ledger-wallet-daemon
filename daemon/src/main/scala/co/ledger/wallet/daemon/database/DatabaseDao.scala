@@ -14,11 +14,11 @@ import slick.jdbc.JdbcBackend.Database
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
-class DatabaseDao @Inject()(db: Database)(implicit ec: ExecutionContext) extends Logging {
+class DatabaseDao @Inject()(db: Database) extends Logging {
   import database.Tables.profile.api._
   import database.Tables._
 
-  def migrate(): Future[Unit] = {
+  def migrate()(implicit ec: ExecutionContext): Future[Unit] = {
     info("Start database migration")
     val lastMigrationVersion = databaseVersions.sortBy(_.version.desc).map(_.version).take(1).result.head
     db.run(lastMigrationVersion.transactionally) recover {
@@ -46,7 +46,7 @@ class DatabaseDao @Inject()(db: Database)(implicit ec: ExecutionContext) extends
     }
   }
 
-  def deletePool(poolName: String, userId: Long): Future[Int] = {
+  def deletePool(poolName: String, userId: Long)(implicit ec: ExecutionContext): Future[Int] = {
     safeRun(filterPool(poolName, userId).delete).map { int =>
       debug(LogMsgMaker.newInstance("Daemon wallet pool deleted")
         .append("poolName", poolName)
@@ -57,7 +57,7 @@ class DatabaseDao @Inject()(db: Database)(implicit ec: ExecutionContext) extends
     }
   }
 
-  def getPools(userId: Long): Future[Seq[Pool]] = {
+  def getPools(userId: Long)(implicit ec: ExecutionContext): Future[Seq[Pool]] = {
     val query = pools.filter(pool => pool.userId === userId.bind).sortBy(_.id.desc)
     safeRun(query.result.transactionally).map { rows =>
       debug(LogMsgMaker.newInstance("Daemon wallet pools retrieved")
@@ -69,7 +69,7 @@ class DatabaseDao @Inject()(db: Database)(implicit ec: ExecutionContext) extends
     }
   }
 
-  def getUser(targetPubKey: Array[Byte]): Future[Option[User]] = {
+  def getUser(targetPubKey: Array[Byte])(implicit ec: ExecutionContext): Future[Option[User]] = {
     val pubKey = HexUtils.valueOf(targetPubKey)
     safeRun(filterUser(pubKey).result).map { rows =>
       debug(LogMsgMaker.newInstance("Daemon users retrieved")
@@ -82,7 +82,7 @@ class DatabaseDao @Inject()(db: Database)(implicit ec: ExecutionContext) extends
     }
   }
 
-  def getUsers(): Future[Seq[User]] = {
+  def getUsers()(implicit ec: ExecutionContext): Future[Seq[User]] = {
     val query = users.result
     safeRun(query).map { rows =>
       debug(LogMsgMaker.newInstance("Daemon users retrieved")
@@ -93,7 +93,7 @@ class DatabaseDao @Inject()(db: Database)(implicit ec: ExecutionContext) extends
     }
   }
 
-  def insertPool(newPool: Pool): Future[Int] = {
+  def insertPool(newPool: Pool)(implicit ec: ExecutionContext): Future[Int] = {
     val query = filterPool(newPool.name, newPool.userId).exists.result.flatMap { exists =>
       if (!exists) {
         pools += createPoolRow(newPool)
@@ -110,7 +110,7 @@ class DatabaseDao @Inject()(db: Database)(implicit ec: ExecutionContext) extends
     }
   }
 
-  def insertUser(newUser: User): Future[Int] = {
+  def insertUser(newUser: User)(implicit ec: ExecutionContext): Future[Int] = {
     val query = filterUser(newUser.pubKey).exists.result.flatMap {(exists) =>
       if (!exists) {
         users += createUserRow(newUser)
@@ -128,7 +128,7 @@ class DatabaseDao @Inject()(db: Database)(implicit ec: ExecutionContext) extends
     }
   }
 
-  private def safeRun[R](query: DBIO[R]): Future[R] = {
+  private def safeRun[R](query: DBIO[R])(implicit ec: ExecutionContext): Future[R] = {
     db.run(query.transactionally).recoverWith {
       case e: DaemonException => Future.failed(e)
       case others: Throwable => Future.failed(DaemonDatabaseException("Failed to run database query", others))

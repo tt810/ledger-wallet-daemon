@@ -1,5 +1,6 @@
 package co.ledger.wallet.daemon
 
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.controllers._
 import co.ledger.wallet.daemon.database.DefaultDaemonCache
 import co.ledger.wallet.daemon.filters._
@@ -12,14 +13,13 @@ import com.twitter.finatra.http.filters.{AccessLoggingFilter, CommonFilters}
 import com.twitter.finatra.http.routing.HttpRouter
 import djinni.NativeLibLoader
 
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext
 
 object Server extends ServerImpl {
 
 }
 
 class ServerImpl extends HttpServer {
-
   override def jacksonModule = DaemonJacksonModule
 
   override protected def configureHttp(router: HttpRouter): Unit =
@@ -38,6 +38,8 @@ class ServerImpl extends HttpServer {
       .exceptionMapper[AuthenticationExceptionMapper]
 
   override protected def warmup(): Unit = {
+    implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
+
     super.warmup()
     NativeLibLoader.loadLibs()
     DefaultDaemonCache.migrateDatabase().flatMap { _ =>
