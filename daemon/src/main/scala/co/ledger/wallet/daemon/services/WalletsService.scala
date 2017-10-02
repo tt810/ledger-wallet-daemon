@@ -3,13 +3,13 @@ package co.ledger.wallet.daemon.services
 import javax.inject.{Inject, Singleton}
 
 import co.ledger.core.{Wallet => CoreWallet}
-import co.ledger.wallet.daemon.database.{Bulk, DefaultDaemonCache, User, WalletsWithCount}
+import co.ledger.wallet.daemon.database._
 
 import scala.concurrent.Future
 
 
 @Singleton
-class WalletsService @Inject()(daemonCache: DefaultDaemonCache) extends DaemonService {
+class WalletsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
 
   def wallets(user: User, poolName: String, offset: Int, bulkSize: Int): Future[WalletsWithCount] = {
     info(LogMsgMaker.newInstance("Obtain wallets with params")

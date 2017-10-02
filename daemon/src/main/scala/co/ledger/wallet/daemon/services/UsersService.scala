@@ -3,15 +3,16 @@ package co.ledger.wallet.daemon.services
 import javax.inject.{Inject, Singleton}
 
 import co.ledger.wallet.daemon.DaemonConfiguration
-import co.ledger.wallet.daemon.database.{DefaultDaemonCache, User}
+import co.ledger.wallet.daemon.database.{DaemonCache, DefaultDaemonCache, User}
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.twitter.inject.Logging
 import org.bitcoinj.core.Sha256Hash
 import org.spongycastle.util.encoders.Base64
+
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
-class UsersService @Inject()(daemonCache: DefaultDaemonCache, ecdsa: ECDSAService) extends DaemonService {
+class UsersService @Inject()(daemonCache: DaemonCache, ecdsa: ECDSAService) extends DaemonService {
 
   def createUser(publicKey: String, permissions: Long = 0): Future[Int] = {
     info(LogMsgMaker.newInstance("Create user with params")

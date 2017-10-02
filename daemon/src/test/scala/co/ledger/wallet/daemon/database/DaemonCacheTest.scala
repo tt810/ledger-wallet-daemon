@@ -18,7 +18,7 @@ class DaemonCacheTest extends AssertionsForJUnit {
 
   @Test def verifyGetPoolNotFound(): Unit = {
     try {
-      Await.result(cache.getPool(PUB_KEY_1, "pool_not_exist"), Duration.Inf)
+      Await.result(cache.getWalletPool(PUB_KEY_1, "pool_not_exist"), Duration.Inf)
       fail()
     } catch {
       case e: WalletPoolNotFoundException => // expected
@@ -27,7 +27,7 @@ class DaemonCacheTest extends AssertionsForJUnit {
 
   @Test def verifyGetPoolsWithNotExistUser(): Unit = {
     try {
-      Await.result(cache.getPools(UUID.randomUUID().toString), Duration.Inf)
+      Await.result(cache.getWalletPools(UUID.randomUUID().toString), Duration.Inf)
       fail()
     } catch {
       case e: UserNotFoundException => // expected
@@ -35,10 +35,10 @@ class DaemonCacheTest extends AssertionsForJUnit {
   }
 
   @Test def verifyCreateAndGetPools(): Unit = {
-    val pool11 = Await.result(cache.getPool(PUB_KEY_1, "pool_1"), Duration.Inf)
-    val pool12 = Await.result(cache.getPool(PUB_KEY_1, "pool_2"), Duration.Inf)
-    val pool13 = Await.result(cache.createPool(User(PUB_KEY_1, 0, Option(1L)), "pool_3", "config"), Duration.Inf)
-    val pool1s = Await.result(cache.getPools(PUB_KEY_1), Duration.Inf)
+    val pool11 = Await.result(cache.getWalletPool(PUB_KEY_1, "pool_1"), Duration.Inf)
+    val pool12 = Await.result(cache.getWalletPool(PUB_KEY_1, "pool_2"), Duration.Inf)
+    val pool13 = Await.result(cache.createWalletPool(User(PUB_KEY_1, 0, Option(1L)), "pool_3", "config"), Duration.Inf)
+    val pool1s = Await.result(cache.getWalletPools(PUB_KEY_1), Duration.Inf)
     assertEquals(3, pool1s.size)
     assertTrue(pool1s.contains(pool11))
     assertTrue(pool1s.contains(pool12))
@@ -46,20 +46,20 @@ class DaemonCacheTest extends AssertionsForJUnit {
   }
 
   @Test def verifyCreateAndDeletePool(): Unit = {
-    val poolRandom = Await.result(cache.createPool(User(PUB_KEY_2, 0, Option(2L)),UUID.randomUUID().toString, "config"), Duration.Inf)
-    val beforeDeletion = Await.result(cache.getPools(PUB_KEY_2), Duration.Inf)
+    val poolRandom = Await.result(cache.createWalletPool(User(PUB_KEY_2, 0, Option(2L)),UUID.randomUUID().toString, "config"), Duration.Inf)
+    val beforeDeletion = Await.result(cache.getWalletPools(PUB_KEY_2), Duration.Inf)
     assertEquals(3, beforeDeletion.size)
     assertTrue(beforeDeletion.contains(poolRandom))
 
-    val afterDeletion = Await.result(cache.deletePool(User(PUB_KEY_2, 0, Option(2L)), poolRandom.getName).flatMap(_=>cache.getPools(PUB_KEY_2)), Duration.Inf)
+    val afterDeletion = Await.result(cache.deleteWalletPool(User(PUB_KEY_2, 0, Option(2L)), poolRandom.name).flatMap(_=>cache.getWalletPools(PUB_KEY_2)), Duration.Inf)
     assertFalse(afterDeletion.contains(poolRandom))
   }
 
   @Test def verifyGetCurrencies(): Unit = {
     val currencies = Await.result(cache.getCurrencies("pool_1"), Duration.Inf)
     assertEquals(1, currencies.size)
-    val currency = Await.result(cache.getCurrency("pool_2", "bitcoin"), Duration.Inf)
-    assertEquals(currency.getName, currencies(0).getName)
+    val currency = Await.result(cache.getCurrency("bitcoin", "pool_2"), Duration.Inf)
+    assertEquals(currency.name, currencies(0).name)
   }
 
 }
@@ -72,10 +72,10 @@ object DaemonCacheTest {
     val user2 = User(PUB_KEY_2, 0, Option(2L))
     Await.result(cache.createUser(user1), Duration.Inf)
     Await.result(cache.createUser(user2), Duration.Inf)
-    Await.result(cache.createPool(user1, "pool_1", ""), Duration.Inf)
-    Await.result(cache.createPool(user1, "pool_2", ""), Duration.Inf)
-    Await.result(cache.createPool(user2, "pool_1", ""), Duration.Inf)
-    Await.result(cache.createPool(user2, "pool_3", ""), Duration.Inf)
+    Await.result(cache.createWalletPool(user1, "pool_1", ""), Duration.Inf)
+    Await.result(cache.createWalletPool(user1, "pool_2", ""), Duration.Inf)
+    Await.result(cache.createWalletPool(user2, "pool_1", ""), Duration.Inf)
+    Await.result(cache.createWalletPool(user2, "pool_3", ""), Duration.Inf)
     DefaultDaemonCache.initialize()
   }
   private val cache: DefaultDaemonCache = new DefaultDaemonCache()
