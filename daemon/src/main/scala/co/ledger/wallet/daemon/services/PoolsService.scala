@@ -2,47 +2,45 @@ package co.ledger.wallet.daemon.services
 
 import javax.inject.{Inject, Singleton}
 
-import scala.concurrent.{ExecutionContext, Future}
-import co.ledger.wallet.daemon.database.{DefaultDaemonCache, User}
-import co.ledger.wallet.daemon.models
+import scala.concurrent.Future
+import co.ledger.wallet.daemon.database.{DaemonCache, User}
+import co.ledger.wallet.daemon.models.WalletPool
 
 @Singleton
-class PoolsService @Inject()(daemonCache: DefaultDaemonCache) extends DaemonService {
+class PoolsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
   import PoolsService._
 
-  def createPool(user: User, poolName: String, configuration: PoolConfiguration)(implicit ec: ExecutionContext): Future[models.WalletPool] = {
+  def createPool(user: User, poolName: String, configuration: PoolConfiguration): Future[WalletPool] = {
     info(LogMsgMaker.newInstance("Create wallet pool with params")
       .append("poolName", poolName)
       .append("configuration", configuration)
       .append("userPubKey", user.pubKey)
       .toString())
-    daemonCache.createPool(user, poolName, configuration.toString).flatMap(corePool => models.newInstance(corePool))
+    daemonCache.createWalletPool(user, poolName, configuration.toString)
   }
 
-  def pools(user: User)(implicit ec: ExecutionContext): Future[Seq[models.WalletPool]] = {
+  def pools(user: User): Future[Seq[WalletPool]] = {
     info(LogMsgMaker.newInstance("Obtain wallet pools with params")
       .append("userPubKey", user.pubKey)
       .toString())
-    daemonCache.getPools(user.pubKey).flatMap { pools =>
-      Future.sequence(pools.map(corePool => models.newInstance(corePool)))
-    }
+    daemonCache.getWalletPools(user.pubKey)
   }
 
-  def pool(user: User, poolName: String)(implicit ec: ExecutionContext): Future[models.WalletPool] = {
+  def pool(user: User, poolName: String): Future[WalletPool] = {
     info(LogMsgMaker.newInstance("Obtain wallet pool with params")
       .append("poolName", poolName)
       .append("userPubKey", user.pubKey)
       .toString())
-    daemonCache.getPool(user.pubKey, poolName).flatMap(models.newInstance(_))
+    daemonCache.getWalletPool(user.pubKey, poolName)
   }
 
-  def removePool(user: User, poolName: String)(implicit ec: ExecutionContext): Future[Unit] = {
+  def removePool(user: User, poolName: String): Future[Unit] = {
     info(LogMsgMaker.newInstance("Remove wallet pool with params")
       .append("poolName", poolName)
       .append("userPubKey", user.pubKey)
       .toString())
     info(s"Start to remove pool: poolName=$poolName userPubKey=${user.pubKey}")
-    daemonCache.deletePool(user, poolName)
+    daemonCache.deleteWalletPool(user, poolName)
   }
 
 }

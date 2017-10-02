@@ -3,13 +3,13 @@ package co.ledger.wallet.daemon.services
 import javax.inject.{Inject, Singleton}
 
 import co.ledger.core.{Account, BitcoinLikeNextAccountInfo}
-import co.ledger.wallet.daemon.database.{DefaultDaemonCache, User}
-import co.ledger.wallet.daemon.models.{AccountDerivation}
+import co.ledger.wallet.daemon.database.{DaemonCache, User}
+import co.ledger.wallet.daemon.models.AccountDerivation
 
 import scala.concurrent.Future
 
 @Singleton
-class AccountsService @Inject()(defaultDaemonCache: DefaultDaemonCache) extends DaemonService {
+class AccountsService @Inject()(defaultDaemonCache: DaemonCache) extends DaemonService {
   import AccountsService._
 
   def accounts(user: User, poolName: String, walletName: String): Future[Seq[Account]] = {

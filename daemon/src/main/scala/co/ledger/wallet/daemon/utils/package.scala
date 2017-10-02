@@ -35,4 +35,8 @@ package object utils {
     def asArrayList : java.util.ArrayList[T] = new java.util.ArrayList[T](input.asJava)
   }
 
+  def sum(list: List[Long]): Long = list match {
+    case Nil => 0
+    case x :: xs => x + sum(xs)
+  }
 }

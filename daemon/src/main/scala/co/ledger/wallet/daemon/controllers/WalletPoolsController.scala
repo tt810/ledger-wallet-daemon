@@ -12,7 +12,7 @@ import co.ledger.wallet.daemon.services.PoolsService.PoolConfiguration
 import co.ledger.wallet.daemon.utils.RichRequest
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.finatra.http.Controller
-import com.twitter.finatra.validation.{MethodValidation, NotEmpty, ValidationResult}
+import com.twitter.finatra.validation.{MethodValidation, NotEmpty}
 
 import scala.concurrent.ExecutionContext
 

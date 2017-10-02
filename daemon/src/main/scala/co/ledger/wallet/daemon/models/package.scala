@@ -1,6 +1,6 @@
 package co.ledger.wallet.daemon
 
-import co.ledger.core.{CurrencyUnit, Account => CoreAccount, Currency => CoreCurrency, Wallet => CoreWallet, WalletPool => CoreWalletPool}
+import co.ledger.core.{CurrencyUnit, DynamicObject, Account => CoreAccount, Currency => CoreCurrency, Wallet => CoreWallet, WalletPool => CoreWalletPool}
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.fasterxml.jackson.annotation._
 import co.ledger.core.implicits._
@@ -27,9 +27,9 @@ package object models {
     case _ => ???
   }
 
-//  def newInstance(account: CoreAccount, walletName: String): Account = {
+//  def newInstance(account: CoreAccount, walletName: String, currency: Currency): Account = {
 //    account.getBalance().map { balance =>
-//      Account(walletName, account.getIndex, balance, account.get)
+//      Account(walletName, account.getIndex, balance.toLong, account.getKeyChain, currency)
 //    }
 //
 //  }
@@ -49,10 +49,34 @@ package object models {
   def newInstance(pool: CoreWalletPool)(implicit ec: ExecutionContext): Future[WalletPool] =
     pool.getWalletCount().map(models.WalletPool(pool.getName, _))
 
-  def newInstance(coreWallet: CoreWallet): Unit = ???
-//  {
-//    Wallet(coreWallet.getName, newInstance(coreWallet.getCurrency), coreWallet.getAccountCount(), core)
-//  }
+  def newInstance(coreWallet: CoreWallet)(implicit ec: ExecutionContext): Future[Wallet] = {
+
+    def getBalance(count: Int): Future[Long] = {
+      coreWallet.getAccounts(0, count) flatMap { (accounts) =>
+        val accs = accounts.asScala.toList
+        val balances = Future.sequence(for (acc <- accs) yield acc.getBalance())
+        balances.map { bs =>
+          val bls = for(balance <- bs) yield balance.toLong
+          utils.sum(bls)
+        }
+      }
+    }
+
+    def getConfiguration(): Map[String, Any] = {
+      var configs = collection.mutable.Map[String, Any]()
+      val dynamicObject = DynamicObject.newInstance()
+      dynamicObject.getKeys.forEach { key =>
+        configs += (key -> dynamicObject.getObject(key))
+      }
+      configs.toMap
+    }
+
+    coreWallet.getAccountCount().flatMap { count =>
+      getBalance(count).map { balance =>
+        Wallet(coreWallet.getName, newInstance(coreWallet.getCurrency), count, balance, getConfiguration())
+      }
+    }
+  }
 
   def newInstance(coreCurrencyUnit: CurrencyUnit): Unit =
     Unit(
