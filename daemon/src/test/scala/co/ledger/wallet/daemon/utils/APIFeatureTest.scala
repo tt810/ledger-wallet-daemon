@@ -41,8 +41,8 @@ trait APIFeatureTest extends FeatureTest {
     server.httpGet(s"/pools/$poolName", headers = defaultHeaders, andExpect = expected)
   }
 
-  def createPool(poolName: String): Response = {
-    server.httpPost("/pools", s"""{"pool_name":"$poolName"}""", headers = defaultHeaders, andExpect = Status.Ok)
+  def createPool(poolName: String, expected: Status = Status.Ok): Response = {
+    server.httpPost("/pools", s"""{"pool_name":"$poolName"}""", headers = defaultHeaders, andExpect = expected)
   }
 
   def deletePool(poolName: String): Response = {

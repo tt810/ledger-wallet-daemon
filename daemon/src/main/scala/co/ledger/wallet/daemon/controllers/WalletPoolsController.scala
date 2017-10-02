@@ -3,8 +3,8 @@ package co.ledger.wallet.daemon.controllers
 import javax.inject.Inject
 
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
+import co.ledger.wallet.daemon.controllers.responses.ResponseSerializer
 import co.ledger.wallet.daemon.exceptions._
-import co.ledger.wallet.daemon.{ErrorCode, ErrorResponseBody}
 import co.ledger.wallet.daemon.services.{LogMsgMaker, PoolsService}
 import com.twitter.finagle.http.Request
 import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
@@ -12,6 +12,7 @@ import co.ledger.wallet.daemon.services.PoolsService.PoolConfiguration
 import co.ledger.wallet.daemon.utils.RichRequest
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.finatra.http.Controller
+import com.twitter.finatra.validation.{MethodValidation, NotEmpty, ValidationResult}
 
 import scala.concurrent.ExecutionContext
 
@@ -20,76 +21,65 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
   import WalletPoolsController._
 
   get("/pools") {(request: Request) =>
-    info(LogMsgMaker.newInstance("Receive get wallet pools request")
+    info(LogMsgMaker.newInstance("GET wallet pools request")
       .append("request", request)
       .toString())
     poolsService.pools(request.user.get).recover {
-      case e: Throwable => {
-        error("Internal error", e)
-        response.ok()
-          .body(ErrorResponseBody(ErrorCode.Internal_Error, "Problem occurred when processing the request, check with developers"))
-      }
+      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
     }
   }
 
   get("/pools/:pool_name") {(request: Request) =>
-    info(LogMsgMaker.newInstance("Receive get wallet pool request")
-      .append("request", request)
-      .toString())
     val poolName = request.getParam("pool_name")
+    info(LogMsgMaker.newInstance("GET wallet pool request")
+      .append("request", request)
+      .append("pool_name", poolName)
+      .toString())
     poolsService.pool(request.user.get, poolName).recover {
-      case pe: WalletPoolNotFoundException => {
-        debug("Not Found", pe)
-        response.notFound()
-          .body(ErrorResponseBody(ErrorCode.Not_Found, s"Wallet pool $poolName doesn't exist"))
-      }
-      case e: Throwable => {
-        error("Internal error", e)
-        response.ok()
-          .body(ErrorResponseBody(ErrorCode.Internal_Error, "Problem occurred when processing the request, check with developers"))
-      }
+      case pe: WalletPoolNotFoundException => responseSerializer.serializeNotFound(
+        Map("response"->"Wallet pool doesn't exist", "pool_name" -> poolName),
+        response,
+        pe)
+      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
     }
   }
 
   post("/pools") { (request: CreationRequest) =>
-    info(LogMsgMaker.newInstance("Receive create wallet pool request")
-      .append("request", request)
+    info(LogMsgMaker.newInstance("CREATE wallet pool request")
+      .append("request", request.request)
       .toString())
     val poolName = request.pool_name
     // TODO: Deserialize the configuration from the body of the request
     poolsService.createPool(request.user, poolName, PoolConfiguration()).recover {
-      case e: Throwable => {
-        error("Internal error", e)
-        response.ok()
-          .body(ErrorResponseBody(ErrorCode.Internal_Error, "Problem occurred when processing the request, check with developers"))
-      }
+      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
     }
   }
 
   delete("/pools/:pool_name") {(request: Request) =>
-    info(LogMsgMaker.newInstance("Receive delete wallet pools request")
-      .append("request", request)
-      .toString())
     val poolName = request.getParam("pool_name")
+    info(LogMsgMaker.newInstance("DELETE wallet pool request")
+      .append("request", request)
+      .append("pool_name", poolName)
+      .toString())
     poolsService.removePool(request.user.get, poolName).recover {
-      case pe: WalletPoolNotFoundException => {
-       debug("Not Found", pe)
-       response.notFound()
-          .body(ErrorResponseBody(ErrorCode.Invalid_Request, s"Attempt deleting wallet pool $poolName request is ignored"))
-      }
-      case e: Throwable => {
-        error("Internal error", e)
-        response.ok()
-          .body(ErrorResponseBody(ErrorCode.Internal_Error, "Problem occurred when processing the request, check with developers"))
-      }
+      case pe: WalletPoolNotFoundException => responseSerializer.serializeNotFound(
+        Map("response" -> "Wallet pool doesn't exist", "pool_name" -> poolName),
+        response,
+        pe)
+      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
     }
   }
 
+  private val responseSerializer: ResponseSerializer = ResponseSerializer.newInstance
 }
 
 object WalletPoolsController {
   case class CreationRequest(
-                            @JsonProperty pool_name: String,
+                            @NotEmpty @JsonProperty pool_name: String,
                             request: Request
-                            ) extends RichRequest(request)
+                            ) extends RichRequest(request) {
+    @MethodValidation
+    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+
+  }
 }

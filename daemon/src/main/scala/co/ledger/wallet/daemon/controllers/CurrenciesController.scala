@@ -3,8 +3,8 @@ package co.ledger.wallet.daemon.controllers
 import javax.inject.Inject
 
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
+import co.ledger.wallet.daemon.controllers.responses.ResponseSerializer
 import co.ledger.wallet.daemon.exceptions._
-import co.ledger.wallet.daemon.{ErrorCode, ErrorResponseBody}
 import co.ledger.wallet.daemon.services.{CurrenciesService, LogMsgMaker}
 import co.ledger.wallet.daemon.utils.RichRequest
 import com.twitter.finagle.http.Request
@@ -20,46 +20,40 @@ class CurrenciesController @Inject()(currenciesService: CurrenciesService) exten
   get("/pools/:pool_name/currencies/:currency_name") { request: GetCurrencyRequest =>
     val poolName = request.pool_name
     val currencyName = request.currency_name
-    info(LogMsgMaker.newInstance("Receive get currencies request")
-      .append("request", request)
+    info(LogMsgMaker.newInstance("GET currency request")
+      .append("request", request.request)
+      .append("currency_name", currencyName)
+      .append("pool_name", poolName)
       .toString())
     currenciesService.currency(currencyName, poolName).recover {
-      case pnfe: WalletPoolNotFoundException => {
-        debug("Not Found", pnfe)
-        response.badRequest()
-          .body(ErrorResponseBody(ErrorCode.Invalid_Request, s"Wallet pool $poolName doesn't exist"))
-      }
-      case cnfe: CurrencyNotFoundException => {
-        debug("Not Found", cnfe)
-        response.notFound()
-          .body(ErrorResponseBody(ErrorCode.Not_Found, s"Currency $currencyName is not supported"))
-      }
-      case e: Throwable => {
-        error("Internal error", e)
-        response.ok()
-          .body(ErrorResponseBody(ErrorCode.Internal_Error, "Problem occurred when processing the request, check with developers"))
-      }
+      case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
+        Map("response" -> "Wallet pool doesn't exist", "pool_name" -> poolName),
+        response,
+        pnfe)
+      case cnfe: CurrencyNotFoundException => responseSerializer.serializeNotFound(
+        Map("response"-> "Currency not support", "currency_name" -> currencyName),
+        response,
+        cnfe)
+      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
     }
   }
 
   get("/pools/:pool_name/currencies") {request: GetCurrenciesRequest =>
-    info(LogMsgMaker.newInstance("Receive get currency request")
-      .append("request", request)
-      .toString())
     val poolName = request.pool_name
+    info(LogMsgMaker.newInstance("GET currencies request")
+      .append("request", request.request)
+      .append("pool_name", poolName)
+      .toString())
     currenciesService.currencies(poolName).recover {
-      case pnfe: WalletPoolNotFoundException => {
-        debug("Not Found", pnfe)
-        response.badRequest()
-          .body(ErrorResponseBody(ErrorCode.Invalid_Request, s"Wallet pool $poolName doesn't exist"))
-      }
-      case e: Throwable => {
-        error("Internal error", e)
-        response.ok()
-          .body(ErrorResponseBody(ErrorCode.Internal_Error, "Problem occurred when processing the request, check with developers"))
-      }
+      case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
+        Map("response" -> "Wallet pool doesn't exist", "pool_name" -> poolName),
+        response,
+        pnfe)
+      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
     }
   }
+
+  private val responseSerializer: ResponseSerializer = ResponseSerializer.newInstance()
 }
 
 object CurrenciesController {
