@@ -32,7 +32,7 @@ import scala.concurrent.ExecutionContext
   * TODO: Add wallets and accounts to cache
   */
 @Singleton
-class DefaultDaemonCache() extends DaemonCache {
+class DefaultDaemonCache() extends DaemonCache with Logging {
   implicit def asArrayList[T](input: Seq[T]) = new AsArrayList[T](input)
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
   import DefaultDaemonCache._

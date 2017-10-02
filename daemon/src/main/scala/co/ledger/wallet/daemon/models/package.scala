@@ -10,23 +10,6 @@ import scala.concurrent.{ExecutionContext, Future}
 
 package object models {
 
-  def newInstance(crcyFamily: CurrencyFamily, coreCurrency: CoreCurrency): NetworkParams = crcyFamily match {
-    case CurrencyFamily.BITCOIN => {
-      val coreCrcyNetworkPrms = coreCurrency.getBitcoinLikeNetworkParameters
-      BitcoinLikeNetworkParams(
-        coreCrcyNetworkPrms.getIdentifier,
-        utils.HexUtils.valueOf(coreCrcyNetworkPrms.getP2PKHVersion),
-        HexUtils.valueOf(coreCrcyNetworkPrms.getP2SHVersion),
-        HexUtils.valueOf(coreCrcyNetworkPrms.getXPUBVersion),
-        coreCrcyNetworkPrms.getFeePolicy.name,
-        coreCrcyNetworkPrms.getDustAmount,
-        coreCrcyNetworkPrms.getMessagePrefix,
-        coreCrcyNetworkPrms.getUsesTimestampedTransaction
-      )
-    }
-    case _ => ???
-  }
-
 //  def newInstance(account: CoreAccount, walletName: String, currency: Currency): Account = {
 //    account.getBalance().map { balance =>
 //      Account(walletName, account.getIndex, balance.toLong, account.getKeyChain, currency)
@@ -35,14 +18,41 @@ package object models {
 //  }
 
   def newInstance(crCrcy: CoreCurrency): Currency = {
+
     val currencyFamily = CurrencyFamily.valueOf(crCrcy.getWalletType.name())
+
+    def networkParams: NetworkParams = currencyFamily match {
+      case CurrencyFamily.BITCOIN => {
+        val coreCrcyNetworkPrms = crCrcy.getBitcoinLikeNetworkParameters
+        BitcoinLikeNetworkParams(
+          coreCrcyNetworkPrms.getIdentifier,
+          utils.HexUtils.valueOf(coreCrcyNetworkPrms.getP2PKHVersion),
+          HexUtils.valueOf(coreCrcyNetworkPrms.getP2SHVersion),
+          HexUtils.valueOf(coreCrcyNetworkPrms.getXPUBVersion),
+          coreCrcyNetworkPrms.getFeePolicy.name,
+          coreCrcyNetworkPrms.getDustAmount,
+          coreCrcyNetworkPrms.getMessagePrefix,
+          coreCrcyNetworkPrms.getUsesTimestampedTransaction
+        )
+      }
+      case _ => ???
+    }
+
+    def currencyUnit(coreCurrencyUnit: CurrencyUnit): Unit =
+      Unit(
+        coreCurrencyUnit.getName,
+        coreCurrencyUnit.getSymbol,
+        coreCurrencyUnit.getCode,
+        coreCurrencyUnit.getNumberOfDecimal
+      )
+
     Currency(
       crCrcy.getName,
       currencyFamily,
       crCrcy.getBip44CoinType,
       crCrcy.getPaymentUriScheme,
-      crCrcy.getUnits.asScala.toList.map(newInstance(_)),
-      newInstance(currencyFamily, crCrcy)
+      crCrcy.getUnits.asScala.toList.map(currencyUnit(_)),
+      networkParams
     )
   }
 
@@ -62,7 +72,7 @@ package object models {
       }
     }
 
-    def getConfiguration(): Map[String, Any] = {
+    val configuration: Map[String, Any] = {
       var configs = collection.mutable.Map[String, Any]()
       val dynamicObject = DynamicObject.newInstance()
       dynamicObject.getKeys.forEach { key =>
@@ -73,18 +83,10 @@ package object models {
 
     coreWallet.getAccountCount().flatMap { count =>
       getBalance(count).map { balance =>
-        Wallet(coreWallet.getName, newInstance(coreWallet.getCurrency), count, balance, getConfiguration())
+        Wallet(coreWallet.getName, newInstance(coreWallet.getCurrency), count, balance, configuration)
       }
     }
   }
-
-  def newInstance(coreCurrencyUnit: CurrencyUnit): Unit =
-    Unit(
-      coreCurrencyUnit.getName,
-      coreCurrencyUnit.getSymbol,
-      coreCurrencyUnit.getCode,
-      coreCurrencyUnit.getNumberOfDecimal
-    )
 
   case class Account(
                       @JsonProperty("wallet_name") walletName: String,
