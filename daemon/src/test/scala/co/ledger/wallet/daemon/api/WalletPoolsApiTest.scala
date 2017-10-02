@@ -1,6 +1,7 @@
 package co.ledger.wallet.daemon.api
 
-import co.ledger.wallet.daemon.{ErrorCode, ErrorResponseBody, models}
+import co.ledger.wallet.daemon.controllers.responses.{ErrorCode, ErrorResponseBody}
+import co.ledger.wallet.daemon.models
 import co.ledger.wallet.daemon.models.WalletPool
 import co.ledger.wallet.daemon.utils.APIFeatureTest
 import com.twitter.finagle.http.Status
@@ -10,8 +11,13 @@ class WalletPoolsApiTest extends APIFeatureTest {
   test("WalletPoolsApi#Create and list single pool") {
     createPool("my_pool")
     val pools = parse[List[models.WalletPool]](getPools())
-    assert(pools == List(WalletPool("my_pool", 0)))
+    val pool = parse[models.WalletPool](getPool("my_pool"))
+    assert(pools == List(pool))
     deletePool("my_pool")
+  }
+
+  test("WalletPoolsApi#Create pool with invalid name") {
+    createPool("my_pool; drop table my_pool,", Status.BadRequest)
   }
 
   test("WalletPoolsApi#Create and list multiple pool") {
@@ -36,7 +42,7 @@ class WalletPoolsApiTest extends APIFeatureTest {
   test("WalletPoolsApi#Get and delete non-exist pool return not found") {
     assert(
       server.mapper.objectMapper.readValue[ErrorResponseBody](getPool("not_exist_pool", Status.NotFound).contentString)
-        == ErrorResponseBody(ErrorCode.Not_Found, "Wallet pool not_exist_pool doesn't exist"))
+        == ErrorResponseBody(ErrorCode.Not_Found, Map("response"->"Wallet pool doesn't exist","pool_name"-> "not_exist_pool")))
     assert(deletePool("another_not_exist_pool").contentString === "")
   }
 

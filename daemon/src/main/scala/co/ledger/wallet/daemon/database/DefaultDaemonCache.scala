@@ -37,7 +37,7 @@ class DefaultDaemonCache() extends DaemonCache {
   private val _writeContext = SerialExecutionContext.Implicits.global
 
   def createAccount(accountDerivations: AccountDerivation, user: User, poolName: String, walletName: String): Future[Account] = {
-    debug(LogMsgMaker.newInstance("Creating account")
+    info(LogMsgMaker.newInstance("Creating account")
       .append("derivations", accountDerivations)
       .append("walletName", walletName)
       .append("poolName", poolName)
@@ -69,7 +69,7 @@ class DefaultDaemonCache() extends DaemonCache {
 
   def createPool(user: User, poolName: String, configuration: String): Future[core.WalletPool] = {
     implicit val ec = _writeContext
-    debug(LogMsgMaker.newInstance("Creating wallet pool")
+    info(LogMsgMaker.newInstance("Creating wallet pool")
       .append("poolName", poolName)
       .append("configuration", configuration)
       .toString())
@@ -97,7 +97,7 @@ class DefaultDaemonCache() extends DaemonCache {
   }
 
   def createWallet(walletName: String, currencyName: String, poolName: String, user: User): Future[core.Wallet] = {
-    debug(LogMsgMaker.newInstance("Creating wallet")
+    info(LogMsgMaker.newInstance("Creating wallet")
       .append("walletName", walletName)
       .append("currencyName", currencyName)
       .append("poolName", poolName)
@@ -144,7 +144,7 @@ class DefaultDaemonCache() extends DaemonCache {
 
   def deletePool(user: User, poolName: String): Future[Unit] = {
     implicit val ec = _writeContext
-    debug(LogMsgMaker.newInstance("Deleting wallet pool")
+    info(LogMsgMaker.newInstance("Deleting wallet pool")
       .append("poolName", poolName)
       .append("userPubKey", user.pubKey)
       .toString())
@@ -213,10 +213,18 @@ class DefaultDaemonCache() extends DaemonCache {
   }
 
   def getCurrencies(poolName: String): Future[Seq[core.Currency]] = Future {
-    debug(LogMsgMaker.newInstance("Retrieving currencies")
+    info(LogMsgMaker.newInstance("Retrieving currencies")
       .append("poolName", poolName)
       .toString())
     getNamedCurrencies(poolName).values().asScala.toList
+  }
+
+  def getCurrencyNames(poolName: String): Seq[String] = {
+    info(LogMsgMaker.newInstance("Retrieving currency names")
+      .append("poolName", poolName)
+      .toString())
+    val currencies = getNamedCurrencies(poolName).values().asScala.toList
+    for(currency <- currencies) yield currency.getName
   }
 
   def getPool(pubKey: String, poolName: String): Future[core.WalletPool] = Future {

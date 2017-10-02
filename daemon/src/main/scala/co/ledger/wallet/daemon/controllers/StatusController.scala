@@ -10,7 +10,7 @@ class StatusController extends Controller {
   import StatusController._
 
   get("/status") {(request: Request) =>
-    info(LogMsgMaker.newInstance("Receive get status request")
+    info(LogMsgMaker.newInstance("GET status request")
       .append("request", request)
       .toString())
     response.ok(Status(LedgerCore.getStringVersion))

@@ -1,7 +1,7 @@
 package co.ledger.wallet.daemon.api
 
 import co.ledger.core.Wallet
-import co.ledger.wallet.daemon.{ErrorCode, ErrorResponseBody}
+import co.ledger.wallet.daemon.controllers.responses.{ErrorCode, ErrorResponseBody}
 import co.ledger.wallet.daemon.database.WalletsWithCount
 import co.ledger.wallet.daemon.utils.APIFeatureTest
 import com.twitter.finagle.http.{Response, Status}
@@ -23,7 +23,7 @@ class WalletsApiTest extends APIFeatureTest {
     createPool(WALLET_POOL)
     val notFoundErr = server.mapper.objectMapper.readValue[ErrorResponseBody](
       assertGetWallet(WALLET_POOL, "not_exist_wallet", Status.NotFound).contentString)
-    assert(notFoundErr === ErrorResponseBody(ErrorCode.Not_Found, s"Wallet not_exist_wallet doesn't exist"))
+    assert(notFoundErr === ErrorResponseBody(ErrorCode.Not_Found, Map("response"->"Wallet doesn't exist","wallet_name"->"not_exist_wallet")))
   }
 
   test("WalletsApi#Create already exist wallet Return Ok") {
@@ -56,7 +56,7 @@ class WalletsApiTest extends APIFeatureTest {
   }
 
   test("WalletsApi#Get/Post wallet(s) from non existing pool") {
-    val expectedErr = ErrorResponseBody(ErrorCode.Invalid_Request, "Wallet pool not_existing_pool doesn't exist")
+    val expectedErr = ErrorResponseBody(ErrorCode.Bad_Request, Map("response"->"Wallet pool doesn't exist", "pool_name"->"not_existing_pool"))
     val result = assertGetWallets("not_existing_pool", 0, 2, Status.BadRequest)
     val getWalletsErr = server.mapper.objectMapper.readValue[ErrorResponseBody](result.contentString)
     assert(getWalletsErr === expectedErr)
@@ -70,7 +70,7 @@ class WalletsApiTest extends APIFeatureTest {
 
   test("WalletsApi#Post wallet with non exist currency to existing pool") {
     createPool(WALLET_POOL)
-    val expectedErr = ErrorResponseBody(ErrorCode.Invalid_Request, "Currency non_existing_currency is not supported")
+    val expectedErr = ErrorResponseBody(ErrorCode.Bad_Request, Map("response"->"Currency not support", "currency_name"->"non_existing_currency"))
     val result = assertWalletCreation(WALLET_POOL, "my_wallet", "non_existing_currency", Status.BadRequest)
     val postWalletErr = server.mapper.objectMapper.readValue[ErrorResponseBody](result.contentString)
     assert(expectedErr === postWalletErr)
