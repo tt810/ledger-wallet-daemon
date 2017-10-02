@@ -2,11 +2,10 @@ package co.ledger.wallet.daemon.database
 
 import co.ledger.wallet.daemon.models.{AccountDerivation, Currency, WalletPool}
 import co.ledger.core
-import com.twitter.inject.Logging
 
 import scala.concurrent.Future
 
-trait DaemonCache extends Logging {
+trait DaemonCache {
 
   // ************** account *************
   // TODO: return models.Account instead of core.Account
