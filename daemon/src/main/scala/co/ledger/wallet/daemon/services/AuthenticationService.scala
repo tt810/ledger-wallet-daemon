@@ -19,35 +19,40 @@ class AuthenticationService @Inject()(daemonCache: DaemonCache, ecdsa: ECDSAServ
   import co.ledger.wallet.daemon.services.AuthenticationService.AuthContextContext._
 
   def authorize(request: Request)(implicit ec: ExecutionContext): Future[Unit] = {
-    daemonCache.getUserDirectlyFromDB(request.authContext.pubKey) map { (usr) =>
-      if (usr.isEmpty)
-        throw AuthenticationFailedException()
-      usr.get
-    } flatMap {user =>
-      debug(LogMsgMaker.newInstance("Authorize request")
-        .append("userPubKey", user.pubKey)
-        .toString())
-      val time = request.authContext.time
-      val date = new Date(time * 1000)
-      val now = new Date()
-      if (Math.abs(now.getTime - date.getTime) > DaemonConfiguration.authTokenDuration) {
-        throw AuthenticationFailedException()
-      }
-      val message = Sha256Hash.hash(s"LWD: $time\n".getBytes(StandardCharsets.US_ASCII))
-      val signed = request.authContext.signedMessage
-      ecdsa.verify(message, signed, request.authContext.pubKey).map({(success) =>
-        if (!success)
-          throw AuthenticationFailedException()
-        AuthentifiedUserContext.setUser(request, user)
-        ()
-      })
-    } asTwitter()
+    try {
+      val pubKey = request.authContext.pubKey
+      daemonCache.getUserDirectlyFromDB(pubKey) map { (usr) =>
+        if (usr.isEmpty)
+          throw AuthenticationFailedException("User doesn't exist")
+        usr.get
+      } flatMap {user =>
+        debug(LogMsgMaker.newInstance("Authorizing request")
+          .append("userPubKey", user.pubKey)
+          .toString())
+        val time = request.authContext.time
+        val date = new Date(time * 1000)
+        val now = new Date()
+        if (Math.abs(now.getTime - date.getTime) > DaemonConfiguration.authTokenDuration) {
+          throw AuthenticationFailedException("Authentication token expired")
+        }
+        val message = Sha256Hash.hash(s"LWD: $time\n".getBytes(StandardCharsets.US_ASCII))
+        val signed = request.authContext.signedMessage
+        ecdsa.verify(message, signed, request.authContext.pubKey).map({(success) =>
+          if (!success)
+            throw AuthenticationFailedException("User not authorized")
+          AuthentifiedUserContext.setUser(request, user)
+          ()
+        })
+      } asTwitter()
+    } catch {
+      case e: IllegalStateException => throw new AuthenticationFailedException("Missing authorization header")
+    }
   }
 }
 
 object AuthenticationService {
 
-  case class AuthenticationFailedException() extends Exception("Unable to authenticate user with those credentials")
+  case class AuthenticationFailedException(msg: String) extends Exception(msg)
   case class AuthContext(pubKey: Array[Byte], time: Long, signedMessage: Array[Byte])
   object AuthContextContext {
     private val AuthContextField = Request.Schema.newField[AuthContext]()
