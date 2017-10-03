@@ -2,13 +2,13 @@ package co.ledger.wallet.daemon.controllers
 
 import javax.inject.Inject
 
-import co.ledger.wallet.daemon.exceptions.{InvalidArgumentException, WalletNotFoundException, WalletPoolNotFoundException}
+import co.ledger.wallet.daemon.exceptions.{AccountNotFoundException, InvalidArgumentException, WalletNotFoundException, WalletPoolNotFoundException}
 import co.ledger.wallet.daemon.filters.AccountCreationFilter
 import co.ledger.wallet.daemon.services.{AccountsService, LogMsgMaker}
 import co.ledger.wallet.daemon.utils.RichRequest
 import com.twitter.finagle.http.Request
 import com.twitter.finatra.http.Controller
-import com.twitter.finatra.request.RouteParam
+import com.twitter.finatra.request.{QueryParam, RouteParam}
 import co.ledger.wallet.daemon.filters.AccountCreationContext._
 import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
@@ -32,8 +32,28 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
         Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
         response,
         pnfe)
-      case wnfe: WalletNotFoundException => responseSerializer.serializeNotFound(
+      case wnfe: WalletNotFoundException => responseSerializer.serializeBadRequest(
         Map("response"->"Wallet doesn't exist", "wallet_name" -> request.wallet_name),
+        response,
+        wnfe)
+      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+    }
+  }
+
+  get("/pools/:pool_name/wallets/:wallet_name/accounts/next") { request: AccountCreationInfoRequest =>
+    info(LogMsgMaker.newInstance("GET next account creation info request")
+      .append("request", request.request)
+      .append("wallet_name", request.wallet_name)
+      .append("pool_name", request.pool_name)
+      .append("account_index", request.account_index)
+      .toString())
+    accountsService.nextAccountCreationInfo(request.user, request.pool_name, request.wallet_name, request.account_index).recover {
+      case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
+        Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
+        response,
+        pnfe)
+      case wnfe: WalletNotFoundException => responseSerializer.serializeBadRequest(
+        Map("response" -> "Wallet doesn't exist", "wallet_name" -> request.wallet_name),
         response,
         wnfe)
       case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
@@ -47,15 +67,21 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
       .append("wallet_name", request.wallet_name)
       .append("pool_name", request.pool_name)
       .toString())
-    accountsService.account(request.account_index.get, request.user, request.pool_name, request.wallet_name)
-  }
-
-  get("/pools/:pool_name/wallets/:wallet_name/accounts/next") { request: AccountRequest =>
-    info(LogMsgMaker.newInstance("GET next account request")
-      .append("request", request.request)
-      .append("wallet_name", request.wallet_name)
-      .append("pool_name", request.pool_name)
-      .toString())
+    accountsService.account(request.account_index.get, request.user, request.pool_name, request.wallet_name).recover {
+      case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
+        Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
+        response,
+        pnfe)
+      case wnfe: WalletNotFoundException => responseSerializer.serializeBadRequest(
+        Map("response"->"Wallet doesn't exist", "wallet_name" -> request.wallet_name),
+        response,
+        wnfe)
+      case anfe: AccountNotFoundException => responseSerializer.serializeNotFound(
+        Map("response"->"Account doesn't exist", "account_index" -> request.account_index),
+        response,
+        anfe)
+      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+    }
   }
 
   filter[AccountCreationFilter]
@@ -72,6 +98,14 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
           Map("response"-> iae.msg, "pool_name" -> poolName, "wallet_name"->walletName),
           response,
           iae)
+        case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
+          Map("response" -> "Wallet pool doesn't exist", "pool_name" -> poolName),
+          response,
+          pnfe)
+        case wnfe: WalletNotFoundException => responseSerializer.serializeBadRequest(
+          Map("response"->"Wallet doesn't exist", "wallet_name" -> walletName),
+          response,
+          wnfe)
         case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
       }
   }
@@ -82,6 +116,7 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
       .append("wallet_name", request.wallet_name)
       .append("pool_name", request.pool_name)
       .toString())
+    //TODO
   }
 
   private val responseSerializer: ResponseSerializer = ResponseSerializer.newInstance()
@@ -94,4 +129,11 @@ object AccountsController {
                            @RouteParam account_index: Option[Int],
                            request: Request
                            ) extends RichRequest(request)
+  case class AccountCreationInfoRequest(
+                                         @RouteParam pool_name: String,
+                                         @RouteParam wallet_name: String,
+                                         @QueryParam account_index: Option[Int],
+                                         request: Request
+                                       ) extends RichRequest(request)
+
 }

@@ -1,6 +1,6 @@
 package co.ledger.wallet.daemon.api
 
-import co.ledger.wallet.daemon.models.Account
+import co.ledger.wallet.daemon.models.{Account, AccountDerivation}
 import co.ledger.wallet.daemon.utils.APIFeatureTest
 import com.twitter.finagle.http.{Response, Status}
 import org.scalatest.Ignore
@@ -10,25 +10,57 @@ class AccountsApiTest extends APIFeatureTest {
   test("AccountsApi#Get empty accounts") {
     createPool("account_pool")
     assertWalletCreation("account_pool", "account_wallet", "bitcoin", Status.Ok)
-    val result = assertGetAccounts(None, "account_pool", "account_wallet", Status.BadRequest)
-    val expectedResponse = Seq[Account]()
-    assert(expectedResponse === server.mapper.objectMapper.readValue[Seq[Account]](result.contentString))
+    val result = assertGetAccounts(None, "account_pool", "account_wallet", Status.Ok)
+    val expectedResponse = List[Account]()
+    assert(expectedResponse === parse[Seq[Account]](result))
     deletePool("account_pool")
   }
 
   test("AccountsApi#Get account with index from empty wallet") {
     createPool("account_pool")
     assertWalletCreation("account_pool", "individual_account_wallet", "bitcoin", Status.Ok)
-    val individual = assertGetAccounts(Option(1), "account_pool", "individual_account_wallet", Status.BadRequest)
-
+    assertGetAccounts(Option(1), "account_pool", "individual_account_wallet", Status.NotFound)
     deletePool("account_pool")
   }
 
-  test("AccountsApi#Create account") {
-    createPool("account_pool")
-    assertWalletCreation("account_pool", "accounts_wallet", "bitcoin", Status.Ok)
-    assertCreateAccount(CORRECT_BODY, "account_pool", "accounts_wallet", Status.Ok)
-    deletePool("account_pool")
+  test("AccountsApi#Get accounts same as get individual account") {
+    createPool("list_pool")
+    assertWalletCreation("list_pool", "account_wallet", "bitcoin", Status.Ok)
+    val expectedAccount = parse[Account](assertCreateAccount(CORRECT_BODY, "list_pool", "account_wallet", Status.Ok))
+    val actualAccount = parse[Account](assertGetAccounts(Option(0), "list_pool", "account_wallet", Status.Ok))
+    assert(expectedAccount === actualAccount)
+    val actualAccountList = parse[Seq[Account]](assertGetAccounts(None, "list_pool", "account_wallet", Status.Ok))
+    assert(List(actualAccount) === actualAccountList)
+    deletePool("list_pool")
+  }
+
+  test("AccountsApi#Get account(s) from non exist pool return bad request") {
+    assertCreateAccount(CORRECT_BODY, "not_exist_pool", "account_wallet", Status.BadRequest)
+    assertGetAccounts(None, "not_exist_pool", "account_wallet", Status.BadRequest)
+    assertGetAccounts(Option(0), "not_exist_pool", "account_wallet", Status.BadRequest)
+  }
+
+  test("AccountsApi#Get account(s) from non exist wallet return bad request") {
+    createPool("exist_pool")
+    assertCreateAccount(CORRECT_BODY, "exist_pool", "not_exist_wallet", Status.BadRequest)
+    assertGetAccounts(None, "exist_pool", "not_exist_wallet", Status.BadRequest)
+    assertGetAccounts(Option(0), "exist_pool", "not_exist_wallet", Status.BadRequest)
+    deletePool("exist_pool")
+  }
+
+  test("AccountsApi#Get next account creation info with index return Ok") {
+    createPool("info_pool")
+    assertWalletCreation("info_pool", "account_wallet", "bitcoin", Status.Ok)
+    val actualResult = parse[AccountDerivation](assertGetAccountCreationInfo("info_pool", "account_wallet", Option(0), Status.Ok))
+    assert(0 === actualResult.accountIndex)
+    deletePool("info_pool")
+  }
+
+  test("AccountsApi#Get next account creation info without index return Ok") {
+    createPool("info_pool")
+    assertWalletCreation("info_pool", "account_wallet", "bitcoin", Status.Ok)
+    assertGetAccountCreationInfo("info_pool", "account_wallet", None, Status.Ok)
+    deletePool("info_pool")
   }
 
   test("AccountsApi#Create account with no pubkey") {
@@ -59,23 +91,19 @@ class AccountsApiTest extends APIFeatureTest {
     deletePool("account_pool")
   }
 
-  test("AccountsApi#Get accounts same as get individual account") {
-
-  }
-
-  test("AccountsApi#Get account(s) from non exist pool return bad request") {
-
-  }
-
-  test("AccountsApi#Get account(s) from non exist wallet return bad request") {
-
-  }
-
   private def assertGetAccounts(index: Option[Int], poolName: String, walletName: String, expected: Status): Response = {
     index match {
       case None => server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts", headers = defaultHeaders, andExpect = expected)
       case Some(i) => server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/$i", headers = defaultHeaders, andExpect = expected)
     }
+  }
+
+  private def assertGetAccountCreationInfo(poolName: String, walletName: String, index: Option[Int], expected: Status): Response = {
+    index match {
+      case None => server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/next", headers = defaultHeaders, andExpect = expected)
+      case Some(i) => server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/next?account_index=$i", headers = defaultHeaders, andExpect = expected)
+    }
+
   }
 
   private def assertCreateAccount(accountCreationBody: String, poolName: String, walletName: String, expected: Status): Response = {

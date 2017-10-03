@@ -4,39 +4,51 @@ import javax.inject.{Inject, Singleton}
 
 import co.ledger.core.{Account, BitcoinLikeNextAccountInfo}
 import co.ledger.wallet.daemon.database.{DaemonCache, User}
+import co.ledger.wallet.daemon.models
 import co.ledger.wallet.daemon.models.AccountDerivation
 
 import scala.concurrent.Future
 
 @Singleton
 class AccountsService @Inject()(defaultDaemonCache: DaemonCache) extends DaemonService {
+
   import AccountsService._
 
-  def accounts(user: User, poolName: String, walletName: String): Future[Seq[Account]] = {
+  def accounts(user: User, poolName: String, walletName: String): Future[Seq[models.Account]] = {
     info(LogMsgMaker.newInstance("Obtain accounts with params")
-      .append("poolName", poolName)
-      .append("walletName", walletName)
-      .append("userPubKey", user.pubKey)
+      .append("pool_name", poolName)
+      .append("wallet_name", walletName)
+      .append("user_pub_key", user.pubKey)
       .toString())
     defaultDaemonCache.getAccounts(user.pubKey, poolName, walletName)
   }
 
-  def account(accountIndex: Int, user: User, poolName: String, walletName: String): Future[Account] = {
+  def account(accountIndex: Int, user: User, poolName: String, walletName: String): Future[models.Account] = {
     info(LogMsgMaker.newInstance("Obtain account with params")
-      .append("accountIndex", accountIndex)
-      .append("poolName", poolName)
-      .append("walletName", walletName)
-      .append("userPubKey", user.pubKey)
+      .append("account_index", accountIndex)
+      .append("pool_name", poolName)
+      .append("wallet_name", walletName)
+      .append("user_pub_key", user.pubKey)
       .toString())
     defaultDaemonCache.getAccount(accountIndex, user.pubKey, poolName, walletName)
   }
 
-  def createAccount(accountCreationBody: AccountDerivation, user: User, poolName: String, walletName: String): Future[Account] = {
+  def nextAccountCreationInfo(user: User, poolName: String, walletName: String, accountIndex: Option[Int]): Future[AccountDerivation] = {
+    info(LogMsgMaker.newInstance("Obtain next available account creation information")
+      .append("account_index", accountIndex)
+      .append("pool_name", poolName)
+      .append("wallet_name", walletName)
+      .append("user_pub_key", user.pubKey)
+      .toString())
+    defaultDaemonCache.getNextAccountCreationInfo(user.pubKey, poolName, walletName, accountIndex)
+  }
+
+  def createAccount(accountCreationBody: AccountDerivation, user: User, poolName: String, walletName: String): Future[models.Account] = {
     info(LogMsgMaker.newInstance("Create account with params")
-      .append("accountDerivations", accountCreationBody)
-      .append("poolName", poolName)
-      .append("walletName", walletName)
-      .append("userPubKey", user.pubKey)
+      .append("account_derivations", accountCreationBody)
+      .append("pool_name", poolName)
+      .append("wallet_name", walletName)
+      .append("user_pub_key", user.pubKey)
       .toString())
     defaultDaemonCache.createAccount(accountCreationBody, user, poolName, walletName)
   }

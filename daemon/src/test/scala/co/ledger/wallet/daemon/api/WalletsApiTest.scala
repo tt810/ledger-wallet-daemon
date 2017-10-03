@@ -1,8 +1,7 @@
 package co.ledger.wallet.daemon.api
 
-import co.ledger.core.Wallet
 import co.ledger.wallet.daemon.controllers.responses.{ErrorCode, ErrorResponseBody}
-import co.ledger.wallet.daemon.database.WalletsWithCount
+import co.ledger.wallet.daemon.models.{Wallet, WalletsWithCount}
 import co.ledger.wallet.daemon.utils.APIFeatureTest
 import com.twitter.finagle.http.{Response, Status}
 
@@ -10,12 +9,11 @@ class WalletsApiTest extends APIFeatureTest {
 
   test("WalletsApi#Create then Get same wallet from pool Return OK") {
     createPool(WALLET_POOL)
-    val createdW = assertWalletCreation(WALLET_POOL, "my_wallet", "bitcoin", Status.Ok).contentString
-    assert(createdW.contains(""""name":"my_wallet""""))
-    assert(createdW.contains(""""wallet_type":"BITCOIN""""))
-    val getW = assertGetWallet(WALLET_POOL, "my_wallet", Status.Ok).contentString
-    assert(getW.contains(""""name":"my_wallet""""))
-    assert(getW.contains(""""wallet_type":"BITCOIN""""))
+    val createdW =  walletFromResponse(assertWalletCreation(WALLET_POOL, "my_wallet", "bitcoin", Status.Ok))
+    assert("my_wallet" === createdW.name)
+    assert("bitcoin" === createdW.currency.name)
+    val getW =  walletFromResponse(assertGetWallet(WALLET_POOL, "my_wallet", Status.Ok))
+    assert(createdW === getW)
     deletePool(WALLET_POOL)
   }
 
@@ -28,24 +26,23 @@ class WalletsApiTest extends APIFeatureTest {
 
   test("WalletsApi#Create already exist wallet Return Ok") {
     createPool("duplicate_pool")
-    val createdW = assertWalletCreation("duplicate_pool", "duplicate_wallet", "bitcoin", Status.Ok).contentString
-    assert(createdW.contains(""""name":"duplicate_wallet""""))
-    assert(createdW.contains(""""wallet_type":"BITCOIN""""))
-    val createdIgnore = assertWalletCreation("duplicate_pool", "duplicate_wallet", "bitcoin", Status.Ok).contentString
+    val createdW = walletFromResponse(assertWalletCreation("duplicate_pool", "duplicate_wallet", "bitcoin", Status.Ok))
+    assert("duplicate_wallet" === createdW.name)
+    assert(Map[String, Any]() === createdW.configuration)
+    assert("bitcoin" === createdW.currency.name)
+    val createdIgnore = walletFromResponse(assertWalletCreation("duplicate_pool", "duplicate_wallet", "bitcoin", Status.Ok))
     assert(createdW === createdIgnore)
     deletePool("duplicate_pool")
   }
 
   test("WalletsApi#Get two wallets from pool Return OK") {
     createPool("multi_pool")
-    val wallet1 = assertWalletCreation("multi_pool", "wallet_1", "bitcoin", Status.Ok).contentString
-    val wallet2 = assertWalletCreation("multi_pool", "wallet_2", "bitcoin", Status.Ok).contentString
-    val wallet3 = assertWalletCreation("multi_pool", "wallet_3", "bitcoin", Status.Ok).contentString
-    val getW = assertGetWallets("multi_pool", 1, 2, Status.Ok).contentString
-    assert(getW.contains(""""count":3"""))
-    assert(!getW.contains(""""name":"wallet_1""""))
-    assert(getW.contains(""""name":"wallet_2""""))
-    assert(getW.contains(""""name":"wallet_3""""))
+    val wallet1 = walletFromResponse(assertWalletCreation("multi_pool", "wallet_1", "bitcoin", Status.Ok))
+    val wallet2 = walletFromResponse(assertWalletCreation("multi_pool", "wallet_2", "bitcoin", Status.Ok))
+    val wallet3 = walletFromResponse(assertWalletCreation("multi_pool", "wallet_3", "bitcoin", Status.Ok))
+    val getW = walletsFromResponse(assertGetWallets("multi_pool", 1, 2, Status.Ok))
+    assert(3 === getW.count)
+    assert(WalletsWithCount(3, List(wallet2, wallet3)) === getW)
     deletePool("multi_pool")
   }
 
@@ -77,8 +74,8 @@ class WalletsApiTest extends APIFeatureTest {
     deletePool(WALLET_POOL)
   }
 
-  private def walletFromResponse(response: Response): Wallet = server.mapper.objectMapper.readValue[Wallet](response.contentString)
-  private def walletsFromResponse(response: Response): WalletsWithCount = server.mapper.objectMapper.readValue[WalletsWithCount](response.contentString)
+  private def walletFromResponse(response: Response): Wallet = parse[Wallet](response)
+  private def walletsFromResponse(response: Response): WalletsWithCount = parse[WalletsWithCount](response)
 
   private val WALLET_POOL = "wallet_pool"
 
