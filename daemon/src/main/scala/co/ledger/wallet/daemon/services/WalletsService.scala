@@ -2,8 +2,8 @@ package co.ledger.wallet.daemon.services
 
 import javax.inject.{Inject, Singleton}
 
-import co.ledger.core.{Wallet => CoreWallet}
 import co.ledger.wallet.daemon.database._
+import co.ledger.wallet.daemon.models.{Bulk, Wallet, WalletsWithCount}
 
 import scala.concurrent.Future
 
@@ -21,7 +21,7 @@ class WalletsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
     daemonCache.getWallets(Bulk(offset, bulkSize), poolName, user.pubKey)
   }
 
-  def wallet(user: User, poolName: String, walletName: String): Future[CoreWallet] = {
+  def wallet(user: User, poolName: String, walletName: String): Future[Wallet] = {
     info(LogMsgMaker.newInstance("Obtain wallet with params")
       .append("walletName", walletName)
       .append("poolName", poolName)
@@ -30,7 +30,7 @@ class WalletsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
     daemonCache.getWallet(walletName, poolName, user.pubKey)
   }
 
-  def createWallet(user: User, poolName: String, walletName: String, currencyName: String): Future[CoreWallet] = {
+  def createWallet(user: User, poolName: String, walletName: String, currencyName: String): Future[Wallet] = {
     info(LogMsgMaker.newInstance("Create wallet with params")
       .append("walletName", walletName)
       .append("poolName", poolName)

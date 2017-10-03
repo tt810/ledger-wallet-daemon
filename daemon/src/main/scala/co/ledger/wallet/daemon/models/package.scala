@@ -1,6 +1,6 @@
 package co.ledger.wallet.daemon
 
-import co.ledger.core.{CurrencyUnit, DynamicObject, Account => CoreAccount, Currency => CoreCurrency, Wallet => CoreWallet, WalletPool => CoreWalletPool}
+import co.ledger.core
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.fasterxml.jackson.annotation._
 import co.ledger.core.implicits._
@@ -10,14 +10,21 @@ import scala.concurrent.{ExecutionContext, Future}
 
 package object models {
 
-//  def newInstance(account: CoreAccount, walletName: String, currency: Currency): Account = {
-//    account.getBalance().map { balance =>
-//      Account(walletName, account.getIndex, balance.toLong, account.getKeyChain, currency)
-//    }
-//
-//  }
+  def newInstance(accountCreationInfo: core.AccountCreationInfo) = {
+    AccountDerivation(accountCreationInfo.getIndex,
+      for {
+        path <- accountCreationInfo.getDerivations.asScala.toList
+        owner <- accountCreationInfo.getOwners.asScala.toList
+      } yield Derivation(path, owner, None, None))
+  }
 
-  def newInstance(crCrcy: CoreCurrency): Currency = {
+  def newInstance(account: core.Account, wallet: core.Wallet)(implicit ec: ExecutionContext): Future[Account] = {
+    account.getBalance().map { balance =>
+      Account(wallet.getName, account.getIndex, balance.toLong, "account key chain", newInstance(wallet.getCurrency))
+    }
+  }
+
+  def newInstance(crCrcy: core.Currency): Currency = {
 
     val currencyFamily = CurrencyFamily.valueOf(crCrcy.getWalletType.name())
 
@@ -38,8 +45,8 @@ package object models {
       case _ => ???
     }
 
-    def currencyUnit(coreCurrencyUnit: CurrencyUnit): Unit =
-      Unit(
+    def currencyUnit(coreCurrencyUnit: core.CurrencyUnit): CurrencyUnit =
+      CurrencyUnit(
         coreCurrencyUnit.getName,
         coreCurrencyUnit.getSymbol,
         coreCurrencyUnit.getCode,
@@ -56,10 +63,10 @@ package object models {
     )
   }
 
-  def newInstance(pool: CoreWalletPool)(implicit ec: ExecutionContext): Future[WalletPool] =
+  def newInstance(pool: core.WalletPool)(implicit ec: ExecutionContext): Future[WalletPool] =
     pool.getWalletCount().map(models.WalletPool(pool.getName, _))
 
-  def newInstance(coreWallet: CoreWallet)(implicit ec: ExecutionContext): Future[Wallet] = {
+  def newInstance(coreWallet: core.Wallet)(implicit ec: ExecutionContext): Future[Wallet] = {
 
     def getBalance(count: Int): Future[Long] = {
       coreWallet.getAccounts(0, count) flatMap { (accounts) =>
@@ -74,7 +81,7 @@ package object models {
 
     val configuration: Map[String, Any] = {
       var configs = collection.mutable.Map[String, Any]()
-      val dynamicObject = DynamicObject.newInstance()
+      val dynamicObject = core.DynamicObject.newInstance()
       dynamicObject.getKeys.forEach { key =>
         configs += (key -> dynamicObject.getObject(key))
       }
@@ -83,7 +90,7 @@ package object models {
 
     coreWallet.getAccountCount().flatMap { count =>
       getBalance(count).map { balance =>
-        Wallet(coreWallet.getName, newInstance(coreWallet.getCurrency), count, balance, configuration)
+        Wallet(coreWallet.getName, count, balance, newInstance(coreWallet.getCurrency), configuration)
       }
     }
   }
@@ -96,23 +103,12 @@ package object models {
                       @JsonProperty("currency") currency: Currency
                     )
 
-  case class BitcoinLikeNetworkParams(
-                                       @JsonProperty("identifier") identifier: String,
-                                       @JsonProperty("p2pkh_version") p2pkhVersion: String,
-                                       @JsonProperty("p2sh_version") p2shVersion: String,
-                                       @JsonProperty("xpub_version") xpubVersion: String,
-                                       @JsonProperty("fee_policy") feePolicy: String,
-                                       @JsonProperty("dust_amount") dustAmount: Long,
-                                       @JsonProperty("message_prefix") messagePrefix: String,
-                                       @JsonProperty("uses_timestamped_transaction") usesTimeStampedTransaction: Boolean
-                                     ) extends NetworkParams
-
   case class Currency(
                        @JsonProperty("name") name: String,
-                       @JsonIgnore family: CurrencyFamily,
+                       @JsonProperty("family") family: CurrencyFamily,
                        @JsonProperty("bip_44_coin_type") bip44CoinType: Int,
                        @JsonProperty("payment_uri_scheme") paymentUriScheme: String,
-                       @JsonProperty("units") units: Seq[Unit],
+                       @JsonProperty("units") units: Seq[CurrencyUnit],
                        @JsonProperty("network_params") networkParams: NetworkParams
                      )
 
@@ -133,7 +129,7 @@ package object models {
                        @JsonProperty("wallet_count") walletCount: Int
                        )
 
-  case class Unit(
+  case class CurrencyUnit(
                    @JsonProperty("name") name: String,
                    @JsonProperty("symbol") symbol: String,
                    @JsonProperty("code") code: String,
@@ -142,12 +138,26 @@ package object models {
 
   case class Wallet(
                      @JsonProperty("name") name: String,
-                     @JsonProperty("currency") currency: Currency,
                      @JsonProperty("account_count") accountCount: Int,
                      @JsonProperty("balance") balance: Long,
+                     @JsonProperty("currency") currency: Currency,
                      @JsonProperty("configuration") configuration: Map[String, Any]
                    )
 
-  trait NetworkParams
+  sealed trait NetworkParams
 
+  case class BitcoinLikeNetworkParams(
+                                       @JsonProperty("identifier") identifier: String,
+                                       @JsonProperty("p2pkh_version") p2pkhVersion: String,
+                                       @JsonProperty("p2sh_version") p2shVersion: String,
+                                       @JsonProperty("xpub_version") xpubVersion: String,
+                                       @JsonProperty("fee_policy") feePolicy: String,
+                                       @JsonProperty("dust_amount") dustAmount: Long,
+                                       @JsonProperty("message_prefix") messagePrefix: String,
+                                       @JsonProperty("uses_timestamped_transaction") usesTimeStampedTransaction: Boolean
+                                     ) extends NetworkParams
+
+  case class Bulk(offset: Int = 0, bulkSize: Int = 20)
+
+  case class WalletsWithCount(count: Int, wallets: Seq[Wallet])
 }

@@ -4,7 +4,7 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Singleton
 
 import co.ledger.core
-import co.ledger.core.{Account, AccountCreationInfo, implicits}
+import co.ledger.core.{AccountCreationInfo, implicits}
 import co.ledger.wallet.daemon.libledger_core.async.ScalaThreadDispatcher
 import co.ledger.wallet.daemon.libledger_core.crypto.SecureRandomRNG
 import co.ledger.wallet.daemon.libledger_core.debug.NoOpLogPrinter
@@ -13,13 +13,12 @@ import co.ledger.wallet.daemon.libledger_core.net.{ScalaHttpClient, ScalaWebSock
 import co.ledger.wallet.daemon.utils.{AsArrayList, HexUtils}
 import org.bitcoinj.core.Sha256Hash
 import co.ledger.core.implicits._
-import co.ledger.wallet.daemon.{DaemonConfiguration, exceptions}
+import co.ledger.wallet.daemon.{DaemonConfiguration, exceptions, models}
 import co.ledger.wallet.daemon.async.{MDCPropagatingExecutionContext, SerialExecutionContext}
 import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.exceptions.CurrencyNotFoundException
 import co.ledger.wallet.daemon.exceptions.InvalidArgumentException
-import co.ledger.wallet.daemon.models.{AccountDerivation, Currency, WalletPool}
-import co.ledger.wallet.daemon.models
+import co.ledger.wallet.daemon.models._
 import co.ledger.wallet.daemon.services.LogMsgMaker
 import com.twitter.inject.Logging
 import slick.jdbc.JdbcBackend.Database
@@ -38,14 +37,14 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
   import DefaultDaemonCache._
   private val _writeContext = SerialExecutionContext.Implicits.global
 
-  def createAccount(accountDerivations: AccountDerivation, user: User, poolName: String, walletName: String): Future[Account] = {
+  def createAccount(accountDerivations: AccountDerivation, user: User, poolName: String, walletName: String): Future[models.Account] = {
     info(LogMsgMaker.newInstance("Creating account")
       .append("derivations", accountDerivations)
       .append("walletName", walletName)
       .append("poolName", poolName)
       .append("userPubKey", user.pubKey)
       .toString())
-    getWallet(walletName, poolName, user.pubKey).flatMap { wallet =>
+    getCoreWallet(walletName, poolName, user.pubKey).flatMap { wallet =>
       val derivations = accountDerivations.derivations
       val accountCreationInfo = new AccountCreationInfo(
         accountDerivations.accountIndex,
@@ -54,7 +53,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
         (for (derivationResult <- derivations) yield HexUtils.valueOf(derivationResult.pubKey.get)).asArrayList,
         (for (derivationResult <- derivations) yield HexUtils.valueOf(derivationResult.chainCode.get)).asArrayList
       )
-      wallet.newAccountWithInfo(accountCreationInfo).map { account =>
+      wallet.newAccountWithInfo(accountCreationInfo).flatMap { account =>
         debug(LogMsgMaker.newInstance("Account created")
           .append("derivations", accountDerivations)
           .append("walletName", walletName)
@@ -62,7 +61,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
           .append("userPubKey", user.pubKey)
           .append("result", account)
           .toString())
-        account
+        models.newInstance(account, wallet)
       }.recover {
         case e: implicits.InvalidArgumentException => throw new InvalidArgumentException(e.getMessage, e)
       }
@@ -74,7 +73,13 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     createPool(user, poolName, configuration).flatMap(corePool => models.newInstance(corePool))
   }
 
-  def createWallet(walletName: String, currencyName: String, poolName: String, user: User): Future[core.Wallet] = {
+  def createWallet(walletName: String, currencyName: String, poolName: String, user: User): Future[Wallet] = {
+    createCoreWallet(walletName, currencyName, poolName, user).flatMap { coreWallet =>
+      models.newInstance(coreWallet)
+    }
+  }
+
+  def createCoreWallet(walletName: String, currencyName: String, poolName: String, user: User): Future[core.Wallet] = {
     info(LogMsgMaker.newInstance("Creating wallet")
       .append("walletName", walletName)
       .append("currencyName", currencyName)
@@ -137,9 +142,9 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     }
   }
 
-  def getAccount(accountIndex: Int, pubKey: String, poolName: String, walletName: String): Future[core.Account] = {
-    getWallet(walletName, poolName, pubKey).flatMap { wallet =>
-      wallet.getAccount(accountIndex).map { account =>
+  def getAccount(accountIndex: Int, pubKey: String, poolName: String, walletName: String): Future[models.Account] = {
+    getCoreWallet(walletName, poolName, pubKey).flatMap { wallet =>
+      wallet.getAccount(accountIndex).flatMap { account =>
         debug(LogMsgMaker.newInstance("Retrieved account")
           .append("accountIndex", accountIndex)
           .append("walletName", walletName)
@@ -147,27 +152,59 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
           .append("userPubKey", pubKey)
           .append("result", account)
           .toString())
-        account
+       models.newInstance(account, wallet)
+        //      }.recover {
+        //        case e: core.AccountNotFoundException => throw new AccountNotFoundException(accountIndex)
       }
     }
   }
 
-  def getAccounts(pubKey: String, poolName: String, walletName: String): Future[Seq[core.Account]] = {
-    getWallet(walletName, poolName, pubKey).flatMap { wallet =>
-      wallet.getAccountCount() flatMap { (count) =>
-        debug(LogMsgMaker.newInstance("Retrieved total accounts count")
-          .append("walletName", walletName)
-          .append("poolName", poolName)
-          .append("userPubKey", pubKey)
-          .append("result", count)
-          .toString())
+  def getNextAccountCreationInfo(pubKey: String, poolName: String, walletName: String, accountIndex: Option[Int]): Future[AccountDerivation] = {
+    info(LogMsgMaker.newInstance("Retrieving next account creation info")
+      .append("accountIndex", accountIndex)
+      .append("walletName", walletName)
+      .append("poolName", poolName)
+      .append("userPubKey", pubKey)
+      .toString())
+    getCoreWallet(walletName, poolName, pubKey).flatMap { wallet =>
+      (accountIndex match {
+        case Some(i) => wallet.getAccountCreationInfo(i)
+        case None => wallet.getNextAccountCreationInfo()
+      }).map { accountCreationInfo =>
+        models.newInstance(accountCreationInfo)
+      }
+    }
+  }
+
+  def getAccounts(pubKey: String, poolName: String, walletName: String): Future[Seq[models.Account]] = {
+    getCoreWallet(walletName, poolName, pubKey).flatMap { wallet =>
+      debug(LogMsgMaker.newInstance("Retrieved wallet")
+        .append("walletName", walletName)
+        .append("poolName", poolName)
+        .append("userPubKey", pubKey)
+        .append("result", wallet)
+        .toString())
+      getCoreAccounts(wallet).flatMap { coreAccounts =>
+        Future.sequence(coreAccounts.map { coreAccount =>
+          models.newInstance(coreAccount, wallet)
+        })
+      }
+    }
+  }
+
+  private def getCoreAccounts(wallet: core.Wallet): Future[Seq[core.Account]] = {
+    wallet.getAccountCount() flatMap { (count) =>
+      debug(LogMsgMaker.newInstance("Retrieved total accounts count")
+        .append("walletName", wallet.getName)
+        .append("result", count)
+        .toString())
+      if (count == 0) Future.successful(List[core.Account]())
+      else {
         wallet.getAccounts(0, count) map { (accounts) =>
           debug(LogMsgMaker.newInstance("Retrieved accounts")
             .append("offset", 0)
             .append("bulkSize", count)
-            .append("walletName", walletName)
-            .append("poolName", poolName)
-            .append("userPubKey", pubKey)
+            .append("walletName", wallet.getName)
             .append("resultSize", accounts.size())
             .toString())
           accounts.asScala.toSeq
@@ -228,7 +265,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
           .append("userPubKey", pubKey)
           .append("result", count)
           .toString())
-        corePool.getWallets(walletBulk.offset, walletBulk.bulkSize) map { wallets =>
+        corePool.getWallets(walletBulk.offset, walletBulk.bulkSize) flatMap { wallets =>
           debug(LogMsgMaker.newInstance("Retrieved wallets")
             .append("offset", walletBulk.offset)
             .append("bulkSize", walletBulk.bulkSize)
@@ -236,13 +273,17 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
             .append("userPubKey", pubKey)
             .append("resultSize", wallets.size())
             .toString())
-          WalletsWithCount(count, wallets.asScala.toSeq)
+          Future.sequence(wallets.asScala.toSeq.map(models.newInstance(_))).map (WalletsWithCount(count, _))
         }
       }
     }
   }
 
-  def getWallet(walletName: String, poolName: String, pubKey: String): Future[core.Wallet] = {
+  def getWallet(walletName: String, poolName: String, pubKey: String): Future[Wallet] = {
+    getCoreWallet(walletName, poolName, pubKey).flatMap(models.newInstance(_))
+  }
+
+  private def getCoreWallet(walletName: String, poolName: String, pubKey: String): Future[core.Wallet] = {
     getPool(pubKey, poolName).flatMap { corePool =>
       corePool.getWallet(walletName).map {wallet =>
         debug(LogMsgMaker.newInstance("Retrieved wallet")
@@ -423,5 +464,3 @@ object DefaultDaemonCache extends Logging {
   private val userPools         =   new ConcurrentHashMap[String, ConcurrentHashMap[String, core.WalletPool]]()
 }
 
-case class Bulk(offset: Int = 0, bulkSize: Int = 20)
-case class WalletsWithCount(count: Int, wallets: Seq[core.Wallet])

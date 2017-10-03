@@ -1,19 +1,19 @@
 package co.ledger.wallet.daemon.database
 
-import co.ledger.wallet.daemon.models.{AccountDerivation, Currency, WalletPool}
-import co.ledger.core
+import co.ledger.wallet.daemon.models._
 
 import scala.concurrent.Future
 
 trait DaemonCache {
 
   // ************** account *************
-  // TODO: return models.Account instead of core.Account
-  def getAccounts(pubKey: String, poolName: String, walletName: String): Future[Seq[core.Account]]
+  def getAccounts(pubKey: String, poolName: String, walletName: String): Future[Seq[Account]]
 
-  def getAccount(accountIndex: Int, pubKey: String, poolName: String, walletName: String): Future[core.Account]
+  def getAccount(accountIndex: Int, pubKey: String, poolName: String, walletName: String): Future[Account]
 
-  def createAccount(accountDerivation: AccountDerivation, user: User, poolName: String, walletName: String): Future[core.Account]
+  def getNextAccountCreationInfo(pubKey: String, poolName: String, walletName: String, accountIndex: Option[Int]): Future[AccountDerivation]
+
+  def createAccount(accountDerivation: AccountDerivation, user: User, poolName: String, walletName: String): Future[Account]
 
   // ************** currency ************
   def getCurrency(currencyName: String, poolName: String): Future[Currency]
@@ -21,12 +21,11 @@ trait DaemonCache {
   def getCurrencies(poolName: String): Future[Seq[Currency]]
 
   // ************** wallet *************
-  // TODO: return models.Wallet instead of core.Wallet
-  def createWallet(walletName: String, currencyName: String, poolName: String, user: User): Future[core.Wallet]
+  def createWallet(walletName: String, currencyName: String, poolName: String, user: User): Future[Wallet]
 
   def getWallets(walletBulk: Bulk, poolName: String, pubKey: String): Future[WalletsWithCount]
 
-  def getWallet(walletName: String, poolName: String, pubKey: String): Future[core.Wallet]
+  def getWallet(walletName: String, poolName: String, pubKey: String): Future[Wallet]
 
   // ************** wallet pool *************
   def createWalletPool(user: User, poolName: String, configuration: String): Future[WalletPool]

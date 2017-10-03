@@ -14,6 +14,7 @@ import org.bitcoinj.core.Sha256Hash
 
 import scala.concurrent.Await
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
+
 import scala.concurrent.duration.Duration
 
 trait APIFeatureTest extends FeatureTest {

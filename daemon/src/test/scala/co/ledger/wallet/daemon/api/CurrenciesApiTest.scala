@@ -1,7 +1,7 @@
 package co.ledger.wallet.daemon.api
 
 import co.ledger.wallet.daemon.controllers.responses.{ErrorCode, ErrorResponseBody}
-import co.ledger.wallet.daemon.models.{BitcoinLikeNetworkParams, Currency, CurrencyFamily, Unit => CurrencyUnit}
+import co.ledger.wallet.daemon.models.{BitcoinLikeNetworkParams, Currency, CurrencyFamily, CurrencyUnit => CurrencyUnit}
 import co.ledger.wallet.daemon.utils.APIFeatureTest
 import com.twitter.finagle.http.{Response, Status}
 
@@ -9,31 +9,28 @@ class CurrenciesApiTest extends APIFeatureTest {
 
   test("CurrenciesApi#Get currency with given pool name and currency name returns OK") {
     val response: Response = assertCurrency(CURRENCY_POOL, CURRENCY_BTC, Status.Ok)
-    val currency: Currency = server.mapper.objectMapper.readValue[Currency](response.contentString)
+    val currency: Currency = parse[Currency](response)
     assert(currency == EXPECTED_BTC_CURRENCY)
   }
 
   test("CurrenciesApi#Get currency from non-existing pool returns bad request") {
-    assert(server.mapper.objectMapper.readValue[ErrorResponseBody](
-      assertCurrency(CURRENCY_NON_EXIST_POOL, CURRENCY_BTC, Status.BadRequest).contentString)
+    assert(parse[ErrorResponseBody](assertCurrency(CURRENCY_NON_EXIST_POOL, CURRENCY_BTC, Status.BadRequest))
       == ErrorResponseBody(ErrorCode.Bad_Request,Map("response"->"Wallet pool doesn't exist","pool_name"->"non_exist_pool")))
   }
 
   test("CurrenciesApi#Get non-supported currency from existing pool returns currency not found") {
-    assert(server.mapper.objectMapper.readValue[ErrorResponseBody](
-    assertCurrency(CURRENCY_POOL, CURRENCY_NON_EXIST, Status.NotFound).contentString)
+    assert(parse[ErrorResponseBody](assertCurrency(CURRENCY_POOL, CURRENCY_NON_EXIST, Status.NotFound))
       == ErrorResponseBody(ErrorCode.Not_Found, Map("response"->"Currency not support", "currency_name"-> CURRENCY_NON_EXIST)))
   }
 
   test("CurrenciesApi#Get currencies returns all") {
     val response: Response = assertCurrencies(CURRENCY_POOL, Status.Ok)
-    val currencies: List[Currency] = server.mapper.objectMapper.readValue[List[Currency]](response.contentString)
+    val currencies: List[Currency] = parse[List[Currency]](response)
     assert(currencies == List(EXPECTED_BTC_CURRENCY))
   }
 
   test("CurrenciesApi#Get currencies from non-existing pool returns bad request") {
-    assert(server.mapper.objectMapper.readValue[ErrorResponseBody](
-      assertCurrencies(CURRENCY_NON_EXIST_POOL, Status.BadRequest).contentString)
+    assert(parse[ErrorResponseBody](assertCurrencies(CURRENCY_NON_EXIST_POOL, Status.BadRequest))
       == ErrorResponseBody(ErrorCode.Bad_Request,Map("response"->"Wallet pool doesn't exist","pool_name"->"non_exist_pool")))
   }
 
