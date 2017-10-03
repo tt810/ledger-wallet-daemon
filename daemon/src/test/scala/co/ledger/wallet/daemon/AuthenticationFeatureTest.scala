@@ -45,9 +45,29 @@ class AuthenticationFeatureTest extends FeatureTest {
     server.httpGet(path = "/status", headers = lwdBasicAuthorisationHeader("whitelisted", new Date(new Date().getTime + 60000)), andExpect = Status.Unauthorized)
   }
 
+  test("Authentication#Missing authorization") {
+    server.httpGet(path = "/status", headers = Map[String, String](), andExpect = Status.Unauthorized)
+  }
+
+  test("Authentication#Not authorized") {
+    server.httpGet(path = "/status", headers = invalidLWDAuthorisationHeader("whitelisted"), andExpect = Status.Unauthorized)
+  }
+
   private def basicAuthorisationHeader(username: String, password: String) = Map(
     "authorization" -> s"Basic ${Base64.encode(s"$username:$password".getBytes).mkString}"
   )
+
+  private def invalidLWDAuthorisationHeader(seedName: String) = {
+    val ecdsa = server.injector.instance(classOf[ECDSAService])
+    val privKey = Sha256Hash.hash(FixturesUtils.seed(seedName).getBytes)
+    val pubKey = Await.result(ecdsa.computePublicKey(privKey), Duration.Inf)
+    val timestamp = (new Date()).getTime / 1000
+    val message = Sha256Hash.hash(s"LWD: $timestamp\n".getBytes)
+    val signed = Await.result(ecdsa.sign(message, privKey), Duration.Inf)
+    Map(
+      "authorization" -> s"LW ${Base64.encode(s"${HexUtils.valueOf(pubKey)}:$timestamp:${HexUtils.valueOf(signed)}".getBytes).mkString}"
+    )
+  }
 
   private def lwdBasicAuthorisationHeader(seedName: String, time: Date = new Date()) = {
     val ecdsa = server.injector.instance(classOf[ECDSAService])
