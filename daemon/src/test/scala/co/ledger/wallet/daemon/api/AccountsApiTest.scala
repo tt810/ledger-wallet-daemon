@@ -4,7 +4,7 @@ import co.ledger.wallet.daemon.models.{Account, AccountDerivation}
 import co.ledger.wallet.daemon.utils.APIFeatureTest
 import com.twitter.finagle.http.{Response, Status}
 import org.scalatest.Ignore
-@Ignore
+
 class AccountsApiTest extends APIFeatureTest {
 
   test("AccountsApi#Get empty accounts") {

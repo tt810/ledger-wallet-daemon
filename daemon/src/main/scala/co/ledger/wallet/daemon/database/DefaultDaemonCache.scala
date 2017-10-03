@@ -79,7 +79,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     }
   }
 
-  def createCoreWallet(walletName: String, currencyName: String, poolName: String, user: User): Future[core.Wallet] = {
+  private def createCoreWallet(walletName: String, currencyName: String, poolName: String, user: User): Future[core.Wallet] = {
     info(LogMsgMaker.newInstance("Creating wallet")
       .append("walletName", walletName)
       .append("currencyName", currencyName)
@@ -153,8 +153,8 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
           .append("result", account)
           .toString())
        models.newInstance(account, wallet)
-        //      }.recover {
-        //        case e: core.AccountNotFoundException => throw new AccountNotFoundException(accountIndex)
+      }.recover {
+        case e: implicits.AccountNotFoundException => throw new exceptions.AccountNotFoundException(accountIndex)
       }
     }
   }
