@@ -12,15 +12,15 @@ class CurrenciesService @Inject()(daemonCache: DaemonCache) extends DaemonServic
 
   def currency(currencyName: String, poolName: String)(implicit ec: ExecutionContext): Future[Currency] = {
     info(LogMsgMaker.newInstance("Obtain currency with params")
-      .append("currencyName", currencyName)
-      .append("poolName", poolName)
+      .append("currency_name", currencyName)
+      .append("pool_name", poolName)
       .toString())
     daemonCache.getCurrency(currencyName, poolName)
   }
 
   def currencies(poolName: String)(implicit ec: ExecutionContext): Future[Seq[Currency]] = {
     info(LogMsgMaker.newInstance("Obtain currencies with params")
-      .append("poolName", poolName)
+      .append("pool_name", poolName)
       .toString())
     daemonCache.getCurrencies(poolName).map { modelCs =>
       info(s"Currencies obtained: size=${modelCs.size} currencies=$modelCs")
