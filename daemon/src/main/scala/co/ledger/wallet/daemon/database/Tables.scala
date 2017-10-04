@@ -28,10 +28,10 @@ trait Tables {
 
   val databaseVersions = TableQuery[DatabaseVersion]
 
-  case class UserRow(id: Option[Long], pubKey: String, permissions: Long, createdAt: Option[Timestamp] = Some(new Timestamp(new java.util.Date().getTime)))
+  case class UserRow(id: Long, pubKey: String, permissions: Long, createdAt: Option[Timestamp] = Some(new Timestamp(new java.util.Date().getTime)))
 
   class Users(tag: Tag) extends Table[UserRow](tag, "users") {
-    def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
+    def id          = column[Long]("id", O.PrimaryKey, O.AutoInc)
 
     def pubKey      = column[String]("pub_key", O.Unique)
 
@@ -39,7 +39,7 @@ trait Tables {
 
     def permissions = column[Long]("permissions")
 
-    override def *  = (id.?, pubKey, permissions, createdAt.?) <> (UserRow.tupled, UserRow.unapply)
+    override def *  = (id, pubKey, permissions, createdAt.?) <> (UserRow.tupled, UserRow.unapply)
 
     def idx         = index("idx_key", pubKey)
   }
@@ -104,7 +104,7 @@ trait Tables {
 
     override def *    = (id, userId, poolName, walletName, accountIndex, opUId, offset, batch, nextOpUId, createdAt, updatedAt) <> (OperationRow.tupled, OperationRow.unapply)
 
-    def idx           = index("idx_user_pool_wallet_account", (userId, poolName, walletName, accountIndex))
+    def idx           = index("idx_nextop_user_pool_wallet_account", (nextOpUId, userId, poolName, walletName, accountIndex))
   }
 
   val operations = TableQuery[Operations]

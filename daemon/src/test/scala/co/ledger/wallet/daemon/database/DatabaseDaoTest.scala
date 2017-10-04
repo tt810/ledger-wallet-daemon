@@ -74,6 +74,26 @@ class DatabaseDaoTest extends AssertionsForJUnit {
     assertEquals(0, Await.result(dbDao.getPools(insertedUser.get.id.get), Duration.Inf).size)
   }
 
+  @Test def verifyAccountOperationInsertionAndUpdate(): Unit = {
+    val pubKey = "13B2394D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D"
+    Await.result(dbDao.insertUser(User(pubKey, 0)), Duration.Inf)
+    val insertedUser = Await.result(dbDao.getUser(HexUtils.valueOf(pubKey)), Duration.Inf)
+    Await.result(dbDao.insertPool(Pool("accountPool", insertedUser.get.id.get, "")), Duration.Inf)
+    val insertedPool = (Await.result(dbDao.getPools(insertedUser.get.id.get), Duration.Inf))(0)
+    Await.result(dbDao.insertOperation(
+      Operation(insertedUser.get.id.get, insertedPool.name, "myWallet", 1, "opUid0", 0, 20, "opUid20")), Duration.Inf)
+    val accountOp = Await.result(dbDao.getAccountOperation("opUid20", insertedUser.get.id.get, insertedPool.name, "myWallet", 1), Duration.Inf)
+    assertFalse("account operation should be inserted", accountOp.isEmpty)
+    Await.result(dbDao.updateOperation(accountOp.get.id.get, "opUid20", 20, 21, "opUid41"), Duration.Inf)
+    val originalOp = Await.result(dbDao.getAccountOperation("opUid20", insertedUser.get.id.get, insertedPool.name, "myWallet", 1), Duration.Inf)
+    assertTrue("original operation should no longer exist", originalOp.isEmpty)
+    val updatedOp = Await.result(dbDao.getAccountOperation("opUid41", insertedUser.get.id.get, insertedPool.name, "myWallet", 1), Duration.Inf)
+    assertFalse("operation should be updated", updatedOp.isEmpty)
+    assert("opUid20" === updatedOp.get.opUId)
+    assert(21 === updatedOp.get.batch)
+    assert(20 === updatedOp.get.offset)
+  }
+
 }
 
 object DatabaseDaoTest extends Logging {
