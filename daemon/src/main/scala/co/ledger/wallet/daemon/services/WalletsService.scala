@@ -13,29 +13,29 @@ class WalletsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
 
   def wallets(user: User, poolName: String, offset: Int, bulkSize: Int): Future[WalletsWithCount] = {
     info(LogMsgMaker.newInstance("Obtain wallets with params")
-      .append("poolName", poolName)
+      .append("pool_name", poolName)
       .append("offset", offset)
-      .append("bulkSize", bulkSize)
-      .append("userPubKey", user.pubKey)
+      .append("bulk_size", bulkSize)
+      .append("user_pub_key", user.pubKey)
       .toString())
     daemonCache.getWallets(Bulk(offset, bulkSize), poolName, user.pubKey)
   }
 
   def wallet(user: User, poolName: String, walletName: String): Future[Wallet] = {
     info(LogMsgMaker.newInstance("Obtain wallet with params")
-      .append("walletName", walletName)
-      .append("poolName", poolName)
-      .append("userPubKey", user.pubKey)
+      .append("wallet_name", walletName)
+      .append("pool_name", poolName)
+      .append("user_pub_key", user.pubKey)
       .toString())
     daemonCache.getWallet(walletName, poolName, user.pubKey)
   }
 
   def createWallet(user: User, poolName: String, walletName: String, currencyName: String): Future[Wallet] = {
     info(LogMsgMaker.newInstance("Create wallet with params")
-      .append("walletName", walletName)
-      .append("poolName", poolName)
-      .append("extraParams", None)
-      .append("userPubKey", user.pubKey)
+      .append("wallet_name", walletName)
+      .append("pool_name", poolName)
+      .append("extra_params", None)
+      .append("user_pub_key", user.pubKey)
       .toString())
     daemonCache.createWallet(walletName, currencyName, poolName, user)
   }

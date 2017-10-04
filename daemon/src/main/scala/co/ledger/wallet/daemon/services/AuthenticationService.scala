@@ -27,7 +27,7 @@ class AuthenticationService @Inject()(daemonCache: DaemonCache, ecdsa: ECDSAServ
         usr.get
       } flatMap {user =>
         debug(LogMsgMaker.newInstance("Authorizing request")
-          .append("userPubKey", user.pubKey)
+          .append("user_pub_key", user.pubKey)
           .toString())
         val time = request.authContext.time
         val date = new Date(time * 1000)

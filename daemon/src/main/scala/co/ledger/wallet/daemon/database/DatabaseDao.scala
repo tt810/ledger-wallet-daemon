@@ -49,9 +49,9 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
   def deletePool(poolName: String, userId: Long)(implicit ec: ExecutionContext): Future[Int] = {
     safeRun(filterPool(poolName, userId).delete).map { int =>
       debug(LogMsgMaker.newInstance("Daemon wallet pool deleted")
-        .append("poolName", poolName)
-        .append("userId", userId)
-        .append("resultRow", int)
+        .append("pool_name", poolName)
+        .append("user_id", userId)
+        .append("result_row", int)
         .toString())
       int
     }
@@ -61,8 +61,8 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     val query = pools.filter(pool => pool.userId === userId.bind).sortBy(_.id.desc)
     safeRun(query.result.transactionally).map { rows =>
       debug(LogMsgMaker.newInstance("Daemon wallet pools retrieved")
-        .append("userId", userId)
-        .append("resultRow", rows.size)
+        .append("user_id", userId)
+        .append("result_row", rows.size)
         .append("result", rows.map(_.name))
         .toString())
       rows.map(createPool)
@@ -73,8 +73,8 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     val pubKey = HexUtils.valueOf(targetPubKey)
     safeRun(filterUser(pubKey).result).map { rows =>
       debug(LogMsgMaker.newInstance("Daemon users retrieved")
-        .append("pubKey", targetPubKey)
-        .append("resultRow", rows.size)
+        .append("pub_key", targetPubKey)
+        .append("result_row", rows.size)
         .append("result", rows.map(_.id.get))
         .toString())
       if(rows.isEmpty) None
@@ -86,7 +86,7 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     val query = users.result
     safeRun(query).map { rows =>
       debug(LogMsgMaker.newInstance("Daemon users retrieved")
-        .append("resultRow", rows.size)
+        .append("result_row", rows.size)
         .append("result", rows.map(_.id.get))
         .toString())
       rows.map(createUser(_))
@@ -103,7 +103,7 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     }
     safeRun(query).map { int =>
       debug(LogMsgMaker.newInstance("Daemon wallet pool inserted")
-        .append("walletPool", newPool)
+        .append("wallet_pool", newPool)
         .append("result", int)
         .toString())
       int
@@ -119,7 +119,6 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
       }
     }
     safeRun(query).map { int =>
-      debug(s"User inserted: pubKey=${newUser.pubKey} returned=$int")
       debug(LogMsgMaker.newInstance("Daemon user inserted")
         .append("user", newUser)
         .append("result", int)

@@ -16,7 +16,7 @@ class UsersService @Inject()(daemonCache: DaemonCache, ecdsa: ECDSAService) exte
 
   def createUser(publicKey: String, permissions: Long = 0): Future[Int] = {
     info(LogMsgMaker.newInstance("Create user with params")
-      .append("pubKey", publicKey)
+      .append("pub_key", publicKey)
       .append("permissions", permissions)
       .toString())
     daemonCache.createUser(User(publicKey, permissions))
