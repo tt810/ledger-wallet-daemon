@@ -4,7 +4,7 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Singleton
 
 import co.ledger.core
-import co.ledger.core.{AccountCreationInfo, implicits}
+import co.ledger.core.{AccountCreationInfo, OperationQuery, implicits}
 import co.ledger.wallet.daemon.libledger_core.async.ScalaThreadDispatcher
 import co.ledger.wallet.daemon.libledger_core.crypto.SecureRandomRNG
 import co.ledger.wallet.daemon.libledger_core.debug.NoOpLogPrinter
@@ -53,7 +53,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
         (for (derivationResult <- derivations) yield HexUtils.valueOf(derivationResult.pubKey.get)).asArrayList,
         (for (derivationResult <- derivations) yield HexUtils.valueOf(derivationResult.chainCode.get)).asArrayList
       )
-      wallet.newAccountWithInfo(accountCreationInfo).flatMap { account =>
+      val createdAccount = wallet.newAccountWithInfo(accountCreationInfo).map { account =>
         debug(LogMsgMaker.newInstance("Account created")
           .append("derivations", accountDerivations)
           .append("wallet_name", walletName)
@@ -63,8 +63,18 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
           .toString())
         models.newInstance(account, wallet)
       }.recover {
-        case e: implicits.InvalidArgumentException => throw new InvalidArgumentException(e.getMessage, e)
+        case e: implicits.InvalidArgumentException => Future.failed(new InvalidArgumentException(e.getMessage, e))
+        case alreadyExist: implicits.AccountAlreadyExistsException => {
+          warn(LogMsgMaker.newInstance("Account already exists")
+              .append("user_pub_key", user.pubKey)
+              .append("pool_name", poolName)
+              .append("wallet_name", walletName)
+              .append("account_index", accountDerivations.accountIndex)
+            .toString())
+          wallet.getAccount(accountDerivations.accountIndex).flatMap(models.newInstance(_, wallet))
+        }
       }
+      createdAccount.flatten
     }
   }
 
@@ -156,17 +166,88 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     }
   }
 
-  def getAccountOperations(accountIndex: Int, walletName: String, poolName: String, pubKey: String) = {
+  def getCoreAccountOperations(accountIndex: Int, batch: Int, walletName: String, poolName: String, user: User, fullOp: Int): Future[Seq[core.Operation]] = {
     info(LogMsgMaker.newInstance("Retrieving account operations")
       .append("account_index", accountIndex)
+      .append("batch", batch)
       .append("wallet_name", walletName)
       .append("pool_name", poolName)
-      .append("user_pub_key", pubKey)
+      .append("user", user)
       .toString())
-//    getCoreAccount(accountIndex, pubKey, poolName, walletName).flatMap { coreAccountWallet =>
-//      coreAccountWallet._1.queryOperations().
-//    }
+    getCoreAccount(accountIndex, user.pubKey, poolName, walletName).flatMap { coreAccountWallet =>
+      debug(LogMsgMaker.newInstance("Retrieved wallet and account")
+        .append("result", coreAccountWallet))
+      val coreAccount = coreAccountWallet._1
+      val offset = 0
+      (if (fullOp > 0)
+        coreAccount.queryOperations().offset(0).limit(batch + 1).complete().execute()
+      else
+        coreAccount.queryOperations().offset(0).limit(batch + 1).partial().execute()
+      ).flatMap { operations =>
+        debug(LogMsgMaker.newInstance("Retrieved account operations")
+          .append("offset", 0)
+          .append("batch_size", batch)
+          .append("result_size", operations.size())
+          .toString)
+        val size = operations.size()
+        if(size > 0) {
+          val uid = operations.get(0).getUid
+          val realBatch = if (size == batch + 1) batch else size
+          val nextUid = if (realBatch < batch) None else Option(operations.get(batch).getUid)
+          debug(LogMsgMaker.newInstance("Retrieved account operations more info")
+            .append("received_size", size)
+            .append("offset", 0)
+            .append("batch_size", batch)
+            .append("returned_batch_size", realBatch)
+            .append("uid", uid)
+            .append("next_uid", nextUid)
+            .toString())
+          dbDao.getPool(user.id.get, poolName).flatMap { pool =>
+            pool match {
+              case None => throw new WalletPoolNotFoundException(s"Wallet pool doesn't exist")
+              case Some(p) => {
+                val operation = Operation(user.id.get, p.id.get, walletName, accountIndex, uid, offset, realBatch, nextUid)
+                dbDao.insertOperation(operation).map { int =>
+                  operations.asScala.toSeq.take(realBatch)
+                }
+              }
+            }
+          }
+        } else Future.successful(List[core.Operation]())
+      }
+    }
   }
+
+//  def getAccountOperations(accountIndex: Int, cursor: Option[String], batch: Int, fullOp: Int, walletName: String, poolName: String, user: User) = {
+//    info(LogMsgMaker.newInstance("Retrieving account operations")
+//      .append("account_index", accountIndex)
+//      .append("wallet_name", walletName)
+//      .append("pool_name", poolName)
+//      .append("user", user)
+//      .toString())
+//    getCoreAccount(accountIndex, user.pubKey, poolName, walletName).map { coreAccountWallet =>
+//      cursor match {
+//        case None => { // create new row in daemon operation table
+//          if(fullOp > 0) coreAccountWallet._1.queryOperations().offset(0).limit(batch).complete().execute()
+//          else coreAccountWallet._1.queryOperations().offset(0).limit(batch).partial().execute()
+//        }
+//        case Some(opUId) => { // update existing row in daemon operation table
+//          dbDao.getAccountOperation(opUId, user.id.get, poolName, walletName, accountIndex).flatMap { opOption =>
+//            opOption match {
+//              case None => throw new OperationCursorNotFoundException(opUId)
+//              case Some(operation) => {
+//                if (fullOp > 0) coreAccountWallet._1.queryOperations().offset(operation.offset + operation.batch).limit(batch).complete().execute()
+//                else coreAccountWallet._1.queryOperations().offset(operation.offset + operation.batch).limit(batch).partial().execute()
+//              }
+//            }
+//          }
+//        }
+//      }
+//
+//
+//      coreAccountWallet
+//    }
+//  }
 
   def getWalletPool(pubKey: String, poolName: String): Future[WalletPool] = {
     getPool(pubKey, poolName).flatMap(models.newInstance(_))
@@ -210,7 +291,12 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     dbDao.getUser(pubKey)
   }
 
-  private def getCoreAccount(accountIndex: Int, pubKey: String, poolName: String, walletName: String): Future[(core.Account, core.Wallet)] = {
+  def getUserDirectlyFromDB(pubKey: String): Future[Option[User]] = {
+    dbDao.getUser(pubKey)
+  }
+
+
+  private[database] def getCoreAccount(accountIndex: Int, pubKey: String, poolName: String, walletName: String): Future[(core.Account, core.Wallet)] = {
     getCoreWallet(walletName, poolName, pubKey).flatMap { wallet =>
       wallet.getAccount(accountIndex).map { account =>
         debug(LogMsgMaker.newInstance("Retrieved account")
@@ -249,20 +335,12 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
   }
 
   private def getCoreCurrencies(poolName: String): Future[Seq[core.Currency]] = Future {
-    info(LogMsgMaker.newInstance("Retrieving currencies")
-      .append("pool_name", poolName)
-      .toString())
     getNamedCurrencies(poolName).values().asScala.toList
   }
 
   private def getCoreCurrency(currencyName: String, poolName: String): Future[core.Currency] = Future {
     val namedCurrencies = getNamedCurrencies(poolName)
     val currency = namedCurrencies.getOrDefault(currencyName, null)
-    debug(LogMsgMaker.newInstance("Retrieved currency")
-      .append("currency_name", currencyName)
-      .append("pool_name", poolName)
-      .append("result", currency)
-      .toString())
     if(currency == null)
       throw new CurrencyNotFoundException(currencyName)
     else
@@ -352,11 +430,6 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
   private def getPool(pubKey: String, poolName: String): Future[core.WalletPool] = Future {
     val namedPools = getNamedPools(pubKey)
     val pool = namedPools.getOrDefault(poolName, null)
-    debug(LogMsgMaker.newInstance("Retrieved wallet pool")
-      .append("pool_name", poolName)
-      .append("user_pub_key", pubKey)
-      .append("result", pool)
-      .toString())
     if(pool == null)
       throw new WalletPoolNotFoundException(poolName)
     else
@@ -369,10 +442,6 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
 
   private def getNamedCurrencies(poolName: String): ConcurrentHashMap[String, core.Currency] = {
     val namedCurrencies = pooledCurrencies.getOrDefault(poolName, null)
-    debug(LogMsgMaker.newInstance("Retrieved currencies")
-      .append("pool_name", poolName)
-      .append("result", namedCurrencies)
-      .toString())
     if(namedCurrencies == null)
       throw new WalletPoolNotFoundException(poolName)
     else
@@ -381,10 +450,6 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
 
   private def getNamedPools(pubKey: String): ConcurrentHashMap[String, core.WalletPool] = {
     val namedPools = userPools.getOrDefault(pubKey, null)
-    debug(LogMsgMaker.newInstance("Retrieved wallet pools")
-      .append("user_pub_key", pubKey)
-      .append("result", namedPools)
-      .toString())
     if(namedPools == null)
       throw new UserNotFoundException(pubKey)
     else
@@ -475,8 +540,8 @@ object DefaultDaemonCache extends Logging {
       .toString())
   }
 
-  private val dbDao             =   new DatabaseDao(Database.forConfig(DaemonConfiguration.dbProfileName))
-  private val dispatcher        =   new ScalaThreadDispatcher(scala.concurrent.ExecutionContext.Implicits.global)
+  private[database] val dbDao             =   new DatabaseDao(Database.forConfig(DaemonConfiguration.dbProfileName))
+  private val dispatcher        =   new ScalaThreadDispatcher(MDCPropagatingExecutionContext.Implicits.global)
   private val pooledCurrencies  =   new ConcurrentHashMap[String, ConcurrentHashMap[String, core.Currency]]()
   private val userPools         =   new ConcurrentHashMap[String, ConcurrentHashMap[String, core.WalletPool]]()
 }

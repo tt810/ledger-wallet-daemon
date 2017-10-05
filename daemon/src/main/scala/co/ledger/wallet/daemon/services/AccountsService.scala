@@ -43,6 +43,18 @@ class AccountsService @Inject()(defaultDaemonCache: DaemonCache) extends DaemonS
     defaultDaemonCache.getNextAccountCreationInfo(user.pubKey, poolName, walletName, accountIndex)
   }
 
+  def accountOperation(user: User, accountIndex: Int, cursor: Option[String], batch: Int, fullOp: Int, poolName: String, walletName: String) = {
+    info(LogMsgMaker.newInstance("Obtain account operations with params")
+      .append("account_index", accountIndex)
+      .append("cursor", cursor)
+      .append("batch", batch)
+      .append("full_op", fullOp)
+      .append("wallet_name", walletName)
+      .append("pool_name", poolName)
+      .toString())
+
+  }
+
   def createAccount(accountCreationBody: AccountDerivation, user: User, poolName: String, walletName: String): Future[models.Account] = {
     info(LogMsgMaker.newInstance("Create account with params")
       .append("account_derivations", accountCreationBody)

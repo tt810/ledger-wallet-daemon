@@ -84,6 +84,19 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
     }
   }
 
+  get("/pools/:pool_name/wallets/:wallet_name/accounts/:account_index/operations") { request: OperationRequest =>
+    info(LogMsgMaker.newInstance("GET account operation request")
+      .append("request", request.request)
+      .append("account_index", request.account_index)
+      .append("cursor", request.cursor)
+      .append("batch", request.batch)
+      .append("is_full_op", request.full_op > 0)
+      .append("wallet_name", request.wallet_name)
+      .append("pool_name", request.pool_name)
+      .toString())
+
+  }
+
   filter[AccountCreationFilter]
     .post("/pools/:pool_name/wallets/:wallet_name/accounts") { request: Request =>
       val walletName = request.getParam("wallet_name")
@@ -135,5 +148,13 @@ object AccountsController {
                                          @QueryParam account_index: Option[Int],
                                          request: Request
                                        ) extends RichRequest(request)
-
+  case class OperationRequest(
+                             @RouteParam pool_name: String,
+                             @RouteParam wallet_name: String,
+                             @RouteParam account_index: Int,
+                             @QueryParam cursor: Option[String],
+                             @QueryParam batch: Int = 20,
+                             @QueryParam full_op: Int = 0,
+                             request: Request
+                             ) extends RichRequest(request)
 }
