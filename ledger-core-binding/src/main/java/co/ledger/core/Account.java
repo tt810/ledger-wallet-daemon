@@ -19,6 +19,18 @@ public abstract class Account {
     /** Key of the synchronization error message. The message is stored as a string. */
     public static final String EV_SYNC_ERROR_MESSAGE = "EV_SYNC_ERROR_MESSAGE";
 
+    public static final String EV_NEW_BLOCK_CURRENCY_NAME = "EV_NEW_BLOCK_CURRENCY_NAME";
+
+    public static final String EV_NEW_BLOCK_HASH = "EV_NEW_BLOCK_HASH";
+
+    public static final String EV_NEW_BLOCK_HEIGHT = "EV_NEW_BLOCK_HEIGHT";
+
+    public static final String EV_NEW_OP_WALLET_NAME = "EV_NEW_OP_WALLET_NAME";
+
+    public static final String EV_NEW_OP_ACCOUNT_INDEX = "EV_NEW_OP_ACCOUNT_INDEX";
+
+    public static final String EV_NEW_OP_UID = "EV_NEW_OP_UID";
+
     public abstract int getIndex();
 
     public abstract OperationQuery queryOperations();
@@ -49,6 +61,8 @@ public abstract class Account {
     public abstract void getFreshPublicAddresses(StringListCallback callback);
 
     public abstract WalletType getWalletType();
+
+    public abstract EventBus getEventBus();
 
     public abstract void computeFees(Amount amount, int priority, ArrayList<String> recipients, ArrayList<byte[]> data, AmountCallback callback);
 
@@ -178,6 +192,14 @@ public abstract class Account {
             return native_getWalletType(this.nativeRef);
         }
         private native WalletType native_getWalletType(long _nativeRef);
+
+        @Override
+        public EventBus getEventBus()
+        {
+            assert !this.destroyed.get() : "trying to use a destroyed object";
+            return native_getEventBus(this.nativeRef);
+        }
+        private native EventBus native_getEventBus(long _nativeRef);
 
         @Override
         public void computeFees(Amount amount, int priority, ArrayList<String> recipients, ArrayList<byte[]> data, AmountCallback callback)
