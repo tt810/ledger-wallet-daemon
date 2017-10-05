@@ -46,7 +46,7 @@ trait Tables {
 
   val users = TableQuery[Users]
 
-  case class PoolRow(id: Long, name: String, createdAt: Timestamp, configuration: String, dbBackend: String, dbConnectString: String, userId: Long)
+  case class PoolRow(id: Long, name: String, userId: Long, createdAt: Timestamp, configuration: String, dbBackend: String, dbConnectString: String)
 
   class Pools(tag: Tag) extends Table[PoolRow](tag, "pools") {
     def id              = column[Long]("id", O.PrimaryKey, O.AutoInc)
@@ -65,14 +65,12 @@ trait Tables {
 
     def user            = foreignKey("pool_user_fk", userId, users)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
 
-    def *               = (id, name, createdAt, configuration, dbBackend, dbConnectString, userId) <> (PoolRow.tupled, PoolRow.unapply)
-
-    def idx             = index("idx_user_name", (userId, name), unique = true)
+    def *               = (id, name, userId, createdAt, configuration, dbBackend, dbConnectString) <> (PoolRow.tupled, PoolRow.unapply)
   }
 
   val pools = TableQuery[Pools]
 
-  case class OperationRow(id: Long, userId: Long, poolName: String, walletName: String, accountIndex: Int, opUId: String, offset: Long, batch: Int, nextOpUId: String, createdAt: Timestamp, updatedAt: Timestamp)
+  case class OperationRow(id: Long, userId: Long, poolId: Long, walletName: String, accountIndex: Int, opUId: String, offset: Long, batch: Int, nextOpUId: Option[String], createdAt: Timestamp, updatedAt: Timestamp)
 
   class Operations(tag: Tag) extends Table[OperationRow](tag, "operations") {
 
@@ -80,7 +78,7 @@ trait Tables {
 
     def userId        = column[Long]("user_id")
 
-    def poolName      = column[String]("pool_Name")
+    def poolId      = column[Long]("pool_id")
 
     def walletName    = column[String]("wallet_name")
 
@@ -92,19 +90,19 @@ trait Tables {
 
     def batch         = column[Int]("batch")
 
-    def nextOpUId     = column[String]("next_op_uid")
+    def nextOpUId     = column[Option[String]]("next_op_uid")
 
     def createdAt     = column[Timestamp]("created_at", SqlType("timestamp default CURRENT_TIMESTAMP"))
 
     def updatedAt     = column[Timestamp]("updated_at", SqlType("timestamp default NULL"))
 
+    def pool          = foreignKey("op_pool_fk", poolId, pools)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
+
     def user          = foreignKey("op_user_fk", userId, users)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
 
-    def pool          = foreignKey("op_pool_fk", poolName, pools)(_.name, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
+    override def *    = (id, userId, poolId, walletName, accountIndex, opUId, offset, batch, nextOpUId, createdAt, updatedAt) <> (OperationRow.tupled, OperationRow.unapply)
 
-    override def *    = (id, userId, poolName, walletName, accountIndex, opUId, offset, batch, nextOpUId, createdAt, updatedAt) <> (OperationRow.tupled, OperationRow.unapply)
-
-    def idx           = index("idx_nextop_user_pool_wallet_account", (nextOpUId, userId, poolName, walletName, accountIndex))
+    def idx           = index("idx_user_pool_wallet_account", (userId, poolId, walletName, accountIndex))
   }
 
   val operations = TableQuery[Operations]

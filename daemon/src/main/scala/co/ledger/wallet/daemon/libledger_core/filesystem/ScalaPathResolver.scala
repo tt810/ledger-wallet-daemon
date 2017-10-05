@@ -4,7 +4,7 @@ import java.io.File
 
 import co.ledger.core.PathResolver
 
-class ScalaPathResolver(poolName: String) extends PathResolver {
+class ScalaPathResolver(identifier: String) extends PathResolver {
   /**
     * Resolves the path for a SQLite database file.
     *
@@ -38,6 +38,6 @@ class ScalaPathResolver(poolName: String) extends PathResolver {
   lazy val installDirectory: File = {
     import java.net.URLDecoder
     val jarPath = URLDecoder.decode(classOf[Nothing].getProtectionDomain.getCodeSource.getLocation.getPath, "UTF-8")
-    new File(new File(jarPath).getParentFile, poolName)
+    new File(new File(jarPath).getParentFile, identifier)
   }
 }

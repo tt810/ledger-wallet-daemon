@@ -5,6 +5,7 @@ parallelExecution in Test := false
 parallelExecution in IntegrationTest := false
 testForkedParallel in Test := false
 testForkedParallel in IntegrationTest := false
+testOptions in Test := Seq(Tests.Argument(TestFrameworks.JUnit, "-a"))
 
 lazy val versions = new {
   val finatra = "2.12.0"
@@ -47,6 +48,7 @@ libraryDependencies ++= Seq(
   "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
   "org.scalatest" %% "scalatest" %  "3.0.0" % "test",
   "junit" % "junit" % "4.12" % "test",
+  "com.novocode" % "junit-interface" % "0.11" % "test",
   "org.mockito" % "mockito-core" % "1.9.5" % "test",
   "org.specs2" %% "specs2-mock" % "2.4.17" % "test"
 )
