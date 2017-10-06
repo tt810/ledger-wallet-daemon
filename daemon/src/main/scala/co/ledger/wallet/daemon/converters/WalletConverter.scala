@@ -6,6 +6,6 @@ import com.twitter.util.Future
 
 class WalletConverter {
 
-  def apply(wallet: Wallet): Future[models.Wallet] = ???
+  def apply(wallet: Wallet): Future[models.WalletView] = ???
 
 }

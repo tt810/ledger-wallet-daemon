@@ -12,12 +12,11 @@ import org.scalatest.junit.AssertionsForJUnit
 import scala.concurrent.{Await, Promise}
 import scala.concurrent.duration.Duration
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
-import co.ledger.wallet.daemon.models.{AccountDerivation, Derivation}
+import co.ledger.wallet.daemon.models.{AccountDerivationView, DerivationView}
 
 
 class DaemonCacheTest extends AssertionsForJUnit {
   import DaemonCacheTest._
-  import DefaultDaemonCache._
 
   @Test def verifyGetPoolNotFound(): Unit = {
     try {
@@ -66,53 +65,53 @@ class DaemonCacheTest extends AssertionsForJUnit {
   }
 
   @Test def verifyGetAccountOperations(): Unit = {
-    val user1 = Await.result(cache.getUserDirectlyFromDB(PUB_KEY_1), Duration.Inf)
-    val pool1 = Await.result(DefaultDaemonCache.dbDao.getPool(user1.get.id.get, "pool_1"), Duration.Inf)
-    val ops = Await.result(cache.getCoreAccountOperations(0, 20, "wallet_1", pool1.get.name, user1.get, 0), Duration.Inf)
+    val user1 = Await.result(cache.getUserDirectlyFromDB(PUB_KEY_3), Duration.Inf)
+    val pool1 = Await.result(DefaultDaemonCache.dbDao.getPool(user1.get.id.get, POOL_NAME), Duration.Inf)
+    val ops = Await.result(cache.getCoreAccountOperations(0, 20, WALLET_NAME, pool1.get.name, user1.get, 0), Duration.Inf)
     assert(20 === ops.size)
-    val opsRow = Await.result(DefaultDaemonCache.dbDao.getFirstAccountOperation(user1.get.id.get, pool1.get.id.get, "wallet_1", 0), Duration.Inf)
+    val opsRow = Await.result(DefaultDaemonCache.dbDao.getLastAccountOperation(user1.get.id.get, pool1.get.id.get, WALLET_NAME, 0), Duration.Inf)
     assertFalse("Operation should be inserted", opsRow.isEmpty)
     assertFalse(opsRow.get.nextOpUId.isEmpty)
     assert(ops.size === opsRow.get.batch)
     assert(0 === opsRow.get.offset)
     assert(opsRow.get.opUId === ops.head.getUid)
+
+    val maxi = Await.result(cache.getCoreAccountOperations(0, Int.MaxValue, WALLET_NAME, pool1.get.name, user1.get, 0), Duration.Inf)
+    assert(maxi.size < Int.MaxValue)
+    val maxiRow = Await.result(DefaultDaemonCache.dbDao.getLastAccountOperation(user1.get.id.get, pool1.get.id.get, WALLET_NAME, 0), Duration.Inf)
+    assertFalse("Operation should be inserted", maxiRow.isEmpty)
+    assert(maxiRow.get.nextOpUId.isEmpty)
+    assert(maxi.size === maxiRow.get.batch)
+    assert(0 === maxiRow.get.offset)
+    assert(maxiRow.get.opUId === maxi.head.getUid)
   }
 
-  @Test def verifyGetAccountOperationsWithNoMoreLeft(): Unit = {
-    val user1 = Await.result(cache.getUserDirectlyFromDB(PUB_KEY_1), Duration.Inf)
-    val pool1 = Await.result(DefaultDaemonCache.dbDao.getPool(user1.get.id.get, "pool_1"), Duration.Inf)
-    val ops = Await.result(cache.getCoreAccountOperations(0, Int.MaxValue, "wallet_1", pool1.get.name, user1.get, 0), Duration.Inf)
-    assert(ops.size < Int.MaxValue)
-    val opsRow = Await.result(DefaultDaemonCache.dbDao.getFirstAccountOperation(user1.get.id.get, pool1.get.id.get, "wallet_1", 0), Duration.Inf)
-    assertFalse("Operation should be inserted", opsRow.isEmpty)
-    assert(opsRow.get.nextOpUId.isEmpty)
-    assert(ops.size === opsRow.get.batch)
-    assert(0 === opsRow.get.offset)
-    assert(opsRow.get.opUId === ops.head.getUid)
-  }
 }
 
 object DaemonCacheTest {
   @BeforeClass def initialization(): Unit = {
     NativeLibLoader.loadLibs()
-    val user1 = User(PUB_KEY_1, 0, Option(1L))
-    val user2 = User(PUB_KEY_2, 0, Option(2L))
     Await.result(DefaultDaemonCache.migrateDatabase(), Duration.Inf)
-    Await.result(cache.createUser(user1), Duration.Inf)
-    Await.result(cache.createUser(user2), Duration.Inf)
-    Await.result(cache.createWalletPool(user1, "pool_1", ""), Duration.Inf)
-    Await.result(cache.createWalletPool(user1, "pool_2", ""), Duration.Inf)
-    Await.result(cache.createWalletPool(user2, "pool_1", ""), Duration.Inf)
-    Await.result(cache.createWalletPool(user2, "pool_3", ""), Duration.Inf)
-    Await.result(cache.createWallet("wallet_1", "bitcoin", "pool_1", user1), Duration.Inf)
+    Await.result(cache.createUser(User(PUB_KEY_1, 0, None)), Duration.Inf)
+    Await.result(cache.createUser(User(PUB_KEY_2, 0, None)), Duration.Inf)
+    Await.result(cache.createUser(User(PUB_KEY_3, 0, None)), Duration.Inf)
+    val user1 = Await.result(cache.getUserDirectlyFromDB(PUB_KEY_1), Duration.Inf)
+    val user2 = Await.result(cache.getUserDirectlyFromDB(PUB_KEY_2), Duration.Inf)
+    val user3 = Await.result(cache.getUserDirectlyFromDB(PUB_KEY_3), Duration.Inf)
+    Await.result(cache.createWalletPool(user1.get, "pool_1", ""), Duration.Inf)
+    Await.result(cache.createWalletPool(user1.get, "pool_2", ""), Duration.Inf)
+    Await.result(cache.createWalletPool(user2.get, "pool_1", ""), Duration.Inf)
+    Await.result(cache.createWalletPool(user2.get, "pool_3", ""), Duration.Inf)
+    Await.result(cache.createWalletPool(user3.get, POOL_NAME, ""), Duration.Inf)
+    Await.result(cache.createWallet(WALLET_NAME, "bitcoin", POOL_NAME, user3.get), Duration.Inf)
     Await.result(cache.createAccount(
-      AccountDerivation(0, List(
-        Derivation("44'/0'/0'", "main", Option("0437bc83a377ea025e53eafcd18f299268d1cecae89b4f15401926a0f8b006c0f7ee1b995047b3e15959c5d10dd1563e22a2e6e4be9572aa7078e32f317677a901"), Option("d1bb833ecd3beed6ec5f6aa79d3a424d53f5b99147b21dbc00456b05bc978a71")),
-        Derivation("44'/0'", "main", Option("0437bc83a377ea025e53eafcd18f299268d1cecae89b4f15401926a0f8b006c0f7ee1b995047b3e15959c5d10dd1563e22a2e6e4be9572aa7078e32f317677a901"), Option("d1bb833ecd3beed6ec5f6aa79d3a424d53f5b99147b21dbc00456b05bc978a71")))),
-      user1,
-    "pool_1",
-    "wallet_1"), Duration.Inf)
-    val coreAccount = Await.result(cache.getCoreAccount(0, user1.pubKey, "pool_1", "wallet_1"), Duration.Inf)
+      AccountDerivationView(0, List(
+        DerivationView("44'/0'/0'", "main", Option("0437bc83a377ea025e53eafcd18f299268d1cecae89b4f15401926a0f8b006c0f7ee1b995047b3e15959c5d10dd1563e22a2e6e4be9572aa7078e32f317677a901"), Option("d1bb833ecd3beed6ec5f6aa79d3a424d53f5b99147b21dbc00456b05bc978a71")),
+        DerivationView("44'/0'", "main", Option("0437bc83a377ea025e53eafcd18f299268d1cecae89b4f15401926a0f8b006c0f7ee1b995047b3e15959c5d10dd1563e22a2e6e4be9572aa7078e32f317677a901"), Option("d1bb833ecd3beed6ec5f6aa79d3a424d53f5b99147b21dbc00456b05bc978a71")))),
+        user3.get,
+        POOL_NAME,
+        WALLET_NAME), Duration.Inf)
+    val coreAccount = Await.result(cache.getCoreAccount(0, user3.get.pubKey, POOL_NAME, WALLET_NAME), Duration.Inf)
     Await.result(TestAccountPreparation.prepare(coreAccount._1, Promise[Boolean]()), Duration.Inf)
     DefaultDaemonCache.initialize()
   }
@@ -120,4 +119,7 @@ object DaemonCacheTest {
   private val cache: DefaultDaemonCache = new DefaultDaemonCache()
   private val PUB_KEY_1 = UUID.randomUUID().toString
   private val PUB_KEY_2 = UUID.randomUUID().toString
+  private val PUB_KEY_3 = UUID.randomUUID().toString
+  private val WALLET_NAME = UUID.randomUUID().toString
+  private val POOL_NAME = UUID.randomUUID().toString
 }

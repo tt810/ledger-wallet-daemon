@@ -7,32 +7,32 @@ import scala.concurrent.Future
 trait DaemonCache {
 
   // ************** account *************
-  def getAccounts(pubKey: String, poolName: String, walletName: String): Future[Seq[Account]]
+  def getAccounts(pubKey: String, poolName: String, walletName: String): Future[Seq[AccountView]]
 
-  def getAccount(accountIndex: Int, pubKey: String, poolName: String, walletName: String): Future[Account]
+  def getAccount(accountIndex: Int, pubKey: String, poolName: String, walletName: String): Future[AccountView]
 
-  def getNextAccountCreationInfo(pubKey: String, poolName: String, walletName: String, accountIndex: Option[Int]): Future[AccountDerivation]
+  def getNextAccountCreationInfo(pubKey: String, poolName: String, walletName: String, accountIndex: Option[Int]): Future[AccountDerivationView]
 
-  def createAccount(accountDerivation: AccountDerivation, user: User, poolName: String, walletName: String): Future[Account]
+  def createAccount(accountDerivation: AccountDerivationView, user: User, poolName: String, walletName: String): Future[AccountView]
 
   // ************** currency ************
-  def getCurrency(currencyName: String, poolName: String): Future[Currency]
+  def getCurrency(currencyName: String, poolName: String): Future[CurrencyView]
 
-  def getCurrencies(poolName: String): Future[Seq[Currency]]
+  def getCurrencies(poolName: String): Future[Seq[CurrencyView]]
 
   // ************** wallet *************
-  def createWallet(walletName: String, currencyName: String, poolName: String, user: User): Future[Wallet]
+  def createWallet(walletName: String, currencyName: String, poolName: String, user: User): Future[WalletView]
 
-  def getWallets(walletBulk: Bulk, poolName: String, pubKey: String): Future[WalletsWithCount]
+  def getWallets(walletBulk: Bulk, poolName: String, pubKey: String): Future[WalletsViewWithCount]
 
-  def getWallet(walletName: String, poolName: String, pubKey: String): Future[Wallet]
+  def getWallet(walletName: String, poolName: String, pubKey: String): Future[WalletView]
 
   // ************** wallet pool *************
-  def createWalletPool(user: User, poolName: String, configuration: String): Future[WalletPool]
+  def createWalletPool(user: User, poolName: String, configuration: String): Future[WalletPoolView]
 
-  def getWalletPool(pubKey: String, poolName: String): Future[WalletPool]
+  def getWalletPool(pubKey: String, poolName: String): Future[WalletPoolView]
 
-  def getWalletPools(pubKey: String): Future[Seq[WalletPool]]
+  def getWalletPools(pubKey: String): Future[Seq[WalletPoolView]]
 
   def deleteWalletPool(user: User, poolName: String): Future[Unit]
 
