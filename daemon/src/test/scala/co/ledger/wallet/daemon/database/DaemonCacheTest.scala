@@ -39,7 +39,7 @@ class DaemonCacheTest extends AssertionsForJUnit {
   @Test def verifyCreateAndGetPools(): Unit = {
     val pool11 = Await.result(cache.getWalletPool(PUB_KEY_1, "pool_1"), Duration.Inf)
     val pool12 = Await.result(cache.getWalletPool(PUB_KEY_1, "pool_2"), Duration.Inf)
-    val pool13 = Await.result(cache.createWalletPool(User(PUB_KEY_1, 0, Option(1L)), "pool_3", "config"), Duration.Inf)
+    val pool13 = Await.result(cache.createWalletPool(UserDTO(PUB_KEY_1, 0, Option(1L)), "pool_3", "config"), Duration.Inf)
     val pool1s = Await.result(cache.getWalletPools(PUB_KEY_1), Duration.Inf)
     assertEquals(3, pool1s.size)
     assertTrue(pool1s.contains(pool11))
@@ -48,12 +48,12 @@ class DaemonCacheTest extends AssertionsForJUnit {
   }
 
   @Test def verifyCreateAndDeletePool(): Unit = {
-    val poolRandom = Await.result(cache.createWalletPool(User(PUB_KEY_2, 0, Option(2L)),UUID.randomUUID().toString, "config"), Duration.Inf)
+    val poolRandom = Await.result(cache.createWalletPool(UserDTO(PUB_KEY_2, 0, Option(2L)),UUID.randomUUID().toString, "config"), Duration.Inf)
     val beforeDeletion = Await.result(cache.getWalletPools(PUB_KEY_2), Duration.Inf)
     assertEquals(3, beforeDeletion.size)
     assertTrue(beforeDeletion.contains(poolRandom))
 
-    val afterDeletion = Await.result(cache.deleteWalletPool(User(PUB_KEY_2, 0, Option(2L)), poolRandom.name).flatMap(_=>cache.getWalletPools(PUB_KEY_2)), Duration.Inf)
+    val afterDeletion = Await.result(cache.deleteWalletPool(UserDTO(PUB_KEY_2, 0, Option(2L)), poolRandom.name).flatMap(_=>cache.getWalletPools(PUB_KEY_2)), Duration.Inf)
     assertFalse(afterDeletion.contains(poolRandom))
   }
 
@@ -92,9 +92,9 @@ object DaemonCacheTest {
   @BeforeClass def initialization(): Unit = {
     NativeLibLoader.loadLibs()
     Await.result(DefaultDaemonCache.migrateDatabase(), Duration.Inf)
-    Await.result(cache.createUser(User(PUB_KEY_1, 0, None)), Duration.Inf)
-    Await.result(cache.createUser(User(PUB_KEY_2, 0, None)), Duration.Inf)
-    Await.result(cache.createUser(User(PUB_KEY_3, 0, None)), Duration.Inf)
+    Await.result(cache.createUser(UserDTO(PUB_KEY_1, 0, None)), Duration.Inf)
+    Await.result(cache.createUser(UserDTO(PUB_KEY_2, 0, None)), Duration.Inf)
+    Await.result(cache.createUser(UserDTO(PUB_KEY_3, 0, None)), Duration.Inf)
     val user1 = Await.result(cache.getUserDirectlyFromDB(PUB_KEY_1), Duration.Inf)
     val user2 = Await.result(cache.getUserDirectlyFromDB(PUB_KEY_2), Duration.Inf)
     val user3 = Await.result(cache.getUserDirectlyFromDB(PUB_KEY_3), Duration.Inf)

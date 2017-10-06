@@ -1,7 +1,8 @@
 package co.ledger.wallet.daemon.api
 
 import co.ledger.wallet.daemon.controllers.responses.{ErrorCode, ErrorResponseBody}
-import co.ledger.wallet.daemon.models.{BitcoinLikeNetworkParamsView, CurrencyFamily, CurrencyView, UnitView}
+import co.ledger.wallet.daemon.models.coins.BitcoinNetworkParamsView
+import co.ledger.wallet.daemon.models.{CurrencyFamily, CurrencyView, UnitView}
 import co.ledger.wallet.daemon.utils.APIFeatureTest
 import com.twitter.finagle.http.{Response, Status}
 
@@ -67,7 +68,7 @@ class CurrenciesApiTest extends APIFeatureTest {
       UnitView("milli-bitcoin","mBTC", "mBTC", 5),
       UnitView("micro-bitcoin", "μBTC", "μBTC", 2),
       ),
-    BitcoinLikeNetworkParamsView("btc", "00", "05", "0488B21E", "PER_BYTE", 5430, "Bitcoin signed message:\n", false)
+    BitcoinNetworkParamsView("btc", "00", "05", "0488B21E", "PER_BYTE", 5430, "Bitcoin signed message:\n", false)
   )
 
 }
