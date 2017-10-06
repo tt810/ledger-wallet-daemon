@@ -3,7 +3,7 @@ package co.ledger.wallet.daemon.services
 import javax.inject.{Inject, Singleton}
 
 import co.ledger.wallet.daemon.DaemonConfiguration
-import co.ledger.wallet.daemon.database.{DaemonCache, DefaultDaemonCache, User}
+import co.ledger.wallet.daemon.database.{DaemonCache, DefaultDaemonCache, UserDTO}
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.twitter.inject.Logging
 import org.bitcoinj.core.Sha256Hash
@@ -19,7 +19,7 @@ class UsersService @Inject()(daemonCache: DaemonCache, ecdsa: ECDSAService) exte
       .append("pub_key", publicKey)
       .append("permissions", permissions)
       .toString())
-    daemonCache.createUser(User(publicKey, permissions))
+    daemonCache.createUser(UserDTO(publicKey, permissions))
   }
 
   def createUser(username: String, password: String)(implicit ec: ExecutionContext): Future[Int] = {
