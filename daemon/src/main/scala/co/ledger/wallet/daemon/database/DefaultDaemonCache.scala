@@ -37,7 +37,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
   import DefaultDaemonCache._
   private val _writeContext = SerialExecutionContext.Implicits.global
 
-  def createAccount(accountDerivations: AccountDerivationView, user: UserDTO, poolName: String, walletName: String): Future[models.AccountView] = {
+  def createAccount(accountDerivations: AccountDerivationView, user: UserDto, poolName: String, walletName: String): Future[models.AccountView] = {
     info(LogMsgMaker.newInstance("Creating account")
       .append("derivations", accountDerivations)
       .append("wallet_name", walletName)
@@ -78,18 +78,18 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     }
   }
 
-  def createWalletPool(user: UserDTO, poolName: String, configuration: String): Future[WalletPoolView] = {
+  def createWalletPool(user: UserDto, poolName: String, configuration: String): Future[WalletPoolView] = {
     implicit val ec = _writeContext
     createPool(user, poolName, configuration).flatMap(corePool => Pool.newView(corePool))
   }
 
-  def createWallet(walletName: String, currencyName: String, poolName: String, user: UserDTO): Future[WalletView] = {
+  def createWallet(walletName: String, currencyName: String, poolName: String, user: UserDto): Future[WalletView] = {
     createCoreWallet(walletName, currencyName, poolName, user).flatMap { coreWallet =>
       Wallet.newView(coreWallet)
     }
   }
 
-  def createUser(user: UserDTO): Future[Int] = {
+  def createUser(user: UserDto): Future[Int] = {
     implicit val ec = _writeContext
     dbDao.insertUser(user).map { int =>
       userPools.put(user.pubKey, new ConcurrentHashMap[String, core.WalletPool]())
@@ -100,7 +100,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     }
   }
 
-  def deleteWalletPool(user: UserDTO, poolName: String): Future[Unit] = {
+  def deleteWalletPool(user: UserDto, poolName: String): Future[Unit] = {
     implicit val ec = _writeContext
     info(LogMsgMaker.newInstance("Deleting wallet pool")
       .append("pool_name", poolName)
@@ -166,7 +166,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     }
   }
 
-  def getAccountOperations(accountIndex: Int, batch: Int, walletName: String, poolName: String, user: UserDTO, fullOp: Int): Future[PackedOperationsView] = {
+  def getAccountOperations(accountIndex: Int, batch: Int, walletName: String, poolName: String, user: UserDto, fullOp: Int): Future[PackedOperationsView] = {
     info(LogMsgMaker.newInstance("Retrieving account operations")
       .append("account_index", accountIndex)
       .append("batch", batch)
@@ -205,7 +205,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
             pool match {
               case None => throw new WalletPoolNotFoundException("Wallet pool doesn't exist")
               case Some(p) => {
-                val operation = OperationDTO(user.id.get, p.id.get, walletName, accountIndex, uid, offset, realBatch, nextUid)
+                val operation = OperationDto(user.id.get, p.id.get, walletName, accountIndex, uid, offset, realBatch, nextUid)
                 dbDao.insertOperation(operation).map { int =>
                   PackedOperationsView(
                     None,
@@ -219,37 +219,6 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
       }
     }
   }
-
-//  def getAccountOperations(accountIndex: Int, cursor: Option[String], batch: Int, fullOp: Int, walletName: String, poolName: String, user: User) = {
-//    info(LogMsgMaker.newInstance("Retrieving account operations")
-//      .append("account_index", accountIndex)
-//      .append("wallet_name", walletName)
-//      .append("pool_name", poolName)
-//      .append("user", user)
-//      .toString())
-//    getCoreAccount(accountIndex, user.pubKey, poolName, walletName).map { coreAccountWallet =>
-//      cursor match {
-//        case None => { // create new row in daemon operation table
-//          if(fullOp > 0) coreAccountWallet._1.queryOperations().offset(0).limit(batch).complete().execute()
-//          else coreAccountWallet._1.queryOperations().offset(0).limit(batch).partial().execute()
-//        }
-//        case Some(opUId) => { // update existing row in daemon operation table
-//          dbDao.getAccountOperation(opUId, user.id.get, poolName, walletName, accountIndex).flatMap { opOption =>
-//            opOption match {
-//              case None => throw new OperationCursorNotFoundException(opUId)
-//              case Some(operation) => {
-//                if (fullOp > 0) coreAccountWallet._1.queryOperations().offset(operation.offset + operation.batch).limit(batch).complete().execute()
-//                else coreAccountWallet._1.queryOperations().offset(operation.offset + operation.batch).limit(batch).partial().execute()
-//              }
-//            }
-//          }
-//        }
-//      }
-//
-//
-//      coreAccountWallet
-//    }
-//  }
 
   def getWalletPool(pubKey: String, poolName: String): Future[WalletPoolView] = {
     getPool(pubKey, poolName).flatMap(Pool.newView(_))
@@ -289,11 +258,11 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     getCoreWallet(walletName, poolName, pubKey).flatMap(Wallet.newView(_))
   }
 
-  def getUserDirectlyFromDB(pubKey: Array[Byte]): Future[Option[UserDTO]] =  {
+  def getUserDirectlyFromDB(pubKey: Array[Byte]): Future[Option[UserDto]] =  {
     dbDao.getUser(pubKey)
   }
 
-  def getUserDirectlyFromDB(pubKey: String): Future[Option[UserDTO]] = {
+  def getUserDirectlyFromDB(pubKey: String): Future[Option[UserDto]] = {
     dbDao.getUser(pubKey)
   }
 
@@ -349,7 +318,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
       currency
   }
 
-  private def createCoreWallet(walletName: String, currencyName: String, poolName: String, user: UserDTO): Future[core.Wallet] = {
+  private def createCoreWallet(walletName: String, currencyName: String, poolName: String, user: UserDto): Future[core.Wallet] = {
     info(LogMsgMaker.newInstance("Creating wallet")
       .append("wallet_name", walletName)
       .append("currency_name", currencyName)
@@ -400,13 +369,13 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     }
   }
 
-  private def createPool(user: UserDTO, poolName: String, configuration: String)(implicit ec: ExecutionContext): Future[core.WalletPool] = {
+  private def createPool(user: UserDto, poolName: String, configuration: String)(implicit ec: ExecutionContext): Future[core.WalletPool] = {
     info(LogMsgMaker.newInstance("Creating wallet pool")
       .append("pool_name", poolName)
       .append("user", user)
       .append("configuration", configuration)
       .toString())
-    val newPool = PoolDTO(poolName, user.id.get, configuration)
+    val newPool = PoolDto(poolName, user.id.get, configuration)
 
     dbDao.insertPool(newPool).map { (_) =>
       addToCache(user,newPool).map { walletPool =>
@@ -493,7 +462,7 @@ object DefaultDaemonCache extends Logging {
 
   private def poolIdentifier(userId: Long, poolName: String): String = HexUtils.valueOf(Sha256Hash.hash(s"${userId}:${poolName}".getBytes))
 
-  private def buildPool(pool: PoolDTO)(implicit ec: ExecutionContext): Future[core.WalletPool] = {
+  private def buildPool(pool: PoolDto)(implicit ec: ExecutionContext): Future[core.WalletPool] = {
     val identifier = poolIdentifier(pool.userId, pool.name)
     core.WalletPoolBuilder.createInstance()
       .setHttpClient(new ScalaHttpClient)
@@ -508,7 +477,7 @@ object DefaultDaemonCache extends Logging {
       .build()
   }
 
-  private def addToCache(user: UserDTO, pool: PoolDTO)(implicit ec: ExecutionContext): Future[core.WalletPool] = {
+  private def addToCache(user: UserDto, pool: PoolDto)(implicit ec: ExecutionContext): Future[core.WalletPool] = {
 
     buildPool(pool).map { p =>
       debug(LogMsgMaker.newInstance("Built core wallet pool")

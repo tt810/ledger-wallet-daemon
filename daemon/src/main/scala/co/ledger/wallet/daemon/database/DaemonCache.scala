@@ -13,7 +13,7 @@ trait DaemonCache {
 
   def getNextAccountCreationInfo(pubKey: String, poolName: String, walletName: String, accountIndex: Option[Int]): Future[AccountDerivationView]
 
-  def createAccount(accountDerivation: AccountDerivationView, user: UserDTO, poolName: String, walletName: String): Future[AccountView]
+  def createAccount(accountDerivation: AccountDerivationView, user: UserDto, poolName: String, walletName: String): Future[AccountView]
 
   // ************** currency ************
   def getCurrency(currencyName: String, poolName: String): Future[CurrencyView]
@@ -21,24 +21,24 @@ trait DaemonCache {
   def getCurrencies(poolName: String): Future[Seq[CurrencyView]]
 
   // ************** wallet *************
-  def createWallet(walletName: String, currencyName: String, poolName: String, user: UserDTO): Future[WalletView]
+  def createWallet(walletName: String, currencyName: String, poolName: String, user: UserDto): Future[WalletView]
 
   def getWallets(walletBulk: Bulk, poolName: String, pubKey: String): Future[WalletsViewWithCount]
 
   def getWallet(walletName: String, poolName: String, pubKey: String): Future[WalletView]
 
   // ************** wallet pool *************
-  def createWalletPool(user: UserDTO, poolName: String, configuration: String): Future[WalletPoolView]
+  def createWalletPool(user: UserDto, poolName: String, configuration: String): Future[WalletPoolView]
 
   def getWalletPool(pubKey: String, poolName: String): Future[WalletPoolView]
 
   def getWalletPools(pubKey: String): Future[Seq[WalletPoolView]]
 
-  def deleteWalletPool(user: UserDTO, poolName: String): Future[Unit]
+  def deleteWalletPool(user: UserDto, poolName: String): Future[Unit]
 
   //**************** user ***************
-  def getUserDirectlyFromDB(pubKey: Array[Byte]): Future[Option[UserDTO]]
+  def getUserDirectlyFromDB(pubKey: Array[Byte]): Future[Option[UserDto]]
 
-  def createUser(user: UserDTO): Future[Int]
+  def createUser(user: UserDto): Future[Int]
 
 }

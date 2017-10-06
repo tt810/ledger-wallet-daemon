@@ -17,7 +17,7 @@ class DatabaseDaoTest extends AssertionsForJUnit {
   import DatabaseDaoTest._
   @Test def verifyCreateUser(): Unit = {
     val pubKey = "A3B4A94D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D"
-    val expectedUser = UserDTO(pubKey, 0)
+    val expectedUser = UserDto(pubKey, 0)
     Await.result(dbDao.insertUser(expectedUser), Duration.Inf)
     val actualUser = Await.result(dbDao.getUser(HexUtils.valueOf(pubKey)), Duration.Inf).get
     assertEquals(expectedUser.pubKey, actualUser.pubKey)
@@ -27,8 +27,8 @@ class DatabaseDaoTest extends AssertionsForJUnit {
 
   @Test def verifyCreateUsersWithSamePubKeyFailed(): Unit = {
     val pubKey = "03B4A94D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076F"
-    val user1 = UserDTO(pubKey, 0)
-    val user2 = UserDTO(pubKey, 1)
+    val user1 = UserDto(pubKey, 0)
+    val user2 = UserDto(pubKey, 1)
     Await.result(dbDao.insertUser(user1), Duration.Inf)
     try {
       Await.result(dbDao.insertUser(user2), Duration.Inf)
@@ -39,7 +39,7 @@ class DatabaseDaoTest extends AssertionsForJUnit {
   }
 
   @Test def verifyCreatePoolWithNonExistUser(): Unit = {
-    val expectedPool = PoolDTO("myPool", Long.MaxValue.longValue(), "")
+    val expectedPool = PoolDto("myPool", Long.MaxValue.longValue(), "")
     try {
       Await.result(dbDao.insertPool(expectedPool), Duration.Inf)
       fail()
@@ -50,9 +50,9 @@ class DatabaseDaoTest extends AssertionsForJUnit {
 
   @Test def verifyCreatePoolWithExistUser(): Unit = {
     val pubKey = "23B4A94D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D"
-    Await.result(dbDao.insertUser(UserDTO(pubKey, 0)), Duration.Inf)
+    Await.result(dbDao.insertUser(UserDto(pubKey, 0)), Duration.Inf)
     val insertedUser = Await.result(dbDao.getUser(HexUtils.valueOf(pubKey)), Duration.Inf)
-    val expectedPool = PoolDTO("myPool", insertedUser.get.id.get, "")
+    val expectedPool = PoolDto("myPool", insertedUser.get.id.get, "")
     Await.result(dbDao.insertPool(expectedPool), Duration.Inf)
     val actualPool =Await.result(dbDao.getPools(insertedUser.get.id.get), Duration.Inf)
     assertEquals(1, actualPool.size)
@@ -62,9 +62,9 @@ class DatabaseDaoTest extends AssertionsForJUnit {
 
   @Test def verifyDeletePoolNotDeletingUserWithNoPool(): Unit = {
     val pubKey = "33B4A94D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D"
-    Await.result(dbDao.insertUser(UserDTO(pubKey, 0)), Duration.Inf)
+    Await.result(dbDao.insertUser(UserDto(pubKey, 0)), Duration.Inf)
     val insertedUser = Await.result(dbDao.getUser(HexUtils.valueOf(pubKey)), Duration.Inf)
-    Await.result(dbDao.insertPool(PoolDTO("myPool", insertedUser.get.id.get, "")), Duration.Inf)
+    Await.result(dbDao.insertPool(PoolDto("myPool", insertedUser.get.id.get, "")), Duration.Inf)
     val existingPools = Await.result(dbDao.getPools(insertedUser.get.id.get), Duration.Inf)
     assertEquals(1, existingPools.size)
     assertEquals("myPool", existingPools(0).name)
@@ -76,12 +76,12 @@ class DatabaseDaoTest extends AssertionsForJUnit {
 
   @Test def verifyAccountOperationInsertionAndUpdate(): Unit = {
     val pubKey = "13B2394D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D"
-    Await.result(dbDao.insertUser(UserDTO(pubKey, 0)), Duration.Inf)
+    Await.result(dbDao.insertUser(UserDto(pubKey, 0)), Duration.Inf)
     val insertedUser = Await.result(dbDao.getUser(HexUtils.valueOf(pubKey)), Duration.Inf)
-    Await.result(dbDao.insertPool(PoolDTO("accountPool", insertedUser.get.id.get, "")), Duration.Inf)
+    Await.result(dbDao.insertPool(PoolDto("accountPool", insertedUser.get.id.get, "")), Duration.Inf)
     val insertedPool = (Await.result(dbDao.getPool(insertedUser.get.id.get, "accountPool"), Duration.Inf))
     Await.result(dbDao.insertOperation(
-      OperationDTO(insertedUser.get.id.get, insertedPool.get.id.get, "myWallet", 1, "opUid0", 0, 20, Option("opUid20"))), Duration.Inf)
+      OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, "myWallet", 1, "opUid0", 0, 20, Option("opUid20"))), Duration.Inf)
     val accountOp = Await.result(dbDao.getFirstAccountOperation(Option("opUid20"), insertedUser.get.id.get, insertedPool.get.id.get, "myWallet", 1), Duration.Inf)
     assertFalse("account operation should be inserted", accountOp.isEmpty)
     Await.result(dbDao.updateOperation(accountOp.get.id.get, "opUid20", 20, 21, Option("opUid41")), Duration.Inf)
@@ -98,12 +98,12 @@ class DatabaseDaoTest extends AssertionsForJUnit {
 
   @Test def verifyAccountOperationWithNextUIdNone(): Unit = {
     val pubKey = "0212394D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D"
-    Await.result(dbDao.insertUser(UserDTO(pubKey, 0)), Duration.Inf)
+    Await.result(dbDao.insertUser(UserDto(pubKey, 0)), Duration.Inf)
     val insertedUser = Await.result(dbDao.getUser(HexUtils.valueOf(pubKey)), Duration.Inf)
-    Await.result(dbDao.insertPool(PoolDTO("accountPool", insertedUser.get.id.get, "")), Duration.Inf)
+    Await.result(dbDao.insertPool(PoolDto("accountPool", insertedUser.get.id.get, "")), Duration.Inf)
     val insertedPool = (Await.result(dbDao.getPool(insertedUser.get.id.get, "accountPool"), Duration.Inf))
     Await.result(dbDao.insertOperation(
-      OperationDTO(insertedUser.get.id.get, insertedPool.get.id.get, "myWallet", 1, "opUid0", 0, 20, None)), Duration.Inf)
+      OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, "myWallet", 1, "opUid0", 0, 20, None)), Duration.Inf)
     val accountOp = Await.result(dbDao.getFirstAccountOperation(None, insertedUser.get.id.get, insertedPool.get.id.get, "myWallet", 1), Duration.Inf)
     assertFalse("account operation should be inserted", accountOp.isEmpty)
     assertTrue("next uid should be null", accountOp.get.nextOpUId.isEmpty)
