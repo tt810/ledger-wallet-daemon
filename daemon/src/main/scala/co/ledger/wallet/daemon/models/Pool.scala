@@ -7,7 +7,8 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import scala.concurrent.{ExecutionContext, Future}
 
 object Pool {
-  def newInstance(pool: core.WalletPool)(implicit ec: ExecutionContext): Future[WalletPoolView] =
+
+  def newView(pool: core.WalletPool)(implicit ec: ExecutionContext): Future[WalletPoolView] =
     pool.getWalletCount().map(WalletPoolView(pool.getName, _))
 
 }

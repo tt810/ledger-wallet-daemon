@@ -1,8 +1,10 @@
 package co.ledger.wallet.daemon.models
 
 import co.ledger.core
-import co.ledger.wallet.daemon.models.coins.{Bitcoin, NetworkParamsView}
+import co.ledger.wallet.daemon.models.coins.Coin.NetworkParamsView
+import co.ledger.wallet.daemon.models.coins.Bitcoin
 import com.fasterxml.jackson.annotation.JsonProperty
+
 import scala.collection.JavaConverters._
 
 object Currency {
@@ -25,7 +27,7 @@ object Currency {
     UnitView(coreUnit.getName, coreUnit.getSymbol, coreUnit.getCode, coreUnit.getNumberOfDecimal)
 
   private def newNetworkParamsView(coreCurrency: core.Currency, currencyFamily: CurrencyFamily): NetworkParamsView = currencyFamily match {
-    case CurrencyFamily.BITCOIN => Bitcoin.getNetworkParamsView(coreCurrency)
+    case CurrencyFamily.BITCOIN => Bitcoin.newNetworkParamsView(coreCurrency.getBitcoinLikeNetworkParameters)
     case _ => ???
   }
 

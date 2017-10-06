@@ -1,37 +1,18 @@
 package co.ledger.wallet.daemon.models.coins
 
-import co.ledger.core
-import co.ledger.wallet.daemon.models.CurrencyFamily
 
+object Coin {
 
-trait Coin {
+  trait NetworkParamsView
 
-  val currencyFamily: CurrencyFamily
+  trait TransactionView
 
-  def getNetworkParamsView(from: core.Currency): NetworkParamsView
+  trait BlockView
 
-//  def transactionView: TransactionView
+  trait InputView
 
-
-//  def getBlock
-//
-//  def getTransaction
-//
-//  def getInput
-//
-//  def getOutput
-
-
+  trait OutputView
 }
 
-trait NetworkParamsView
-
-trait TransactionView
-
-trait BlockView
-
-trait InputView
-
-trait OutputView
 
 
