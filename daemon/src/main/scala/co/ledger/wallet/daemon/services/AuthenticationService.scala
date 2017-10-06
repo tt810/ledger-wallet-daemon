@@ -5,7 +5,7 @@ import java.util.Date
 import javax.inject.{Inject, Singleton}
 
 import co.ledger.wallet.daemon.DaemonConfiguration
-import co.ledger.wallet.daemon.database.{DaemonCache, UserDTO}
+import co.ledger.wallet.daemon.database.{DaemonCache, UserDto}
 import co.ledger.wallet.daemon.services.AuthenticationService.{AuthenticationFailedException, AuthentifiedUserContext}
 import com.twitter.finagle.http.Request
 import com.twitter.util.Future
@@ -64,14 +64,14 @@ object AuthenticationService {
     }
   }
 
-  case class AuthentifiedUser(get: UserDTO)
+  case class AuthentifiedUser(get: UserDto)
   object AuthentifiedUserContext {
     private val UserField = Request.Schema.newField[AuthentifiedUser]()
 
     implicit class UserContextSyntax(val request: Request) extends AnyVal {
       def user: AuthentifiedUser = request.ctx(UserField)
     }
-    def setUser(request: Request, user: UserDTO): Unit = request.ctx.update[AuthentifiedUser](UserField, AuthentifiedUser(user))
+    def setUser(request: Request, user: UserDto): Unit = request.ctx.update[AuthentifiedUser](UserField, AuthentifiedUser(user))
   }
 
 }

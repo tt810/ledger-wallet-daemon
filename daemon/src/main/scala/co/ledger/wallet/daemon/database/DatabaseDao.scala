@@ -57,7 +57,7 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     }
   }
 
-  def getPools(userId: Long)(implicit ec: ExecutionContext): Future[Seq[PoolDTO]] = {
+  def getPools(userId: Long)(implicit ec: ExecutionContext): Future[Seq[PoolDto]] = {
     val query = pools.filter(pool => pool.userId === userId.bind).sortBy(_.id.desc)
     safeRun(query.result).map { rows =>
       debug(LogMsgMaker.newInstance("Daemon wallet pools retrieved")
@@ -69,7 +69,7 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     }
   }
 
-  def getPool(userId: Long, poolName: String)(implicit ec: ExecutionContext): Future[Option[PoolDTO]] = {
+  def getPool(userId: Long, poolName: String)(implicit ec: ExecutionContext): Future[Option[PoolDto]] = {
     val query = pools.filter(pool => pool.userId === userId && pool.name === poolName).result.headOption
     safeRun(query).map { row =>
       debug(LogMsgMaker.newInstance("Daemon wallet pool retrieved")
@@ -81,11 +81,11 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     }
   }
 
-  def getUser(targetPubKey: Array[Byte])(implicit ec: ExecutionContext): Future[Option[UserDTO]] = {
+  def getUser(targetPubKey: Array[Byte])(implicit ec: ExecutionContext): Future[Option[UserDto]] = {
     getUser(HexUtils.valueOf(targetPubKey))
   }
 
-  def getUser(pubKey: String)(implicit ec: ExecutionContext): Future[Option[UserDTO]] = {
+  def getUser(pubKey: String)(implicit ec: ExecutionContext): Future[Option[UserDto]] = {
     safeRun(filterUser(pubKey).result).map { rows =>
       debug(LogMsgMaker.newInstance("Daemon user retrieved")
         .append("pub_key", pubKey)
@@ -97,7 +97,7 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     }
   }
 
-  def getUsers()(implicit ec: ExecutionContext): Future[Seq[UserDTO]] = {
+  def getUsers()(implicit ec: ExecutionContext): Future[Seq[UserDto]] = {
     val query = users.result
     safeRun(query).map { rows =>
       debug(LogMsgMaker.newInstance("Daemon users retrieved")
@@ -108,7 +108,7 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     }
   }
 
-  def getFirstAccountOperation(nextOpUId: Option[String], userId: Long, poolId: Long, walletName: String, accountIndex: Int)(implicit ec: ExecutionContext): Future[Option[OperationDTO]] = {
+  def getFirstAccountOperation(nextOpUId: Option[String], userId: Long, poolId: Long, walletName: String, accountIndex: Int)(implicit ec: ExecutionContext): Future[Option[OperationDto]] = {
     val query = operations.filter { op =>
       op.userId === userId && op.poolId === poolId && op.walletName === walletName && op.accountIndex === accountIndex &&
         ((op.nextOpUId.isDefined && nextOpUId.isDefined && op.nextOpUId === nextOpUId) || (op.nextOpUId.isEmpty && nextOpUId.isEmpty))
@@ -127,7 +127,7 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     }
   }
 
-  def insertOperation(operation: OperationDTO)(implicit ec: ExecutionContext): Future[Int] = {
+  def insertOperation(operation: OperationDto)(implicit ec: ExecutionContext): Future[Int] = {
     val query = operations += createOperationRow(operation)
     safeRun(query).map { int =>
       debug(LogMsgMaker.newInstance("Daemon operation inserted")
@@ -156,7 +156,7 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     }
   }
 
-  def insertPool(newPool: PoolDTO)(implicit ec: ExecutionContext): Future[Int] = {
+  def insertPool(newPool: PoolDto)(implicit ec: ExecutionContext): Future[Int] = {
     val query = filterPool(newPool.name, newPool.userId).exists.result.flatMap { exists =>
       if (!exists) {
         pools += createPoolRow(newPool)
@@ -173,7 +173,7 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     }
   }
 
-  def insertUser(newUser: UserDTO)(implicit ec: ExecutionContext): Future[Int] = {
+  def insertUser(newUser: UserDto)(implicit ec: ExecutionContext): Future[Int] = {
     val query = filterUser(newUser.pubKey).exists.result.flatMap {(exists) =>
       if (!exists) {
         users += createUserRow(newUser)
@@ -197,26 +197,26 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     }
   }
 
-  private def createOperationRow(operation: OperationDTO): OperationRow = {
+  private def createOperationRow(operation: OperationDto): OperationRow = {
     val currentTime = new Timestamp(new Date().getTime)
     OperationRow(0, operation.userId, operation.poolId, operation.walletName, operation.accountIndex, operation.opUId, operation.offset, operation.batch, operation.nextOpUId, currentTime, currentTime)
   }
 
-  private def createOperation(opRow: OperationRow): OperationDTO = {
-    OperationDTO(opRow.userId, opRow.poolId, opRow.walletName, opRow.accountIndex, opRow.opUId, opRow.offset, opRow.batch, opRow.nextOpUId, Option(opRow.id))
+  private def createOperation(opRow: OperationRow): OperationDto = {
+    OperationDto(opRow.userId, opRow.poolId, opRow.walletName, opRow.accountIndex, opRow.opUId, opRow.offset, opRow.batch, opRow.nextOpUId, Option(opRow.id))
   }
 
-  private def createPoolRow(pool: PoolDTO): PoolRow =
+  private def createPoolRow(pool: PoolDto): PoolRow =
     PoolRow(0, pool.name, pool.userId, new Timestamp(new Date().getTime), pool.configuration, pool.dbBackend, pool.dbConnectString)
 
-  private def createPool(poolRow: PoolRow): PoolDTO =
-    PoolDTO(poolRow.name, poolRow.userId, poolRow.configuration, Option(poolRow.id), poolRow.dbBackend, poolRow.dbConnectString)
+  private def createPool(poolRow: PoolRow): PoolDto =
+    PoolDto(poolRow.name, poolRow.userId, poolRow.configuration, Option(poolRow.id), poolRow.dbBackend, poolRow.dbConnectString)
 
-  private def createUserRow(user: UserDTO): UserRow =
+  private def createUserRow(user: UserDto): UserRow =
     UserRow(0, user.pubKey, user.permissions)
 
-  private def createUser(userRow: UserRow): UserDTO =
-    UserDTO(userRow.pubKey, userRow.permissions, Option(userRow.id))
+  private def createUser(userRow: UserRow): UserDto =
+    UserDto(userRow.pubKey, userRow.permissions, Option(userRow.id))
 
   private def insertDatabaseVersion(version: Int): DBIO[Int] =
     databaseVersions += (0, new Timestamp(new Date().getTime))
@@ -231,6 +231,6 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
 
 }
 
-case class UserDTO(pubKey: String, permissions: Long, id: Option[Long] = None)
-case class PoolDTO(name: String, userId: Long, configuration: String, id: Option[Long] = None, dbBackend: String = "", dbConnectString: String = "")
-case class OperationDTO(userId: Long, poolId: Long, walletName: String, accountIndex: Int, opUId: String, offset: Long, batch: Int, nextOpUId: Option[String], id: Option[Long] = None)
+case class UserDto(pubKey: String, permissions: Long, id: Option[Long] = None)
+case class PoolDto(name: String, userId: Long, configuration: String, id: Option[Long] = None, dbBackend: String = "", dbConnectString: String = "")
+case class OperationDto(userId: Long, poolId: Long, walletName: String, accountIndex: Int, opUId: String, offset: Long, batch: Int, nextOpUId: Option[String], id: Option[Long] = None)

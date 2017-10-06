@@ -3,14 +3,14 @@ package co.ledger.wallet.daemon.services
 import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.Future
-import co.ledger.wallet.daemon.database.{DaemonCache, UserDTO}
+import co.ledger.wallet.daemon.database.{DaemonCache, UserDto}
 import co.ledger.wallet.daemon.models.WalletPoolView
 
 @Singleton
 class PoolsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
   import PoolsService._
 
-  def createPool(user: UserDTO, poolName: String, configuration: PoolConfiguration): Future[WalletPoolView] = {
+  def createPool(user: UserDto, poolName: String, configuration: PoolConfiguration): Future[WalletPoolView] = {
     info(LogMsgMaker.newInstance("Create wallet pool with params")
       .append("pool_name", poolName)
       .append("configuration", configuration)
@@ -19,14 +19,14 @@ class PoolsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
     daemonCache.createWalletPool(user, poolName, configuration.toString)
   }
 
-  def pools(user: UserDTO): Future[Seq[WalletPoolView]] = {
+  def pools(user: UserDto): Future[Seq[WalletPoolView]] = {
     info(LogMsgMaker.newInstance("Obtain wallet pools with params")
       .append("user_pub_key", user.pubKey)
       .toString())
     daemonCache.getWalletPools(user.pubKey)
   }
 
-  def pool(user: UserDTO, poolName: String): Future[WalletPoolView] = {
+  def pool(user: UserDto, poolName: String): Future[WalletPoolView] = {
     info(LogMsgMaker.newInstance("Obtain wallet pool with params")
       .append("pool_name", poolName)
       .append("user_pub_key", user.pubKey)
@@ -34,7 +34,7 @@ class PoolsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
     daemonCache.getWalletPool(user.pubKey, poolName)
   }
 
-  def removePool(user: UserDTO, poolName: String): Future[Unit] = {
+  def removePool(user: UserDto, poolName: String): Future[Unit] = {
     info(LogMsgMaker.newInstance("Remove wallet pool with params")
       .append("pool_name", poolName)
       .append("user_pub_key", user.pubKey)
