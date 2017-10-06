@@ -110,28 +110,12 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
 
   def getFirstAccountOperation(nextOpUId: Option[String], userId: Long, poolId: Long, walletName: String, accountIndex: Int)(implicit ec: ExecutionContext): Future[Option[OperationDTO]] = {
     val query = operations.filter { op =>
-      op.nextOpUId === nextOpUId && op.userId === userId && op.poolId === poolId && op.walletName === walletName && op.accountIndex === accountIndex
+      op.userId === userId && op.poolId === poolId && op.walletName === walletName && op.accountIndex === accountIndex &&
+        ((op.nextOpUId.isDefined && nextOpUId.isDefined && op.nextOpUId === nextOpUId) || (op.nextOpUId.isEmpty && nextOpUId.isEmpty))
     }.sortBy(_.id).result
     safeRun(query).map { ops =>
       debug(LogMsgMaker.newInstance("Daemon account operation retrieved")
         .append("next_op_uid", nextOpUId)
-        .append("user_id", userId)
-        .append("pool_id", poolId)
-        .append("wallet_name", walletName)
-        .append("account_index", accountIndex)
-        .append("result_row", ops.size)
-        .append("result", ops.map(_.id))
-        .toString())
-      ops.headOption.map(createOperation(_))
-    }
-  }
-
-  def getLastAccountOperation(userId: Long, poolId: Long, walletName: String, accountIndex: Int)(implicit ec: ExecutionContext): Future[Option[OperationDTO]] = {
-    val query = operations.filter { op =>
-      op.userId === userId && op.poolId === poolId && op.walletName === walletName && op.accountIndex === accountIndex
-    }.sortBy(_.id.desc).result
-    safeRun(query).map { ops =>
-      debug(LogMsgMaker.newInstance("Daemon account operation retrieved")
         .append("user_id", userId)
         .append("pool_id", poolId)
         .append("wallet_name", walletName)

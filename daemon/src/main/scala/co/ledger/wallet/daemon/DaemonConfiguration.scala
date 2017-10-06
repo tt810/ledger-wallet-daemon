@@ -1,5 +1,7 @@
 package co.ledger.wallet.daemon
 
+import java.util.Locale
+
 import com.typesafe.config.ConfigFactory
 import org.spongycastle.util.encoders.Base64
 import slick.jdbc.JdbcProfile
@@ -28,7 +30,7 @@ object DaemonConfiguration {
     var users = new ListBuffer[(String, Long)]()
     for (i <- 0 until usersConfig.size()) {
       val userConfig = usersConfig.get(i)
-      val pubKey = userConfig.getString("key")
+      val pubKey = userConfig.getString("key").toUpperCase(Locale.US)
       val permissions = if (Try(userConfig.getBoolean("account_creation")).getOrElse(false)) PERMISSION_CREATE_USER else 0
       users += ((pubKey, permissions))
     }

@@ -80,7 +80,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
 
   def createWalletPool(user: UserDTO, poolName: String, configuration: String): Future[WalletPoolView] = {
     implicit val ec = _writeContext
-    createPool(user, poolName, configuration).flatMap(corePool => Pool.newInstance(corePool))
+    createPool(user, poolName, configuration).flatMap(corePool => Pool.newView(corePool))
   }
 
   def createWallet(walletName: String, currencyName: String, poolName: String, user: UserDTO): Future[WalletView] = {
@@ -166,7 +166,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     }
   }
 
-  def getCoreAccountOperations(accountIndex: Int, batch: Int, walletName: String, poolName: String, user: UserDTO, fullOp: Int): Future[Seq[core.Operation]] = {
+  def getAccountOperations(accountIndex: Int, batch: Int, walletName: String, poolName: String, user: UserDTO, fullOp: Int): Future[PackedOperationsView] = {
     info(LogMsgMaker.newInstance("Retrieving account operations")
       .append("account_index", accountIndex)
       .append("batch", batch)
@@ -175,21 +175,20 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
       .append("user", user)
       .toString())
     getCoreAccount(accountIndex, user.pubKey, poolName, walletName).flatMap { coreAccountWallet =>
-      debug(LogMsgMaker.newInstance("Retrieved wallet and account")
-        .append("result", coreAccountWallet))
       val coreAccount = coreAccountWallet._1
+      val currencyName = coreAccountWallet._2.getCurrency.getName
       val offset = 0
       (if (fullOp > 0)
         coreAccount.queryOperations().offset(0).limit(batch + 1).complete().execute()
       else
         coreAccount.queryOperations().offset(0).limit(batch + 1).partial().execute()
       ).flatMap { operations =>
+        val size = operations.size()
         debug(LogMsgMaker.newInstance("Retrieved account operations")
           .append("offset", 0)
           .append("batch_size", batch)
-          .append("result_size", operations.size())
+          .append("result_size", size)
           .toString)
-        val size = operations.size()
         if(size > 0) {
           val uid = operations.get(0).getUid
           val realBatch = if (size == batch + 1) batch else size
@@ -208,12 +207,15 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
               case Some(p) => {
                 val operation = OperationDTO(user.id.get, p.id.get, walletName, accountIndex, uid, offset, realBatch, nextUid)
                 dbDao.insertOperation(operation).map { int =>
-                  operations.asScala.toSeq.take(realBatch)
+                  PackedOperationsView(
+                    None,
+                    nextUid,
+                    operations.asScala.toSeq.take(realBatch).map(Operation.newView(_, currencyName, walletName, accountIndex)))
                 }
               }
             }
           }
-        } else Future.successful(List[core.Operation]())
+        } else Future.successful(PackedOperationsView(None, None, List[OperationView]()))
       }
     }
   }
@@ -250,12 +252,12 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
 //  }
 
   def getWalletPool(pubKey: String, poolName: String): Future[WalletPoolView] = {
-    getPool(pubKey, poolName).flatMap(Pool.newInstance(_))
+    getPool(pubKey, poolName).flatMap(Pool.newView(_))
   }
 
   def getWalletPools(pubKey: String): Future[Seq[WalletPoolView]] = {
     getPools(pubKey).flatMap { pools =>
-      Future.sequence(pools.map(corePool => Pool.newInstance(corePool)))
+      Future.sequence(pools.map(corePool => Pool.newView(corePool)))
     }
   }
 

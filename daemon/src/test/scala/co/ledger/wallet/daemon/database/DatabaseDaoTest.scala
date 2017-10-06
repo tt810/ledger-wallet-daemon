@@ -96,6 +96,19 @@ class DatabaseDaoTest extends AssertionsForJUnit {
     assertTrue("Should not have row in database with nextUid null", lastOps.isEmpty)
   }
 
+  @Test def verifyAccountOperationWithNextUIdNone(): Unit = {
+    val pubKey = "0212394D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D"
+    Await.result(dbDao.insertUser(UserDTO(pubKey, 0)), Duration.Inf)
+    val insertedUser = Await.result(dbDao.getUser(HexUtils.valueOf(pubKey)), Duration.Inf)
+    Await.result(dbDao.insertPool(PoolDTO("accountPool", insertedUser.get.id.get, "")), Duration.Inf)
+    val insertedPool = (Await.result(dbDao.getPool(insertedUser.get.id.get, "accountPool"), Duration.Inf))
+    Await.result(dbDao.insertOperation(
+      OperationDTO(insertedUser.get.id.get, insertedPool.get.id.get, "myWallet", 1, "opUid0", 0, 20, None)), Duration.Inf)
+    val accountOp = Await.result(dbDao.getFirstAccountOperation(None, insertedUser.get.id.get, insertedPool.get.id.get, "myWallet", 1), Duration.Inf)
+    assertFalse("account operation should be inserted", accountOp.isEmpty)
+    assertTrue("next uid should be null", accountOp.get.nextOpUId.isEmpty)
+  }
+
 }
 
 object DatabaseDaoTest extends Logging {
