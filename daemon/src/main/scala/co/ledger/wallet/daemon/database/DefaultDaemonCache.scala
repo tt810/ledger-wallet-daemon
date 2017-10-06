@@ -4,7 +4,7 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Singleton
 
 import co.ledger.core
-import co.ledger.core.{AccountCreationInfo, OperationQuery, implicits}
+import co.ledger.core.{AccountCreationInfo, implicits}
 import co.ledger.wallet.daemon.libledger_core.async.ScalaThreadDispatcher
 import co.ledger.wallet.daemon.libledger_core.crypto.SecureRandomRNG
 import co.ledger.wallet.daemon.libledger_core.debug.NoOpLogPrinter
@@ -37,7 +37,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
   import DefaultDaemonCache._
   private val _writeContext = SerialExecutionContext.Implicits.global
 
-  def createAccount(accountDerivations: AccountDerivation, user: User, poolName: String, walletName: String): Future[models.Account] = {
+  def createAccount(accountDerivations: AccountDerivationView, user: User, poolName: String, walletName: String): Future[models.AccountView] = {
     info(LogMsgMaker.newInstance("Creating account")
       .append("derivations", accountDerivations)
       .append("wallet_name", walletName)
@@ -78,12 +78,12 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     }
   }
 
-  def createWalletPool(user: User, poolName: String, configuration: String): Future[WalletPool] = {
+  def createWalletPool(user: User, poolName: String, configuration: String): Future[WalletPoolView] = {
     implicit val ec = _writeContext
     createPool(user, poolName, configuration).flatMap(corePool => models.newInstance(corePool))
   }
 
-  def createWallet(walletName: String, currencyName: String, poolName: String, user: User): Future[Wallet] = {
+  def createWallet(walletName: String, currencyName: String, poolName: String, user: User): Future[WalletView] = {
     createCoreWallet(walletName, currencyName, poolName, user).flatMap { coreWallet =>
       models.newInstance(coreWallet)
     }
@@ -117,13 +117,13 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     }
   }
 
-  def getAccount(accountIndex: Int, pubKey: String, poolName: String, walletName: String): Future[models.Account] = {
+  def getAccount(accountIndex: Int, pubKey: String, poolName: String, walletName: String): Future[models.AccountView] = {
     getCoreAccount(accountIndex, pubKey, poolName, walletName). flatMap { coreAccountWallet =>
       models.newInstance(coreAccountWallet._1, coreAccountWallet._2)
     }
   }
 
-  def getAccounts(pubKey: String, poolName: String, walletName: String): Future[Seq[models.Account]] = {
+  def getAccounts(pubKey: String, poolName: String, walletName: String): Future[Seq[models.AccountView]] = {
     getCoreWallet(walletName, poolName, pubKey).flatMap { wallet =>
       debug(LogMsgMaker.newInstance("Retrieved wallet")
         .append("wallet_name", walletName)
@@ -139,17 +139,17 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     }
   }
 
-  def getCurrency(currencyName: String, poolName: String): Future[Currency] =
+  def getCurrency(currencyName: String, poolName: String): Future[CurrencyView] =
     getCoreCurrency(currencyName, poolName).map(models.newInstance(_))
 
 
-  def getCurrencies(poolName: String): Future[Seq[Currency]] = {
+  def getCurrencies(poolName: String): Future[Seq[CurrencyView]] = {
     getCoreCurrencies(poolName).map { currencies =>
       for(currency <- currencies) yield models.newInstance(currency)
     }
   }
 
-  def getNextAccountCreationInfo(pubKey: String, poolName: String, walletName: String, accountIndex: Option[Int]): Future[AccountDerivation] = {
+  def getNextAccountCreationInfo(pubKey: String, poolName: String, walletName: String, accountIndex: Option[Int]): Future[AccountDerivationView] = {
     info(LogMsgMaker.newInstance("Retrieving next account creation info")
       .append("account_index", accountIndex)
       .append("wallet_name", walletName)
@@ -204,7 +204,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
             .toString())
           dbDao.getPool(user.id.get, poolName).flatMap { pool =>
             pool match {
-              case None => throw new WalletPoolNotFoundException(s"Wallet pool doesn't exist")
+              case None => throw new WalletPoolNotFoundException("Wallet pool doesn't exist")
               case Some(p) => {
                 val operation = Operation(user.id.get, p.id.get, walletName, accountIndex, uid, offset, realBatch, nextUid)
                 dbDao.insertOperation(operation).map { int =>
@@ -249,17 +249,17 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
 //    }
 //  }
 
-  def getWalletPool(pubKey: String, poolName: String): Future[WalletPool] = {
+  def getWalletPool(pubKey: String, poolName: String): Future[WalletPoolView] = {
     getPool(pubKey, poolName).flatMap(models.newInstance(_))
   }
 
-  def getWalletPools(pubKey: String): Future[Seq[WalletPool]] = {
+  def getWalletPools(pubKey: String): Future[Seq[WalletPoolView]] = {
     getPools(pubKey).flatMap { pools =>
       Future.sequence(pools.map(corePool => models.newInstance(corePool)))
     }
   }
 
-  def getWallets(walletBulk: Bulk, poolName: String, pubKey: String): Future[WalletsWithCount] = {
+  def getWallets(walletBulk: Bulk, poolName: String, pubKey: String): Future[WalletsViewWithCount] = {
     getPool(pubKey, poolName).flatMap { corePool =>
       corePool.getWalletCount().flatMap { count =>
         debug(LogMsgMaker.newInstance("Retrieved total wallets count")
@@ -277,13 +277,13 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
             .append("user_pub_key", pubKey)
             .append("result_size", wallets.size())
             .toString())
-          Future.sequence(wallets.asScala.toSeq.map(models.newInstance(_))).map (WalletsWithCount(count, _))
+          Future.sequence(wallets.asScala.toSeq.map(models.newInstance(_))).map (WalletsViewWithCount(count, _))
         }
       }
     }
   }
 
-  def getWallet(walletName: String, poolName: String, pubKey: String): Future[Wallet] = {
+  def getWallet(walletName: String, poolName: String, pubKey: String): Future[WalletView] = {
     getCoreWallet(walletName, poolName, pubKey).flatMap(models.newInstance(_))
   }
 

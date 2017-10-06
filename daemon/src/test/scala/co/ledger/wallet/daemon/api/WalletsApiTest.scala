@@ -1,7 +1,7 @@
 package co.ledger.wallet.daemon.api
 
 import co.ledger.wallet.daemon.controllers.responses.{ErrorCode, ErrorResponseBody}
-import co.ledger.wallet.daemon.models.{Wallet, WalletsWithCount}
+import co.ledger.wallet.daemon.models.{WalletView, WalletsViewWithCount}
 import co.ledger.wallet.daemon.utils.APIFeatureTest
 import com.twitter.finagle.http.{Response, Status}
 
@@ -42,14 +42,14 @@ class WalletsApiTest extends APIFeatureTest {
     val wallet3 = walletFromResponse(assertWalletCreation("multi_pool", "wallet_3", "bitcoin", Status.Ok))
     val getW = walletsFromResponse(assertGetWallets("multi_pool", 1, 2, Status.Ok))
     assert(3 === getW.count)
-    assert(WalletsWithCount(3, List(wallet2, wallet3)) === getW)
+    assert(WalletsViewWithCount(3, List(wallet2, wallet3)) === getW)
     deletePool("multi_pool")
   }
 
   test("WalletsApi#Get no wallets from existing pool") {
     createPool("empty_pool")
     val result = assertGetWallets("empty_pool", 0, 2, Status.Ok)
-    assert(WalletsWithCount(0, Array[Wallet]()) === walletsFromResponse(result))
+    assert(WalletsViewWithCount(0, Array[WalletView]()) === walletsFromResponse(result))
   }
 
   test("WalletsApi#Get/Post wallet(s) from non existing pool") {
@@ -74,8 +74,8 @@ class WalletsApiTest extends APIFeatureTest {
     deletePool(WALLET_POOL)
   }
 
-  private def walletFromResponse(response: Response): Wallet = parse[Wallet](response)
-  private def walletsFromResponse(response: Response): WalletsWithCount = parse[WalletsWithCount](response)
+  private def walletFromResponse(response: Response): WalletView = parse[WalletView](response)
+  private def walletsFromResponse(response: Response): WalletsViewWithCount = parse[WalletsViewWithCount](response)
 
   private val WALLET_POOL = "wallet_pool"
 

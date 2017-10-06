@@ -5,7 +5,7 @@ import javax.inject.{Inject, Singleton}
 import co.ledger.core.{Account, BitcoinLikeNextAccountInfo}
 import co.ledger.wallet.daemon.database.{DaemonCache, User}
 import co.ledger.wallet.daemon.models
-import co.ledger.wallet.daemon.models.AccountDerivation
+import co.ledger.wallet.daemon.models.AccountDerivationView
 
 import scala.concurrent.Future
 
@@ -14,7 +14,7 @@ class AccountsService @Inject()(defaultDaemonCache: DaemonCache) extends DaemonS
 
   import AccountsService._
 
-  def accounts(user: User, poolName: String, walletName: String): Future[Seq[models.Account]] = {
+  def accounts(user: User, poolName: String, walletName: String): Future[Seq[models.AccountView]] = {
     info(LogMsgMaker.newInstance("Obtain accounts with params")
       .append("pool_name", poolName)
       .append("wallet_name", walletName)
@@ -23,7 +23,7 @@ class AccountsService @Inject()(defaultDaemonCache: DaemonCache) extends DaemonS
     defaultDaemonCache.getAccounts(user.pubKey, poolName, walletName)
   }
 
-  def account(accountIndex: Int, user: User, poolName: String, walletName: String): Future[models.Account] = {
+  def account(accountIndex: Int, user: User, poolName: String, walletName: String): Future[models.AccountView] = {
     info(LogMsgMaker.newInstance("Obtain account with params")
       .append("account_index", accountIndex)
       .append("pool_name", poolName)
@@ -33,7 +33,7 @@ class AccountsService @Inject()(defaultDaemonCache: DaemonCache) extends DaemonS
     defaultDaemonCache.getAccount(accountIndex, user.pubKey, poolName, walletName)
   }
 
-  def nextAccountCreationInfo(user: User, poolName: String, walletName: String, accountIndex: Option[Int]): Future[AccountDerivation] = {
+  def nextAccountCreationInfo(user: User, poolName: String, walletName: String, accountIndex: Option[Int]): Future[AccountDerivationView] = {
     info(LogMsgMaker.newInstance("Obtain next available account creation information")
       .append("account_index", accountIndex)
       .append("pool_name", poolName)
@@ -55,7 +55,7 @@ class AccountsService @Inject()(defaultDaemonCache: DaemonCache) extends DaemonS
 
   }
 
-  def createAccount(accountCreationBody: AccountDerivation, user: User, poolName: String, walletName: String): Future[models.Account] = {
+  def createAccount(accountCreationBody: AccountDerivationView, user: User, poolName: String, walletName: String): Future[models.AccountView] = {
     info(LogMsgMaker.newInstance("Create account with params")
       .append("account_derivations", accountCreationBody)
       .append("pool_name", poolName)

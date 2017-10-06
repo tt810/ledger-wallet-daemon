@@ -1,7 +1,7 @@
 package co.ledger.wallet.daemon.modules
 
 import com.fasterxml.jackson.databind.module.SimpleModule
-import co.ledger.wallet.daemon.models.{BitcoinLikeNetworkParams, Currency, CurrencyFamily, Wallet, CurrencyUnit => ModelUnit}
+import co.ledger.wallet.daemon.models.{BitcoinLikeNetworkParamsView, CurrencyView, CurrencyFamily, WalletView, UnitView => ModelUnit}
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.databind.{DeserializationContext, JsonDeserializer, JsonNode, ObjectMapper}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -10,34 +10,34 @@ import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import scala.collection.JavaConverters._
 
 class DaemonDeserializersModule extends SimpleModule {
-  addDeserializer(classOf[Currency], new Deserializers.CurrencyDeserializer)
-  addDeserializer(classOf[Wallet], new Deserializers.WalletDeserializer)
+  addDeserializer(classOf[CurrencyView], new Deserializers.CurrencyDeserializer)
+  addDeserializer(classOf[WalletView], new Deserializers.WalletDeserializer)
 }
 
 object Deserializers {
 
-  class WalletDeserializer extends JsonDeserializer[Wallet] {
+  class WalletDeserializer extends JsonDeserializer[WalletView] {
 
-    override def deserialize(jp: JsonParser, ctxt: DeserializationContext): Wallet = {
+    override def deserialize(jp: JsonParser, ctxt: DeserializationContext): WalletView = {
       val node: JsonNode = jp.getCodec.readTree(jp)
       val name = node.get("name").asText()
       val accountCount = node.get("account_count").asInt()
       val balance = node.get("balance").asLong()
       val configuration = mapper.readValue[Map[String, Any]](node.get("configuration").toString, classOf[Map[String, Any]])
-      val currency = mapper.readValue[Currency](node.get("currency").toString, classOf[Currency])
-      Wallet(name, accountCount, balance, currency, configuration)
+      val currency = mapper.readValue[CurrencyView](node.get("currency").toString, classOf[CurrencyView])
+      WalletView(name, accountCount, balance, currency, configuration)
     }
 
     private val mapper: ObjectMapper = new ObjectMapper() with ScalaObjectMapper
     private val module = new SimpleModule()
-    module.addDeserializer(classOf[Currency], new CurrencyDeserializer)
+    module.addDeserializer(classOf[CurrencyView], new CurrencyDeserializer)
     mapper.registerModule(module)
     mapper.registerModule(DefaultScalaModule)
   }
 
-  class CurrencyDeserializer extends JsonDeserializer[Currency] {
+  class CurrencyDeserializer extends JsonDeserializer[CurrencyView] {
 
-    override def deserialize(jp: JsonParser, ctxt: DeserializationContext): Currency = {
+    override def deserialize(jp: JsonParser, ctxt: DeserializationContext): CurrencyView = {
       val node: JsonNode = jp.getCodec.readTree(jp)
       val name = node.get("name").asText()
       val family = CurrencyFamily.valueOf(node.get("family").asText())
@@ -46,10 +46,10 @@ object Deserializers {
       val unitsIter = node.path("units").iterator().asScala
       val units = for (unit <- unitsIter) yield mapper.readValue[ModelUnit](unit.toString(), classOf[ModelUnit])
       val networkParams = family match {
-        case CurrencyFamily.BITCOIN => mapper.readValue[BitcoinLikeNetworkParams](node.get("network_params").toString(), classOf[BitcoinLikeNetworkParams])
+        case CurrencyFamily.BITCOIN => mapper.readValue[BitcoinLikeNetworkParamsView](node.get("network_params").toString(), classOf[BitcoinLikeNetworkParamsView])
         case _ => throw new NotImplementedError()
       }
-      Currency(name, family, bip44CoinType, paymentUriScheme, units.toList, networkParams)
+      CurrencyView(name, family, bip44CoinType, paymentUriScheme, units.toList, networkParams)
     }
 
     private val mapper: ObjectMapper = new ObjectMapper() with ScalaObjectMapper

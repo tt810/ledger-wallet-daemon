@@ -1,7 +1,7 @@
 package co.ledger.wallet.daemon.api
 
 import co.ledger.wallet.daemon.controllers.responses.{ErrorCode, ErrorResponseBody}
-import co.ledger.wallet.daemon.models.{BitcoinLikeNetworkParams, Currency, CurrencyFamily, CurrencyUnit => CurrencyUnit}
+import co.ledger.wallet.daemon.models.{BitcoinLikeNetworkParamsView, CurrencyFamily, CurrencyView, UnitView}
 import co.ledger.wallet.daemon.utils.APIFeatureTest
 import com.twitter.finagle.http.{Response, Status}
 
@@ -9,7 +9,7 @@ class CurrenciesApiTest extends APIFeatureTest {
 
   test("CurrenciesApi#Get currency with given pool name and currency name returns OK") {
     val response: Response = assertCurrency(CURRENCY_POOL, CURRENCY_BTC, Status.Ok)
-    val currency: Currency = parse[Currency](response)
+    val currency: CurrencyView = parse[CurrencyView](response)
     assert(currency == EXPECTED_BTC_CURRENCY)
   }
 
@@ -25,7 +25,7 @@ class CurrenciesApiTest extends APIFeatureTest {
 
   test("CurrenciesApi#Get currencies returns all") {
     val response: Response = assertCurrencies(CURRENCY_POOL, Status.Ok)
-    val currencies: List[Currency] = parse[List[Currency]](response)
+    val currencies: List[CurrencyView] = parse[List[CurrencyView]](response)
     assert(currencies == List(EXPECTED_BTC_CURRENCY))
   }
 
@@ -56,18 +56,18 @@ class CurrenciesApiTest extends APIFeatureTest {
   private val CURRENCY_BTC = "bitcoin"
   private val CURRENCY_NON_EXIST = "ethereum"
   private val CURRENCY_NON_EXIST_POOL = "non_exist_pool"
-  private val EXPECTED_BTC_CURRENCY = Currency(
+  private val EXPECTED_BTC_CURRENCY = CurrencyView(
     "bitcoin",
     CurrencyFamily.BITCOIN,
     0,
     "bitcoin",
     List(
-      CurrencyUnit("satoshi","satoshi","satoshi",0),
-      CurrencyUnit("bitcoin", "BTC", "BTC", 8),
-      CurrencyUnit("milli-bitcoin","mBTC", "mBTC", 5),
-      CurrencyUnit("micro-bitcoin", "μBTC", "μBTC", 2),
+      UnitView("satoshi","satoshi","satoshi",0),
+      UnitView("bitcoin", "BTC", "BTC", 8),
+      UnitView("milli-bitcoin","mBTC", "mBTC", 5),
+      UnitView("micro-bitcoin", "μBTC", "μBTC", 2),
       ),
-    BitcoinLikeNetworkParams("btc", "00", "05", "0488B21E", "PER_BYTE", 5430, "Bitcoin signed message:\n", false)
+    BitcoinLikeNetworkParamsView("btc", "00", "05", "0488B21E", "PER_BYTE", 5430, "Bitcoin signed message:\n", false)
   )
 
 }

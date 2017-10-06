@@ -126,10 +126,10 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     }
   }
 
-  def getFirstAccountOperation(userId: Long, poolId: Long, walletName: String, accountIndex: Int)(implicit ec: ExecutionContext): Future[Option[Operation]] = {
+  def getLastAccountOperation(userId: Long, poolId: Long, walletName: String, accountIndex: Int)(implicit ec: ExecutionContext): Future[Option[Operation]] = {
     val query = operations.filter { op =>
       op.userId === userId && op.poolId === poolId && op.walletName === walletName && op.accountIndex === accountIndex
-    }.sortBy(_.id).result
+    }.sortBy(_.id.desc).result
     safeRun(query).map { ops =>
       debug(LogMsgMaker.newInstance("Daemon account operation retrieved")
         .append("user_id", userId)

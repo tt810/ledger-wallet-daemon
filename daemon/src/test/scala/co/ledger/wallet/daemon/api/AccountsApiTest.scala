@@ -1,6 +1,6 @@
 package co.ledger.wallet.daemon.api
 
-import co.ledger.wallet.daemon.models.{Account, AccountDerivation}
+import co.ledger.wallet.daemon.models.{AccountView, AccountDerivationView}
 import co.ledger.wallet.daemon.utils.APIFeatureTest
 import com.twitter.finagle.http.{Response, Status}
 import org.scalatest.Ignore
@@ -11,8 +11,8 @@ class AccountsApiTest extends APIFeatureTest {
     createPool("account_pool")
     assertWalletCreation("account_pool", "account_wallet", "bitcoin", Status.Ok)
     val result = assertGetAccounts(None, "account_pool", "account_wallet", Status.Ok)
-    val expectedResponse = List[Account]()
-    assert(expectedResponse === parse[Seq[Account]](result))
+    val expectedResponse = List[AccountView]()
+    assert(expectedResponse === parse[Seq[AccountView]](result))
     deletePool("account_pool")
   }
 
@@ -26,10 +26,10 @@ class AccountsApiTest extends APIFeatureTest {
   test("AccountsApi#Get accounts same as get individual account") {
     createPool("list_pool")
     assertWalletCreation("list_pool", "account_wallet", "bitcoin", Status.Ok)
-    val expectedAccount = parse[Account](assertCreateAccount(CORRECT_BODY, "list_pool", "account_wallet", Status.Ok))
-    val actualAccount = parse[Account](assertGetAccounts(Option(0), "list_pool", "account_wallet", Status.Ok))
+    val expectedAccount = parse[AccountView](assertCreateAccount(CORRECT_BODY, "list_pool", "account_wallet", Status.Ok))
+    val actualAccount = parse[AccountView](assertGetAccounts(Option(0), "list_pool", "account_wallet", Status.Ok))
     assert(expectedAccount === actualAccount)
-    val actualAccountList = parse[Seq[Account]](assertGetAccounts(None, "list_pool", "account_wallet", Status.Ok))
+    val actualAccountList = parse[Seq[AccountView]](assertGetAccounts(None, "list_pool", "account_wallet", Status.Ok))
     assert(List(actualAccount) === actualAccountList)
     deletePool("list_pool")
   }
@@ -51,7 +51,7 @@ class AccountsApiTest extends APIFeatureTest {
   test("AccountsApi#Get next account creation info with index return Ok") {
     createPool("info_pool")
     assertWalletCreation("info_pool", "account_wallet", "bitcoin", Status.Ok)
-    val actualResult = parse[AccountDerivation](assertGetAccountCreationInfo("info_pool", "account_wallet", Option(0), Status.Ok))
+    val actualResult = parse[AccountDerivationView](assertGetAccountCreationInfo("info_pool", "account_wallet", Option(0), Status.Ok))
     assert(0 === actualResult.accountIndex)
     deletePool("info_pool")
   }
