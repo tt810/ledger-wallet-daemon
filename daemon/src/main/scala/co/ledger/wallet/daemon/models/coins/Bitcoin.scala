@@ -30,7 +30,7 @@ object Bitcoin {
   def newTransactionView(from: core.BitcoinLikeTransaction): TransactionView = {
     BitcoinTransactionView(
       newBlockView(from.getBlock),
-      0,//from.getFees.toLong,
+      if(from.getFees == null) None else Option(from.getFees.toLong),
       from.getHash,
       from.geTime(),
       from.getInputs.asScala.toSeq.map(newInputView(_)),
@@ -65,7 +65,7 @@ case class BitcoinNetworkParamsView(
 
 case class BitcoinTransactionView(
                                    @JsonProperty("block") block: BlockView,
-                                   @JsonProperty("fees") fees: Long,
+                                   @JsonProperty("fees") fees: Option[Long],
                                    @JsonProperty("hash") hash: String,
                                    @JsonProperty("time") time: Date,
                                    @JsonProperty("inputs") inputs: Seq[InputView],

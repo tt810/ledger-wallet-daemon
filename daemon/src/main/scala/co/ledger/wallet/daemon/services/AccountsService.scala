@@ -5,7 +5,7 @@ import javax.inject.{Inject, Singleton}
 
 import co.ledger.wallet.daemon.database.{DaemonCache, UserDto}
 import co.ledger.wallet.daemon.models
-import co.ledger.wallet.daemon.models.AccountDerivationView
+import co.ledger.wallet.daemon.models.{AccountDerivationView, PackedOperationsView}
 
 import scala.concurrent.Future
 
@@ -40,7 +40,7 @@ class AccountsService @Inject()(defaultDaemonCache: DaemonCache) extends DaemonS
     defaultDaemonCache.getNextAccountCreationInfo(user.pubKey, poolName, walletName, accountIndex)
   }
 
-  def accountOperation(user: UserDto, accountIndex: Int, poolName: String, walletName: String, queryParams: OperationQueryParams) = {
+  def accountOperation(user: UserDto, accountIndex: Int, poolName: String, walletName: String, queryParams: OperationQueryParams): Future[PackedOperationsView] = {
     info(LogMsgMaker.newInstance("Obtain account operations with params")
       .append("previous", queryParams.previous)
       .append("next", queryParams.next)
@@ -57,7 +57,6 @@ class AccountsService @Inject()(defaultDaemonCache: DaemonCache) extends DaemonS
       // next has more priority, using database batch instead queryParams.batch
       defaultDaemonCache.getNextBatchAccountOperations(user, accountIndex, poolName, walletName, queryParams.next.get, queryParams.fullOp)
     } else {
-      assert(queryParams.previous.isDefined, "Previous cursor must be provided")
       defaultDaemonCache.getPreviousBatchAccountOperations(user, accountIndex, poolName, walletName, queryParams.previous.get, queryParams.fullOp)
     }
   }
