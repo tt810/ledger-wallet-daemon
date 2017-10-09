@@ -1,7 +1,7 @@
 package co.ledger.wallet.daemon.database
 
 import java.sql.Timestamp
-import java.util.Date
+import java.util.{Date, UUID}
 import javax.inject.{Inject, Singleton}
 
 import co.ledger.wallet.daemon.database.DBMigrations.Migrations
@@ -108,23 +108,24 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     }
   }
 
-  def getFirstAccountOperation(nextOpUId: Option[String], userId: Long, poolId: Long, walletName: String, accountIndex: Int)(implicit ec: ExecutionContext): Future[Option[OperationDto]] = {
+  def getNextOperationInfo(next: UUID, userId: Long, poolId: Long, walletName: String, accountIndex: Int)
+                          (implicit ec: ExecutionContext): Future[Option[OperationDto]] = {
     val query = operations.filter { op =>
-      op.userId === userId && op.poolId === poolId && op.walletName === walletName && op.accountIndex === accountIndex &&
-        ((op.nextOpUId.isDefined && nextOpUId.isDefined && op.nextOpUId === nextOpUId) || (op.nextOpUId.isEmpty && nextOpUId.isEmpty))
-    }.sortBy(_.id).result
-    safeRun(query).map { ops =>
-      debug(LogMsgMaker.newInstance("Daemon account operation retrieved")
-        .append("next_op_uid", nextOpUId)
-        .append("user_id", userId)
-        .append("pool_id", poolId)
-        .append("wallet_name", walletName)
-        .append("account_index", accountIndex)
-        .append("result_row", ops.size)
-        .append("result", ops.map(_.id))
-        .toString())
-      ops.headOption.map(createOperation(_))
+      op.next.isDefined && op.next === Option(next) && op.userId === userId && op.poolId === poolId && op.walletName === walletName && op.accountIndex === accountIndex
     }
+    safeRun(query.result.headOption).map { op =>
+      op.map { current =>
+        OperationDto(userId, poolId, walletName, accountIndex, Option(next), current.batch + current.offset, current.batch, Option(UUID.randomUUID()))
+      }
+    }
+  }
+
+  def getPreviousOperationInfo(previous: UUID, userId: Long, poolId: Long, walletName: String, accountIndex: Int)
+                              (implicit ec: ExecutionContext): Future[Option[OperationDto]] = {
+    val query = operations.filter { op =>
+      op.next.isDefined && op.next === Option(previous) && op.userId === userId && op.poolId === poolId && op.walletName === walletName && op.accountIndex === accountIndex
+    }
+    safeRun(query.result.headOption).map(_.map(createOperation(_)))
   }
 
   def insertOperation(operation: OperationDto)(implicit ec: ExecutionContext): Future[Int] = {
@@ -133,24 +134,6 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
       debug(LogMsgMaker.newInstance("Daemon operation inserted")
         .append("operation", operation)
         .append("result", int)
-        .toString())
-      int
-    }
-
-  }
-
-  def updateOperation(id: Long, opUId: String, offset: Long, batch: Int, nextOpUId: Option[String])(implicit ec: ExecutionContext): Future[Int] = {
-    val query = operations.filter(_.id === id)
-      .map(op => (op.opUId, op.offset, op.batch, op.nextOpUId, op.updatedAt))
-      .update(opUId, offset, batch, nextOpUId, new Timestamp(new Date().getTime))
-
-    safeRun(query).map { int =>
-      debug(LogMsgMaker.newInstance("Daemon operation updated")
-        .append("id", id)
-        .append("op_uid", opUId)
-        .append("offset", offset)
-        .append("batch", batch)
-        .append("next_op_uid", nextOpUId)
         .toString())
       int
     }
@@ -199,11 +182,11 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
 
   private def createOperationRow(operation: OperationDto): OperationRow = {
     val currentTime = new Timestamp(new Date().getTime)
-    OperationRow(0, operation.userId, operation.poolId, operation.walletName, operation.accountIndex, operation.opUId, operation.offset, operation.batch, operation.nextOpUId, currentTime, currentTime)
+    OperationRow(0, operation.userId, operation.poolId, operation.walletName, operation.accountIndex, operation.previous, operation.offset, operation.batch, operation.next, currentTime)
   }
 
   private def createOperation(opRow: OperationRow): OperationDto = {
-    OperationDto(opRow.userId, opRow.poolId, opRow.walletName, opRow.accountIndex, opRow.opUId, opRow.offset, opRow.batch, opRow.nextOpUId, Option(opRow.id))
+    OperationDto(opRow.userId, opRow.poolId, opRow.walletName, opRow.accountIndex, opRow.previous, opRow.offset, opRow.batch, opRow.next, Option(opRow.id))
   }
 
   private def createPoolRow(pool: PoolDto): PoolRow =
@@ -233,4 +216,4 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
 
 case class UserDto(pubKey: String, permissions: Long, id: Option[Long] = None)
 case class PoolDto(name: String, userId: Long, configuration: String, id: Option[Long] = None, dbBackend: String = "", dbConnectString: String = "")
-case class OperationDto(userId: Long, poolId: Long, walletName: String, accountIndex: Int, opUId: String, offset: Long, batch: Int, nextOpUId: Option[String], id: Option[Long] = None)
+case class OperationDto(userId: Long, poolId: Long, walletName: String, accountIndex: Int, previous: Option[UUID], offset: Long, batch: Int, next: Option[UUID], id: Option[Long] = None)

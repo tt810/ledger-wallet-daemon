@@ -1,5 +1,6 @@
 package co.ledger.wallet.daemon.database
 
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Singleton
 
@@ -166,7 +167,98 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     }
   }
 
-  def getAccountOperations(accountIndex: Int, batch: Int, walletName: String, poolName: String, user: UserDto, fullOp: Int): Future[PackedOperationsView] = {
+  def getPreviousBatchAccountOperations(user: UserDto, accountIndex: Int, poolName: String, walletName: String, previous: UUID, fullOp: Int): Future[PackedOperationsView] = {
+    // fetch poolId, fetch batch and offset info from dbDao, fetch operations from lib return
+    info(LogMsgMaker.newInstance("Retrieving previous batch account operations")
+      .append("previous_cursor", previous)
+      .append("account_index", accountIndex)
+      .append("wallet_name", walletName)
+      .append("pool_name", poolName)
+      .append("user", user)
+      .toString())
+    dbDao.getPool(user.id.get, poolName).flatMap { poolDto => poolDto match {
+      case None => throw new WalletPoolNotFoundException(poolName)
+      case Some(dto) => {
+        dbDao.getPreviousOperationInfo(previous, user.id.get, dto.id.get, walletName, accountIndex).flatMap { operationDto => operationDto match {
+          case None => throw new OperationNotFoundException(previous)
+          case Some(operation) => {
+            getCoreAccount(accountIndex, user.pubKey, poolName, walletName).flatMap { coreAW =>
+              val coreA = coreAW._1
+              val currencyName = coreAW._2.getCurrency.getName
+              (if (fullOp > 0)
+                coreA.queryOperations().offset(operation.offset).limit(operation.batch).complete().execute()
+              else
+                coreA.queryOperations().offset(operation.offset).limit(operation.batch).partial().execute()
+              ).map { operations =>
+                val size = operations.size()
+                debug(LogMsgMaker.newInstance("Retrieved account operations")
+                  .append("offset", operation.offset)
+                  .append("batch_size", operation.batch)
+                  .append("result_size", size)
+                  .toString)
+                if (size <= 0) PackedOperationsView(None, None, List[OperationView]())
+                else {
+                  PackedOperationsView(
+                    operation.previous,
+                    operation.next,
+                    operations.asScala.toSeq.map(Operation.newView(_, currencyName, walletName, accountIndex)))
+                }
+              }
+            }
+          }
+        }}
+
+      }
+    }}
+  }
+
+  def getNextBatchAccountOperations(user: UserDto, accountIndex: Int, poolName: String, walletName: String, next: UUID, fullOp: Int): Future[PackedOperationsView] = {
+    // fetch poolId, fetch batch and offset info from dbDao, fetch operations from lib, insert opsDto, return
+    info(LogMsgMaker.newInstance("Retrieving next batch account operations")
+      .append("next_cursor", next)
+      .append("account_index", accountIndex)
+      .append("wallet_name", walletName)
+      .append("pool_name", poolName)
+      .append("user", user)
+      .toString())
+    dbDao.getPool(user.id.get, poolName).flatMap { poolDto => poolDto match {
+      case None => throw new WalletPoolNotFoundException(poolName)
+      case Some(dto) => {
+        dbDao.getNextOperationInfo(next, user.id.get, dto.id.get, walletName, accountIndex).flatMap { operationDto => operationDto match {
+          case None => throw new OperationNotFoundException(next)
+          case Some(operation) => {
+            getCoreAccount(accountIndex, user.pubKey, poolName, walletName).flatMap { coreAW =>
+              val coreA = coreAW._1
+              val currencyName = coreAW._2.getCurrency.getName
+              (if (fullOp > 0)
+                coreA.queryOperations().offset(operation.offset).limit(operation.batch).complete().execute()
+              else
+                coreA.queryOperations().offset(operation.offset).limit(operation.batch).partial().execute()
+              ).flatMap { operations =>
+                val size = operations.size()
+                debug(LogMsgMaker.newInstance("Retrieved account operations")
+                  .append("offset", operation.offset)
+                  .append("batch_size", operation.batch)
+                  .append("result_size", size)
+                  .toString)
+                if (size <= 0) Future.successful(PackedOperationsView(None, None, List[OperationView]()))
+                else {
+                  dbDao.insertOperation(operation).map { int =>
+                    PackedOperationsView(
+                      operation.previous,
+                      operation.next,
+                      operations.asScala.toSeq.map(Operation.newView(_, currencyName, walletName, accountIndex)))
+                  }
+                }
+              }
+            }
+          }}
+        }
+      }
+    }}
+  }
+
+  def getAccountOperations(user: UserDto, accountIndex: Int, poolName: String, walletName: String, batch: Int, fullOp: Int): Future[PackedOperationsView] = {
     info(LogMsgMaker.newInstance("Retrieving account operations")
       .append("account_index", accountIndex)
       .append("batch", batch)
@@ -174,50 +266,41 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
       .append("pool_name", poolName)
       .append("user", user)
       .toString())
-    getCoreAccount(accountIndex, user.pubKey, poolName, walletName).flatMap { coreAccountWallet =>
-      val coreAccount = coreAccountWallet._1
-      val currencyName = coreAccountWallet._2.getCurrency.getName
-      val offset = 0
-      (if (fullOp > 0)
-        coreAccount.queryOperations().offset(0).limit(batch + 1).complete().execute()
-      else
-        coreAccount.queryOperations().offset(0).limit(batch + 1).partial().execute()
-      ).flatMap { operations =>
-        val size = operations.size()
-        debug(LogMsgMaker.newInstance("Retrieved account operations")
-          .append("offset", 0)
-          .append("batch_size", batch)
-          .append("result_size", size)
-          .toString)
-        if(size > 0) {
-          val uid = operations.get(0).getUid
-          val realBatch = if (size == batch + 1) batch else size
-          val nextUid = if (realBatch < batch) None else Option(operations.get(batch).getUid)
-          debug(LogMsgMaker.newInstance("Retrieved account operations more info")
-            .append("received_size", size)
-            .append("offset", 0)
-            .append("batch_size", batch)
-            .append("returned_batch_size", realBatch)
-            .append("uid", uid)
-            .append("next_uid", nextUid)
-            .toString())
-          dbDao.getPool(user.id.get, poolName).flatMap { pool =>
-            pool match {
-              case None => throw new WalletPoolNotFoundException("Wallet pool doesn't exist")
-              case Some(p) => {
-                val operation = OperationDto(user.id.get, p.id.get, walletName, accountIndex, uid, offset, realBatch, nextUid)
-                dbDao.insertOperation(operation).map { int =>
-                  PackedOperationsView(
-                    None,
-                    nextUid,
-                    operations.asScala.toSeq.take(realBatch).map(Operation.newView(_, currencyName, walletName, accountIndex)))
-                }
+    // fetch poolId, fetch operations from lib, insert opsDto, return
+    dbDao.getPool(user.id.get, poolName).flatMap { poolDto => poolDto match {
+      case None => throw new WalletPoolNotFoundException(poolName)
+      case Some(dto) => {
+        getCoreAccount(accountIndex, user.pubKey, poolName, walletName).flatMap { coreAW =>
+          val coreA = coreAW._1
+          val currencyName = coreAW._2.getCurrency.getName
+          (if (fullOp > 0)
+            coreA.queryOperations().offset(0).limit(batch).complete().execute()
+          else
+            coreA.queryOperations().offset(0).limit(batch).partial().execute()
+          ).flatMap { operations =>
+            val size = operations.size()
+            debug(LogMsgMaker.newInstance("Retrieved account operations")
+              .append("offset", 0)
+              .append("batch_size", batch)
+              .append("result_size", size)
+              .toString)
+            if (size <= 0) Future.successful(PackedOperationsView(None, None, List[OperationView]()))
+            else {
+              // check if total operation count less than request batch.
+              val realBatch = if (size < batch) size else batch
+              val next = if (realBatch < batch) None else Option(UUID.randomUUID())
+              val operationDto = OperationDto(user.id.get, dto.id.get, walletName, accountIndex, None, 0, realBatch, next)
+              dbDao.insertOperation(operationDto).map { int =>
+                PackedOperationsView(
+                  None,
+                  operationDto.next,
+                  operations.asScala.toSeq.map(Operation.newView(_, currencyName, walletName, accountIndex)))
               }
             }
           }
-        } else Future.successful(PackedOperationsView(None, None, List[OperationView]()))
+        }
       }
-    }
+    }}
   }
 
   def getWalletPool(pubKey: String, poolName: String): Future[WalletPoolView] = {
