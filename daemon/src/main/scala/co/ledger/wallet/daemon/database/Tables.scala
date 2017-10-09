@@ -1,6 +1,7 @@
 package co.ledger.wallet.daemon.database
 
 import java.sql.Timestamp
+import java.util.UUID
 
 import co.ledger.wallet.daemon.DaemonConfiguration
 import slick.lifted.ProvenShape
@@ -70,7 +71,7 @@ trait Tables {
 
   val pools = TableQuery[Pools]
 
-  case class OperationRow(id: Long, userId: Long, poolId: Long, walletName: String, accountIndex: Int, opUId: String, offset: Long, batch: Int, nextOpUId: Option[String], createdAt: Timestamp, updatedAt: Timestamp)
+  case class OperationRow(id: Long, userId: Long, poolId: Long, walletName: String, accountIndex: Int, previous: Option[UUID], offset: Long, batch: Int, next: Option[UUID], createdAt: Timestamp)
 
   class Operations(tag: Tag) extends Table[OperationRow](tag, "operations") {
 
@@ -84,23 +85,21 @@ trait Tables {
 
     def accountIndex  = column[Int]("account_index")
 
-    def opUId         = column[String]("op_uid")
+    def previous         = column[Option[UUID]]("previous_cursor", O.Unique)
 
     def offset        = column[Long]("offset")
 
     def batch         = column[Int]("batch")
 
-    def nextOpUId     = column[Option[String]]("next_op_uid")
+    def next     = column[Option[UUID]]("next_cursor", O.Unique)
 
     def createdAt     = column[Timestamp]("created_at", SqlType("timestamp default CURRENT_TIMESTAMP"))
-
-    def updatedAt     = column[Timestamp]("updated_at", SqlType("timestamp default NULL"))
 
     def pool          = foreignKey("op_pool_fk", poolId, pools)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
 
     def user          = foreignKey("op_user_fk", userId, users)(_.id, onUpdate = ForeignKeyAction.Cascade, onDelete = ForeignKeyAction.Cascade)
 
-    override def *    = (id, userId, poolId, walletName, accountIndex, opUId, offset, batch, nextOpUId, createdAt, updatedAt) <> (OperationRow.tupled, OperationRow.unapply)
+    override def *    = (id, userId, poolId, walletName, accountIndex, previous, offset, batch, next, createdAt) <> (OperationRow.tupled, OperationRow.unapply)
 
     def idx           = index("idx_user_pool_wallet_account", (userId, poolId, walletName, accountIndex))
   }

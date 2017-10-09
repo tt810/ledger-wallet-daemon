@@ -67,27 +67,25 @@ class DaemonCacheTest extends AssertionsForJUnit {
   @Test def verifyGetAccountOperations(): Unit = {
     val user1 = Await.result(cache.getUserDirectlyFromDB(PUB_KEY_3), Duration.Inf)
     val pool1 = Await.result(DefaultDaemonCache.dbDao.getPool(user1.get.id.get, POOL_NAME), Duration.Inf)
-    val ops = Await.result(cache.getAccountOperations(0, 20, WALLET_NAME, pool1.get.name, user1.get, 1), Duration.Inf)
+    val ops = Await.result(cache.getAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, 20, 0), Duration.Inf)
     assert(ops.previous.isEmpty)
     assert(20 === ops.operations.size)
-    assertNotNull(ops.operations(0).transaction)
-    val opsRow = Await.result(DefaultDaemonCache.dbDao.getFirstAccountOperation(ops.next, user1.get.id.get, pool1.get.id.get, WALLET_NAME, 0), Duration.Inf)
-    assertFalse("Operation should be inserted", opsRow.isEmpty)
-    assertFalse(opsRow.get.nextOpUId.isEmpty)
-    assert(ops.operations.size === opsRow.get.batch)
-    assert(0 === opsRow.get.offset)
-    assert(opsRow.get.opUId === ops.operations.head.uid)
+    assert(ops.previous.isEmpty)
+    ops.operations.foreach(op => assertNull(op.transaction))
+    val nextOps = Await.result(cache.getNextBatchAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, ops.next.get, 0), Duration.Inf)
 
-    val maxi = Await.result(cache.getAccountOperations(0, Int.MaxValue, WALLET_NAME, pool1.get.name, user1.get, 0), Duration.Inf)
+    val previousOfNextOps = Await.result(cache.getPreviousBatchAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, nextOps.previous.get, 0), Duration.Inf)
+    assert(ops === previousOfNextOps)
+
+    val nextnextOps = Await.result(cache.getNextBatchAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, nextOps.next.get, 0), Duration.Inf)
+
+    val previousOfNextNextOps = Await.result(cache.getPreviousBatchAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, nextnextOps.previous.get, 0), Duration.Inf)
+    assert(nextOps === previousOfNextNextOps)
+
+    val maxi = Await.result(cache.getAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, Int.MaxValue, 0), Duration.Inf)
     assert(maxi.operations.size < Int.MaxValue)
     assert(maxi.previous.isEmpty)
     assert(maxi.next.isEmpty)
-    val maxiRow = Await.result(DefaultDaemonCache.dbDao.getFirstAccountOperation(maxi.next, user1.get.id.get, pool1.get.id.get, WALLET_NAME, 0), Duration.Inf)
-    assertFalse("Operation should be inserted", maxiRow.isEmpty)
-    assert(maxiRow.get.nextOpUId.isEmpty)
-    assert(maxi.operations.size === maxiRow.get.batch)
-    assert(0 === maxiRow.get.offset)
-    assert(maxiRow.get.opUId === maxi.operations.head.uid)
   }
 
 }

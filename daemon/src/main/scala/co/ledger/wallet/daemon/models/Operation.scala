@@ -1,6 +1,6 @@
 package co.ledger.wallet.daemon.models
 
-import java.util.Date
+import java.util.{Date, UUID}
 
 import co.ledger.core
 import co.ledger.wallet.daemon.models.coins.Bitcoin
@@ -71,7 +71,7 @@ case class TrustIndicatorView(
                              )
 
 case class PackedOperationsView(
-                                 @JsonProperty("previous") previous: Option[String],
-                                 @JsonProperty("next") next: Option[String],
+                                 @JsonProperty("previous") previous: Option[UUID],
+                                 @JsonProperty("next") next: Option[UUID],
                                  @JsonProperty("operations") operations: Seq[OperationView]
                                )
