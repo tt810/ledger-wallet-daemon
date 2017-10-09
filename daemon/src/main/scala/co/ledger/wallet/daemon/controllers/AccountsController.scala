@@ -1,10 +1,11 @@
 package co.ledger.wallet.daemon.controllers
 
+import java.util.UUID
 import javax.inject.Inject
 
-import co.ledger.wallet.daemon.exceptions.{AccountNotFoundException, InvalidArgumentException, WalletNotFoundException, WalletPoolNotFoundException}
+import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.filters.AccountCreationFilter
-import co.ledger.wallet.daemon.services.{AccountsService, LogMsgMaker}
+import co.ledger.wallet.daemon.services.{AccountsService, LogMsgMaker, OperationQueryParams}
 import co.ledger.wallet.daemon.utils.RichRequest
 import com.twitter.finagle.http.Request
 import com.twitter.finatra.http.Controller
@@ -13,6 +14,7 @@ import co.ledger.wallet.daemon.filters.AccountCreationContext._
 import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.controllers.responses.ResponseSerializer
+import com.twitter.finatra.validation.{MethodValidation, ValidationResult}
 
 import scala.concurrent.ExecutionContext
 
@@ -88,13 +90,37 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
     info(LogMsgMaker.newInstance("GET account operation request")
       .append("request", request.request)
       .append("account_index", request.account_index)
-      .append("cursor", request.cursor)
+      .append("previous_cursor", request.previous)
+      .append("next_cursor", request.next)
       .append("batch", request.batch)
       .append("is_full_op", request.full_op > 0)
       .append("wallet_name", request.wallet_name)
       .append("pool_name", request.pool_name)
       .toString())
-
+    accountsService.accountOperation(
+      request.user,
+      request.account_index,
+      request.pool_name,
+      request.wallet_name,
+      OperationQueryParams(request.previous, request.next, request.batch, request.full_op)).recover {
+        case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
+          Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
+          response,
+          pnfe)
+        case onfe: OperationNotFoundException => responseSerializer.serializeBadRequest(
+          Map("response" -> "Operation cursor doesn't exist", "next_cursor" -> request.next, "previous_cursor" -> request.previous),
+          response,
+          onfe)
+        case wnfe: WalletNotFoundException => responseSerializer.serializeBadRequest(
+          Map("response"->"Wallet doesn't exist", "wallet_name" -> request.wallet_name),
+          response,
+          wnfe)
+        case anfe: AccountNotFoundException => responseSerializer.serializeBadRequest(
+          Map("response"->"Account doesn't exist", "account_index" -> request.account_index),
+          response,
+          anfe)
+        case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+      }
   }
 
   filter[AccountCreationFilter]
@@ -142,19 +168,27 @@ object AccountsController {
                            @RouteParam account_index: Option[Int],
                            request: Request
                            ) extends RichRequest(request)
+
   case class AccountCreationInfoRequest(
                                          @RouteParam pool_name: String,
                                          @RouteParam wallet_name: String,
                                          @QueryParam account_index: Option[Int],
                                          request: Request
-                                       ) extends RichRequest(request)
+                                       ) extends RichRequest(request) {
+    @MethodValidation
+    def validateAccountIndex = CommonMethodValidations.validateOptionalAccountIndex(account_index)
+  }
   case class OperationRequest(
                              @RouteParam pool_name: String,
                              @RouteParam wallet_name: String,
                              @RouteParam account_index: Int,
-                             @QueryParam cursor: Option[String],
+                             @QueryParam next: Option[UUID],
+                             @QueryParam previous: Option[UUID],
                              @QueryParam batch: Int = 20,
                              @QueryParam full_op: Int = 0,
                              request: Request
-                             ) extends RichRequest(request)
+                             ) extends RichRequest(request) {
+    @MethodValidation
+    def validateBatch = ValidationResult.validate(batch > 0, "batch: batch should be greater than zero")
+  }
 }
