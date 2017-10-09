@@ -177,7 +177,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
       .append("user", user)
       .toString())
     getPoolFromDB(user.id.get, poolName).flatMap { dto =>
-      dbDao.getPreviousOperationInfo(previous, user.id.get, dto.id.get, walletName, accountIndex).flatMap { operationDto => operationDto match {
+      dbDao.getPreviousOperationInfo(previous, user.id.get, dto.id.get, Option(walletName), Option(accountIndex)).flatMap { operationDto => operationDto match {
         case None => throw new OperationNotFoundException(previous)
         case Some(operation) => getAccountOperations(user, accountIndex, poolName, walletName, operation.offset, operation.batch, fullOp)
           .map(PackedOperationsView(operation.previous, operation.next, _))
@@ -195,7 +195,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
       .append("user", user)
       .toString())
     getPoolFromDB(user.id.get, poolName).flatMap { poolDto =>
-      dbDao.getNextOperationInfo(next, user.id.get, poolDto.id.get, walletName, accountIndex).flatMap { operationDto => operationDto match {
+      dbDao.getNextOperationInfo(next, user.id.get, poolDto.id.get, Option(walletName), Option(accountIndex)).flatMap { operationDto => operationDto match {
         case None => throw new OperationNotFoundException(next)
         case Some(operation) => {
           getAccountOperations(user, accountIndex, poolName, walletName, operation.offset, operation.batch, fullOp).flatMap { operations =>
@@ -224,7 +224,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
         // check if total operation count less than request batch.
         val realBatch = if (operations.size < batch) operations.size else batch
         val next = if (realBatch < batch) None else Option(UUID.randomUUID())
-        val operationDto = OperationDto(user.id.get, poolDto.id.get, walletName, accountIndex, None, 0, realBatch, next)
+        val operationDto = OperationDto(user.id.get, poolDto.id.get, Option(walletName), Option(accountIndex), None, 0, realBatch, next)
         dbDao.insertOperation(operationDto).map { int =>
           PackedOperationsView(None, operationDto.next, operations)
         }
@@ -236,20 +236,26 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     getCoreAccount(accountIndex, user.pubKey, poolName, walletName).flatMap { coreAW =>
       val coreA = coreAW._1
       val currencyName = coreAW._2.getCurrency.getName
-      (if (fullOp > 0)
-        coreA.queryOperations().offset(offset).limit(batch).complete().execute()
-      else
-        coreA.queryOperations().offset(offset).limit(batch).partial().execute()
-      ).map { operations =>
-        val size = operations.size()
-        debug(LogMsgMaker.newInstance("Retrieved account operations")
-          .append("offset", offset)
-          .append("batch_size", batch)
-          .append("result_size", size)
-          .toString)
-        if (size <= 0) List[OperationView]()
-        else operations.asScala.toSeq.map(Operation.newView(_, currencyName, walletName, accountIndex))
+      getOperations(coreA.queryOperations(), fullOp, offset, batch).map { ops =>
+        ops.map(Operation.newView(_, currencyName, walletName, accountIndex))
       }
+    }
+  }
+
+  private def getOperations(opsQuery: core.OperationQuery, fullOp: Int, offset: Long, batch: Int): Future[Seq[core.Operation]] = {
+    (if (fullOp > 0)
+      opsQuery.offset(offset).limit(batch).complete().execute()
+    else
+      opsQuery.offset(offset).limit(batch).partial().execute()
+      ).map { operations =>
+      val size = operations.size()
+      debug(LogMsgMaker.newInstance("Retrieved operations")
+        .append("offset", offset)
+        .append("batch_size", batch)
+        .append("result_size", size)
+        .toString)
+      if (size <= 0) List[core.Operation]()
+      else operations.asScala.toSeq
     }
   }
 
@@ -466,7 +472,6 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     else
       namedPools
   }
-
 }
 
 object DefaultDaemonCache extends Logging {
