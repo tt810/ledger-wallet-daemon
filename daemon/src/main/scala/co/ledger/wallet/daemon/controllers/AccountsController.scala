@@ -6,13 +6,13 @@ import javax.inject.Inject
 import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.filters.AccountCreationFilter
 import co.ledger.wallet.daemon.services.{AccountsService, LogMsgMaker, OperationQueryParams}
-import co.ledger.wallet.daemon.utils.RichRequest
 import com.twitter.finagle.http.Request
 import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.{QueryParam, RouteParam}
 import co.ledger.wallet.daemon.filters.AccountCreationContext._
 import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
+import co.ledger.wallet.daemon.controllers.requests.{CommonMethodValidations, RichRequest}
 import co.ledger.wallet.daemon.controllers.responses.ResponseSerializer
 import com.twitter.finatra.validation.{MethodValidation, ValidationResult}
 
@@ -167,7 +167,13 @@ object AccountsController {
                            @RouteParam wallet_name: String,
                            @RouteParam account_index: Option[Int],
                            request: Request
-                           ) extends RichRequest(request)
+                           ) extends RichRequest(request) {
+    @MethodValidation
+    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+
+    @MethodValidation
+    def validateWalletName = CommonMethodValidations.validateName("wallet_name", wallet_name)
+  }
 
   case class AccountCreationInfoRequest(
                                          @RouteParam pool_name: String,
@@ -175,6 +181,12 @@ object AccountsController {
                                          @QueryParam account_index: Option[Int],
                                          request: Request
                                        ) extends RichRequest(request) {
+    @MethodValidation
+    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+
+    @MethodValidation
+    def validateWalletName = CommonMethodValidations.validateName("wallet_name", wallet_name)
+
     @MethodValidation
     def validateAccountIndex = CommonMethodValidations.validateOptionalAccountIndex(account_index)
   }
@@ -188,6 +200,15 @@ object AccountsController {
                              @QueryParam full_op: Int = 0,
                              request: Request
                              ) extends RichRequest(request) {
+    @MethodValidation
+    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+
+    @MethodValidation
+    def validateWalletName = CommonMethodValidations.validateName("wallet_name", wallet_name)
+
+    @MethodValidation
+    def validateAccountIndex = ValidationResult.validate(account_index >= 0, s"account_index: index can not be less than zero")
+
     @MethodValidation
     def validateBatch = ValidationResult.validate(batch > 0, "batch: batch should be greater than zero")
   }

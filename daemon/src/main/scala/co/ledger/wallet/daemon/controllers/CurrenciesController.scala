@@ -3,13 +3,14 @@ package co.ledger.wallet.daemon.controllers
 import javax.inject.Inject
 
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
+import co.ledger.wallet.daemon.controllers.requests.{CommonMethodValidations, RichRequest}
 import co.ledger.wallet.daemon.controllers.responses.ResponseSerializer
 import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.services.{CurrenciesService, LogMsgMaker}
-import co.ledger.wallet.daemon.utils.RichRequest
 import com.twitter.finagle.http.Request
 import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.RouteParam
+import com.twitter.finatra.validation.MethodValidation
 
 import scala.concurrent.ExecutionContext
 
@@ -60,12 +61,18 @@ object CurrenciesController {
   case class GetCurrenciesRequest(
                                  @RouteParam pool_name: String,
                                  request: Request
-                                 ) extends RichRequest(request)
+                                 ) extends RichRequest(request) {
+    @MethodValidation
+    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+  }
 
   case class GetCurrencyRequest(
                                @RouteParam currency_name: String,
                                @RouteParam pool_name: String,
                                request: Request
-                               ) extends RichRequest(request)
+                               ) extends RichRequest(request) {
+    @MethodValidation
+    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+  }
 }
 

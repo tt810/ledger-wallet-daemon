@@ -46,6 +46,16 @@ class WalletsApiTest extends APIFeatureTest {
     deletePool("multi_pool")
   }
 
+  test("WalletsApi#Get wallets with invalid offset and batch size") {
+    createPool("multi_pool_mal")
+    val wallet1 = walletFromResponse(assertWalletCreation("multi_pool_mal", "wallet_1", "bitcoin", Status.Ok))
+    val wallet2 = walletFromResponse(assertWalletCreation("multi_pool_mal", "wallet_2", "bitcoin", Status.Ok))
+    val wallet3 = walletFromResponse(assertWalletCreation("multi_pool_mal", "wallet_3", "bitcoin", Status.Ok))
+    assertGetWallets("multi_pool_mal", 1, -2, Status.BadRequest)
+    assertGetWallets("multi_pool_mal", -1, 2, Status.BadRequest)
+    deletePool("multi_pool_mal")
+  }
+
   test("WalletsApi#Get no wallets from existing pool") {
     createPool("empty_pool")
     val result = assertGetWallets("empty_pool", 0, 2, Status.Ok)
