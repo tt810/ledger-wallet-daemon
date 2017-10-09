@@ -1,4 +1,4 @@
-package co.ledger.wallet.daemon.controllers
+package co.ledger.wallet.daemon.controllers.requests
 
 import co.ledger.wallet.daemon.database.DefaultDaemonCache
 import com.twitter.finatra.validation.ValidationResult
