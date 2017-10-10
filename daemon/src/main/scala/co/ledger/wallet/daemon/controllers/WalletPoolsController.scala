@@ -26,7 +26,7 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
       .append("request", request)
       .toString())
     poolsService.pools(request.user.get).recover {
-      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+      case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 
@@ -40,7 +40,7 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
         Map("response"->"Wallet pool doesn't exist", "pool_name" -> request.pool_name),
         response,
         pe)
-      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+      case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 
@@ -51,7 +51,7 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
     val poolName = request.pool_name
     // TODO: Deserialize the configuration from the body of the request
     poolsService.createPool(request.user, poolName, PoolConfiguration()).recover {
-      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+      case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 
@@ -66,7 +66,7 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
         Map("response" -> "Wallet pool doesn't exist", "pool_name" -> poolName),
         response,
         pe)
-      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+      case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 

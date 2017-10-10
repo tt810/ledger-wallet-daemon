@@ -35,7 +35,7 @@ class CurrenciesController @Inject()(currenciesService: CurrenciesService) exten
         Map("response"-> "Currency not support", "currency_name" -> currencyName),
         response,
         cnfe)
-      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+      case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 
@@ -50,7 +50,7 @@ class CurrenciesController @Inject()(currenciesService: CurrenciesService) exten
         Map("response" -> "Wallet pool doesn't exist", "pool_name" -> poolName),
         response,
         pnfe)
-      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+      case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 

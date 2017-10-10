@@ -35,7 +35,7 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
           Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
           response,
           pnfe)
-        case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+        case e: Throwable => responseSerializer.serializeInternalError(response, e)
       }
   }
 
@@ -54,7 +54,7 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
         Map("response"->"Wallet doesn't exist", "wallet_name" -> request.wallet_name),
         response,
         wnfe)
-      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+      case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 
@@ -72,7 +72,7 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
         Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
         response,
         pnfe)
-      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+      case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 

@@ -6,9 +6,9 @@ import com.twitter.inject.Logging
 
 class ResponseSerializer extends Logging {
 
-  def serializeInternalErrorToOk(response: ResponseBuilder, caught: Throwable): Response = {
+  def serializeInternalError(response: ResponseBuilder, caught: Throwable): Response = {
     error(ErrorCode.Internal_Error, caught)
-    response.ok()
+    response.internalServerError()
       .body(ErrorResponseBody(ErrorCode.Internal_Error, Map("response"->"Problem occurred when processing the request, check with developers")))
   }
 
