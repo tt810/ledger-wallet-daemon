@@ -38,7 +38,7 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
         Map("response"->"Wallet doesn't exist", "wallet_name" -> request.wallet_name),
         response,
         wnfe)
-      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+      case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 
@@ -58,7 +58,7 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
         Map("response" -> "Wallet doesn't exist", "wallet_name" -> request.wallet_name),
         response,
         wnfe)
-      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+      case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 
@@ -82,7 +82,7 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
         Map("response"->"Account doesn't exist", "account_index" -> request.account_index),
         response,
         anfe)
-      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+      case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 
@@ -119,7 +119,7 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
           Map("response"->"Account doesn't exist", "account_index" -> request.account_index),
           response,
           anfe)
-        case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+        case e: Throwable => responseSerializer.serializeInternalError(response, e)
       }
   }
 
@@ -145,7 +145,7 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
           Map("response"->"Wallet doesn't exist", "wallet_name" -> walletName),
           response,
           wnfe)
-        case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+        case e: Throwable => responseSerializer.serializeInternalError(response, e)
       }
   }
 
