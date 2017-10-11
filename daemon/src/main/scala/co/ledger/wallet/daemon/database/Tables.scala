@@ -1,7 +1,6 @@
 package co.ledger.wallet.daemon.database
 
 import java.sql.Timestamp
-import java.util.UUID
 
 import co.ledger.wallet.daemon.DaemonConfiguration
 import slick.lifted.ProvenShape
@@ -15,7 +14,6 @@ package database {
 }
 trait Tables {
   val profile: slick.jdbc.JdbcProfile
-
   import profile.api._
 
   class DatabaseVersion(tag: Tag) extends Table[(Int, Timestamp)](tag, "__database__") {
@@ -71,7 +69,7 @@ trait Tables {
 
   val pools = TableQuery[Pools]
 
-  case class OperationRow(id: Long, userId: Long, poolId: Long, walletName: Option[String], accountIndex: Option[Int], previous: Option[UUID], offset: Long, batch: Int, next: Option[UUID], createdAt: Timestamp, deletedAt: Option[Timestamp])
+  case class OperationRow(id: Long, userId: Long, poolId: Long, walletName: Option[String], accountIndex: Option[Int], previous: Option[String], offset: Long, batch: Int, next: Option[String], createdAt: Timestamp, deletedAt: Option[Timestamp])
 
   class Operations(tag: Tag) extends Table[OperationRow](tag, "operations") {
 
@@ -85,13 +83,13 @@ trait Tables {
 
     def accountIndex  = column[Option[Int]]("account_index")
 
-    def previous         = column[Option[UUID]]("previous_cursor", O.Unique)
+    def previous         = column[Option[String]]("previous_cursor", O.Unique, SqlType("VARCHAR(36)"))
 
     def offset        = column[Long]("offset")
 
     def batch         = column[Int]("batch")
 
-    def next     = column[Option[UUID]]("next_cursor", O.Unique)
+    def next     = column[Option[String]]("next_cursor", O.Unique, SqlType("VARCHAR(36)"))
 
     def createdAt     = column[Timestamp]("created_at", SqlType("timestamp default CURRENT_TIMESTAMP"))
 
