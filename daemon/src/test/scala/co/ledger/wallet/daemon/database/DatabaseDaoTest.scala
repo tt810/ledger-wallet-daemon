@@ -85,10 +85,10 @@ class DatabaseDaoTest extends AssertionsForJUnit {
     val previous = Option(UUID.randomUUID())
     val next = Option(UUID.randomUUID())
     Await.result(dbDao.insertOperation(
-      OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, "myWallet", 1, previous, 0, 20, next)), Duration.Inf)
+      OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1), previous, 0, 20, next)), Duration.Inf)
     try {
       Await.result(dbDao.insertOperation(
-        OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, "myWallet", 1, previous, 0, 20, Option(UUID.randomUUID()))), Duration.Inf)
+        OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1), previous, 0, 20, Option(UUID.randomUUID()))), Duration.Inf)
       fail()
     } catch {
       case e: DaemonDatabaseException => // previous cursor must be unique
@@ -104,14 +104,44 @@ class DatabaseDaoTest extends AssertionsForJUnit {
     val previous = Option(UUID.randomUUID())
     val next = Option(UUID.randomUUID())
     Await.result(dbDao.insertOperation(
-      OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, "myWallet", 1, previous, 0, 20, next)), Duration.Inf)
+      OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1), previous, 0, 20, next)), Duration.Inf)
     try {
       Await.result(dbDao.insertOperation(
-        OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, "myWallet", 1, Option(UUID.randomUUID()), 0, 20, next)), Duration.Inf)
+        OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1), Option(UUID.randomUUID()), 0, 20, next)), Duration.Inf)
       fail()
     } catch {
       case e: DaemonDatabaseException => // next cursor must be unique
     }
+  }
+
+  @Test def verifyWalletOperationInsertion(): Unit = {
+    val pubKey = "03B2394D8E33308DD0323A8C937322101E229D85A2C0DFABC236A8C6A82E58076D"
+    Await.result(dbDao.insertUser(UserDto(pubKey, 0)), Duration.Inf)
+    val insertedUser = Await.result(dbDao.getUser(HexUtils.valueOf(pubKey)), Duration.Inf)
+    Await.result(dbDao.insertPool(PoolDto("accountPool", insertedUser.get.id.get, "")), Duration.Inf)
+    val insertedPool = (Await.result(dbDao.getPool(insertedUser.get.id.get, "accountPool"), Duration.Inf))
+    val previous = Option(UUID.randomUUID())
+    val next = Option(UUID.randomUUID())
+    Await.result(dbDao.insertOperation(
+      OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), None, previous, 0, 20, next)), Duration.Inf)
+    val preOp = Await.result(
+      dbDao.getPreviousOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), None), Duration.Inf)
+    assert(preOp.isDefined)
+    assert(previous === preOp.get.previous)
+    assert(next === preOp.get.next)
+    assert(0 === preOp.get.offset)
+    assert(20 === preOp.get.batch)
+
+    assert((Await.result(
+      dbDao.getPreviousOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1)), Duration.Inf)).isEmpty)
+    assert((Await.result(
+      dbDao.getPreviousOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, None, None), Duration.Inf)).isEmpty)
+
+    assert(Await.result(dbDao.getNextOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), None), Duration.Inf).isDefined)
+    assert((Await.result(
+      dbDao.getNextOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1)), Duration.Inf)).isEmpty)
+    assert((Await.result(
+      dbDao.getNextOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, None, None), Duration.Inf)).isEmpty)
   }
 
   @Test def verifyAccountOperationInsertion(): Unit = {
@@ -123,20 +153,26 @@ class DatabaseDaoTest extends AssertionsForJUnit {
     val previous = Option(UUID.randomUUID())
     val next = Option(UUID.randomUUID())
     Await.result(dbDao.insertOperation(
-      OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, "myWallet", 1, previous, 0, 20, next)), Duration.Inf)
+      OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1), previous, 0, 20, next)), Duration.Inf)
     val preOp = Await.result(
-      dbDao.getPreviousOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, "myWallet", 1), Duration.Inf)
+      dbDao.getPreviousOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1)), Duration.Inf)
+    val preW = Await.result(
+      dbDao.getPreviousOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), None), Duration.Inf)
+    assert(preW.isEmpty)
     assert(preOp.isDefined)
     assert(previous === preOp.get.previous)
     assert(next === preOp.get.next)
     assert(0 === preOp.get.offset)
     assert(20 === preOp.get.batch)
     val preOp2 = Await.result(
-      dbDao.getPreviousOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, "myWallet", 1), Duration.Inf)
+      dbDao.getPreviousOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1)), Duration.Inf)
     assert(preOp === preOp2)
 
     val nextOp = Await.result(
-      dbDao.getNextOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, "myWallet", 1), Duration.Inf)
+      dbDao.getNextOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1)), Duration.Inf)
+    val nextW = Await.result(
+      dbDao.getNextOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), None), Duration.Inf)
+    assert(nextW.isEmpty)
     assert(nextOp.isDefined)
     assert(next === nextOp.get.previous)
     assert(20 === nextOp.get.offset)
@@ -144,7 +180,7 @@ class DatabaseDaoTest extends AssertionsForJUnit {
     assert(nextOp.get.next.isDefined)
 
     val nextOp2 = Await.result(
-      dbDao.getNextOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, "myWallet", 1), Duration.Inf)
+      dbDao.getNextOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1)), Duration.Inf)
     assertFalse(nextOp2.get.next === nextOp.get.next)
   }
 }

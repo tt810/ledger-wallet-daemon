@@ -1,18 +1,20 @@
 package co.ledger.wallet.daemon.controllers
 
+import java.util.UUID
 import javax.inject.Inject
 
-import co.ledger.wallet.daemon.exceptions.{AccountNotFoundException, InvalidArgumentException, WalletNotFoundException, WalletPoolNotFoundException}
+import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.filters.AccountCreationFilter
-import co.ledger.wallet.daemon.services.{AccountsService, LogMsgMaker}
-import co.ledger.wallet.daemon.utils.RichRequest
+import co.ledger.wallet.daemon.services.{AccountsService, LogMsgMaker, OperationQueryParams}
 import com.twitter.finagle.http.Request
 import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.{QueryParam, RouteParam}
 import co.ledger.wallet.daemon.filters.AccountCreationContext._
 import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
+import co.ledger.wallet.daemon.controllers.requests.{CommonMethodValidations, RichRequest}
 import co.ledger.wallet.daemon.controllers.responses.ResponseSerializer
+import com.twitter.finatra.validation.{MethodValidation, ValidationResult}
 
 import scala.concurrent.ExecutionContext
 
@@ -36,7 +38,7 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
         Map("response"->"Wallet doesn't exist", "wallet_name" -> request.wallet_name),
         response,
         wnfe)
-      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+      case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 
@@ -56,7 +58,7 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
         Map("response" -> "Wallet doesn't exist", "wallet_name" -> request.wallet_name),
         response,
         wnfe)
-      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+      case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 
@@ -80,7 +82,7 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
         Map("response"->"Account doesn't exist", "account_index" -> request.account_index),
         response,
         anfe)
-      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+      case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 
@@ -88,13 +90,37 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
     info(LogMsgMaker.newInstance("GET account operation request")
       .append("request", request.request)
       .append("account_index", request.account_index)
-      .append("cursor", request.cursor)
+      .append("previous_cursor", request.previous)
+      .append("next_cursor", request.next)
       .append("batch", request.batch)
       .append("is_full_op", request.full_op > 0)
       .append("wallet_name", request.wallet_name)
       .append("pool_name", request.pool_name)
       .toString())
-
+    accountsService.accountOperation(
+      request.user,
+      request.account_index,
+      request.pool_name,
+      request.wallet_name,
+      OperationQueryParams(request.previous, request.next, request.batch, request.full_op)).recover {
+        case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
+          Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
+          response,
+          pnfe)
+        case onfe: OperationNotFoundException => responseSerializer.serializeBadRequest(
+          Map("response" -> "Operation cursor doesn't exist", "next_cursor" -> request.next, "previous_cursor" -> request.previous),
+          response,
+          onfe)
+        case wnfe: WalletNotFoundException => responseSerializer.serializeBadRequest(
+          Map("response"->"Wallet doesn't exist", "wallet_name" -> request.wallet_name),
+          response,
+          wnfe)
+        case anfe: AccountNotFoundException => responseSerializer.serializeBadRequest(
+          Map("response"->"Account doesn't exist", "account_index" -> request.account_index),
+          response,
+          anfe)
+        case e: Throwable => responseSerializer.serializeInternalError(response, e)
+      }
   }
 
   filter[AccountCreationFilter]
@@ -119,7 +145,7 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
           Map("response"->"Wallet doesn't exist", "wallet_name" -> walletName),
           response,
           wnfe)
-        case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+        case e: Throwable => responseSerializer.serializeInternalError(response, e)
       }
   }
 
@@ -141,20 +167,49 @@ object AccountsController {
                            @RouteParam wallet_name: String,
                            @RouteParam account_index: Option[Int],
                            request: Request
-                           ) extends RichRequest(request)
+                           ) extends RichRequest(request) {
+    @MethodValidation
+    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+
+    @MethodValidation
+    def validateWalletName = CommonMethodValidations.validateName("wallet_name", wallet_name)
+  }
+
   case class AccountCreationInfoRequest(
                                          @RouteParam pool_name: String,
                                          @RouteParam wallet_name: String,
                                          @QueryParam account_index: Option[Int],
                                          request: Request
-                                       ) extends RichRequest(request)
+                                       ) extends RichRequest(request) {
+    @MethodValidation
+    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+
+    @MethodValidation
+    def validateWalletName = CommonMethodValidations.validateName("wallet_name", wallet_name)
+
+    @MethodValidation
+    def validateAccountIndex = CommonMethodValidations.validateOptionalAccountIndex(account_index)
+  }
   case class OperationRequest(
                              @RouteParam pool_name: String,
                              @RouteParam wallet_name: String,
                              @RouteParam account_index: Int,
-                             @QueryParam cursor: Option[String],
+                             @QueryParam next: Option[UUID],
+                             @QueryParam previous: Option[UUID],
                              @QueryParam batch: Int = 20,
                              @QueryParam full_op: Int = 0,
                              request: Request
-                             ) extends RichRequest(request)
+                             ) extends RichRequest(request) {
+    @MethodValidation
+    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+
+    @MethodValidation
+    def validateWalletName = CommonMethodValidations.validateName("wallet_name", wallet_name)
+
+    @MethodValidation
+    def validateAccountIndex = ValidationResult.validate(account_index >= 0, s"account_index: index can not be less than zero")
+
+    @MethodValidation
+    def validateBatch = ValidationResult.validate(batch > 0, "batch: batch should be greater than zero")
+  }
 }

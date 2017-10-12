@@ -3,7 +3,7 @@ package co.ledger.wallet.daemon.services
 import javax.inject.{Inject, Singleton}
 
 import co.ledger.wallet.daemon.database._
-import co.ledger.wallet.daemon.models.{WalletView, WalletsViewWithCount}
+import co.ledger.wallet.daemon.models.{PackedOperationsView, WalletView, WalletsViewWithCount}
 
 import scala.concurrent.Future
 
@@ -39,11 +39,5 @@ class WalletsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
       .toString())
     daemonCache.createWallet(walletName, currencyName, poolName, user)
   }
-
-//  def removeWallet(user: User, poolName: String, walletName: String) = TODO once the method exists on the library
-//    poolsService.pool(user, poolName) flatMap {(pool) =>
-//      pool.
-//
-//    }
 
 }

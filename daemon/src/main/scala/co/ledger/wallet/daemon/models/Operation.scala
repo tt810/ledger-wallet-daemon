@@ -17,7 +17,7 @@ object Operation {
 
     val uid = operation.getUid
 
-//    val trust = newTrustIndicatorView(operation.getTrust)
+    val trust = newTrustIndicatorView(operation.getTrust)
     val confirmations = 0 //TODO
     val time = operation.getDate
     val blockHeight = operation.getBlockHeight  //?
@@ -27,7 +27,7 @@ object Operation {
     val senders = operation.getSenders.asScala.toSeq
     val recipients = operation.getRecipients.asScala.toSeq
     val transaction = newTransactionView(operation, currencyFamily)
-    OperationView(uid, currencyName, currencyFamily, null, confirmations, time, blockHeight, opType, amount, fees, walletName, accountIndex, senders, recipients, transaction)
+    OperationView(uid, currencyName, currencyFamily, trust, confirmations, time, blockHeight, opType, amount, fees, walletName, accountIndex, senders, recipients, transaction)
 
   }
 
@@ -39,8 +39,10 @@ object Operation {
     else null
   }
 
-  private def newTrustIndicatorView(trust: core.TrustIndicator): TrustIndicatorView = {
-    TrustIndicatorView(trust.getTrustWeight, TrustLevel.valueOf(trust.getTrustLevel.name()), trust.getConflictingOperationUids.asScala.toSeq, trust.getOrigin)
+  private def newTrustIndicatorView(trust: core.TrustIndicator): Option[TrustIndicatorView] = {
+    if (trust == null) None
+    else
+      Option(TrustIndicatorView(trust.getTrustWeight, TrustLevel.valueOf(trust.getTrustLevel.name()), trust.getConflictingOperationUids.asScala.toSeq, trust.getOrigin))
   }
 
 }
@@ -49,7 +51,7 @@ case class OperationView(
                           @JsonProperty("uid") uid: String,
                           @JsonProperty("currency_name") currencyName: String,
                           @JsonProperty("currency_family") currencyFamily: CurrencyFamily,
-                          @JsonProperty("trust") trust: TrustIndicatorView,
+                          @JsonProperty("trust") trust: Option[TrustIndicatorView],
                           @JsonProperty("confirmations") confirmations: Int,
                           @JsonProperty("time") time: Date,
                           @JsonProperty("block_height") blockHeight: Long,

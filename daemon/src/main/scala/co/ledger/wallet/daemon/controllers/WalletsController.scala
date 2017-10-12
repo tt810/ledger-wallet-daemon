@@ -3,15 +3,15 @@ package co.ledger.wallet.daemon.controllers
 import javax.inject.Inject
 
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
+import co.ledger.wallet.daemon.controllers.requests.{CommonMethodValidations, RichRequest}
 import co.ledger.wallet.daemon.controllers.responses.ResponseSerializer
 import co.ledger.wallet.daemon.exceptions.{CurrencyNotFoundException, WalletNotFoundException, WalletPoolNotFoundException}
 import co.ledger.wallet.daemon.services.{LogMsgMaker, WalletsService}
-import co.ledger.wallet.daemon.utils.RichRequest
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.finagle.http.Request
 import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.{QueryParam, RouteParam}
-import com.twitter.finatra.validation.{MethodValidation, NotEmpty}
+import com.twitter.finatra.validation.{MethodValidation, NotEmpty, ValidationResult}
 
 import scala.concurrent.ExecutionContext
 
@@ -35,7 +35,7 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
           Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
           response,
           pnfe)
-        case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+        case e: Throwable => responseSerializer.serializeInternalError(response, e)
       }
   }
 
@@ -54,7 +54,7 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
         Map("response"->"Wallet doesn't exist", "wallet_name" -> request.wallet_name),
         response,
         wnfe)
-      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+      case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 
@@ -72,7 +72,7 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
         Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
         response,
         pnfe)
-      case e: Throwable => responseSerializer.serializeInternalErrorToOk(response, e)
+      case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 
@@ -85,14 +85,29 @@ object WalletsController {
                                @RouteParam pool_name: String,
                                @RouteParam wallet_name: String,
                                request: Request
-                             ) extends RichRequest(request)
+                             ) extends RichRequest(request) {
+    @MethodValidation
+    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+
+    @MethodValidation
+    def validateWalletName = CommonMethodValidations.validateName("wallet_name", wallet_name)
+  }
 
   case class GetWalletsRequest(
                               @RouteParam pool_name: String,
                               @QueryParam offset: Option[Int],
                               @QueryParam count: Option[Int],
                               request: Request
-                              ) extends RichRequest(request)
+                              ) extends RichRequest(request) {
+    @MethodValidation
+    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+
+    @MethodValidation
+    def validateOffset = ValidationResult.validate(offset.isEmpty || offset.get >= 0, s"offset: offset can not be less than zero")
+
+    @MethodValidation
+    def validateCount = ValidationResult.validate(count.isEmpty || count.get > 0, s"account_index: index can not be less than 1")
+  }
 
   case class CreateWalletRequest(
                                 @RouteParam pool_name: String,
@@ -101,6 +116,9 @@ object WalletsController {
                                 request: Request
                                 ) extends RichRequest(request) {
     @MethodValidation
-    def validateWalletName =CommonMethodValidations.validateName("wallet_name", wallet_name)
+    def validateWalletName = CommonMethodValidations.validateName("wallet_name", wallet_name)
+
+    @MethodValidation
+    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
   }
 }

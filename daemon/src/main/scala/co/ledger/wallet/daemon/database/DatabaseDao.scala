@@ -108,10 +108,15 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     }
   }
 
-  def getNextOperationInfo(next: UUID, userId: Long, poolId: Long, walletName: String, accountIndex: Int)
+  def getNextOperationInfo(next: UUID, userId: Long, poolId: Long, walletName: Option[String], accountIndex: Option[Int])
                           (implicit ec: ExecutionContext): Future[Option[OperationDto]] = {
     val query = operations.filter { op =>
-      op.next.isDefined && op.next === Option(next) && op.userId === userId && op.poolId === poolId && op.walletName === walletName && op.accountIndex === accountIndex
+      op.deletedAt.isEmpty &&
+      op.next.isDefined && op.next === Option(next.toString) &&
+        op.userId === userId &&
+        op.poolId === poolId &&
+        ((op.walletName.isEmpty && walletName.isEmpty) || (op.walletName === walletName)) &&
+        ((op.accountIndex.isEmpty && accountIndex.isEmpty) || (op.accountIndex === accountIndex))
     }
     safeRun(query.result.headOption).map { op =>
       op.map { current =>
@@ -120,10 +125,15 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     }
   }
 
-  def getPreviousOperationInfo(previous: UUID, userId: Long, poolId: Long, walletName: String, accountIndex: Int)
+  def getPreviousOperationInfo(previous: UUID, userId: Long, poolId: Long, walletName: Option[String], accountIndex: Option[Int])
                               (implicit ec: ExecutionContext): Future[Option[OperationDto]] = {
     val query = operations.filter { op =>
-      op.next.isDefined && op.next === Option(previous) && op.userId === userId && op.poolId === poolId && op.walletName === walletName && op.accountIndex === accountIndex
+      op.deletedAt.isEmpty &&
+      op.next.isDefined && op.next === Option(previous.toString) &&
+        op.userId === userId &&
+        op.poolId === poolId &&
+        ((op.walletName.isEmpty && walletName.isEmpty) || (op.walletName === walletName)) &&
+        ((op.accountIndex.isEmpty && accountIndex.isEmpty) || (op.accountIndex === accountIndex))
     }
     safeRun(query.result.headOption).map(_.map(createOperation(_)))
   }
@@ -182,11 +192,11 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
 
   private def createOperationRow(operation: OperationDto): OperationRow = {
     val currentTime = new Timestamp(new Date().getTime)
-    OperationRow(0, operation.userId, operation.poolId, operation.walletName, operation.accountIndex, operation.previous, operation.offset, operation.batch, operation.next, currentTime)
+    OperationRow(0, operation.userId, operation.poolId, operation.walletName, operation.accountIndex, fromUUID(operation.previous), operation.offset, operation.batch, fromUUID(operation.next), currentTime, None)
   }
 
   private def createOperation(opRow: OperationRow): OperationDto = {
-    OperationDto(opRow.userId, opRow.poolId, opRow.walletName, opRow.accountIndex, opRow.previous, opRow.offset, opRow.batch, opRow.next, Option(opRow.id))
+    OperationDto(opRow.userId, opRow.poolId, opRow.walletName, opRow.accountIndex, toUUID(opRow.previous), opRow.offset, opRow.batch, toUUID(opRow.next), Option(opRow.id))
   }
 
   private def createPoolRow(pool: PoolDto): PoolRow =
@@ -212,8 +222,16 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     users.filter(_.pubKey === pubKey.bind)
   }
 
+  private def toUUID(str: Option[String]): Option[UUID] = {
+    str.map(UUID.fromString(_))
+  }
+
+  private def fromUUID(uuid: Option[UUID]): Option[String] = {
+    uuid.map(_.toString)
+  }
+
 }
 
 case class UserDto(pubKey: String, permissions: Long, id: Option[Long] = None)
 case class PoolDto(name: String, userId: Long, configuration: String, id: Option[Long] = None, dbBackend: String = "", dbConnectString: String = "")
-case class OperationDto(userId: Long, poolId: Long, walletName: String, accountIndex: Int, previous: Option[UUID], offset: Long, batch: Int, next: Option[UUID], id: Option[Long] = None)
+case class OperationDto(userId: Long, poolId: Long, walletName: Option[String], accountIndex: Option[Int], previous: Option[UUID], offset: Long, batch: Int, next: Option[UUID], id: Option[Long] = None)

@@ -1,9 +1,21 @@
 package co.ledger.wallet.daemon.api
 
-import co.ledger.wallet.daemon.models.{AccountView, AccountDerivationView}
+import java.util.UUID
+
+import co.ledger.wallet.daemon.TestAccountPreparation
+import co.ledger.wallet.daemon.models.{AccountDerivationView, AccountView, CurrencyView, PackedOperationsView}
+import co.ledger.wallet.daemon.modules.Deserializers.CurrencyDeserializer
+import co.ledger.wallet.daemon.services.OperationQueryParams
 import co.ledger.wallet.daemon.utils.APIFeatureTest
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.module.SimpleModule
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import com.twitter.finagle.http.{Response, Status}
-import org.scalatest.Ignore
+
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Promise}
 
 class AccountsApiTest extends APIFeatureTest {
 
@@ -89,6 +101,62 @@ class AccountsApiTest extends APIFeatureTest {
     assertWalletCreation("account_pool", "accounts_wallet", "bitcoin", Status.Ok)
     assertCreateAccount(INVALID_JSON, "account_pool", "accounts_wallet", Status.BadRequest)
     deletePool("account_pool")
+  }
+
+  test("AccountsApi#Get account operations") {
+
+    def getUUID(field: String, content: Map[String, Any]): Option[UUID] = {
+      val idStr = content.get(field).asInstanceOf[Option[String]]
+      idStr.map(UUID.fromString(_))
+    }
+
+    createPool("op_pool")
+    assertWalletCreation("op_pool", "op_wallet", "bitcoin", Status.Ok)
+    assertCreateAccount(CORRECT_BODY, "op_pool", "op_wallet", Status.Ok)
+    Await.result(TestAccountPreparation.prepare(0, "03B4A94D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D", "op_pool", "op_wallet", Promise[Boolean]()), Duration.Inf)
+    val firstBtch = parse[Map[String, Any]](assertGetAccountOps("op_pool", "op_wallet", 0, OperationQueryParams(None, None, 2, 0), Status.Ok))
+
+    val secondBtch = parse[Map[String, Any]](assertGetAccountOps("op_pool", "op_wallet", 0, OperationQueryParams(None, getUUID("next", firstBtch), 10, 0), Status.Ok))
+
+    val previousOf2ndBtch = parse[Map[String, Any]](assertGetAccountOps("op_pool", "op_wallet", 0, OperationQueryParams(getUUID("previous", secondBtch), None, 10, 0), Status.Ok))
+    assert(firstBtch.get("next") === previousOf2ndBtch.get("next"))
+    assert(firstBtch.get("previous") === previousOf2ndBtch.get("previous"))
+
+    val thirdBtch = parse[Map[String, Any]](assertGetAccountOps("op_pool", "op_wallet", 0, OperationQueryParams(None, getUUID("next", secondBtch), 5, 0), Status.Ok))
+
+    val fourthBtch = parse[Map[String, Any]](assertGetAccountOps("op_pool", "op_wallet", 0, OperationQueryParams(None, getUUID("next", thirdBtch), 10, 0), Status.Ok))
+
+    val previousOf4thBtch = parse[Map[String, Any]](assertGetAccountOps("op_pool", "op_wallet", 0, OperationQueryParams(getUUID("previous", fourthBtch), None, 10, 1), Status.Ok))
+    assert(thirdBtch.get("next") === previousOf4thBtch.get("next"))
+    assert(thirdBtch.get("previous") === previousOf4thBtch.get("previous"))
+    deletePool("op_pool")
+  }
+
+  test("AccountsApi#Pool not exist") {
+    createPool("op_pool_mal")
+    assertWalletCreation("op_pool_mal", "op_wallet", "bitcoin", Status.Ok)
+    assertCreateAccount(CORRECT_BODY, "op_pool_mal", "op_wallet", Status.Ok)
+
+    assertGetAccountOps("op_pool_non_exist", "op_wallet", 0, OperationQueryParams(None, None, 2, 0), Status.BadRequest)
+    assertGetAccountOps("op_pool_mal", "op_wallet", 0, OperationQueryParams(None, Option(UUID.randomUUID), 2, 0), Status.BadRequest)
+    assertGetAccountOps("op_pool_mal", "op_wallet", 0, OperationQueryParams(Option(UUID.randomUUID), None, 2, 0), Status.BadRequest)
+    deletePool("op_pool_mal")
+  }
+
+  private def assertGetAccountOps(poolName: String, walletName: String, accountIndex: Int, params: OperationQueryParams, expected: Status): Response = {
+    val sb = new StringBuilder(s"/pools/$poolName/wallets/$walletName/accounts/$accountIndex/operations?")
+    params.previous match {
+      case None =>
+      case Some(p) => sb.append("previous=" + p.toString + "&")
+    }
+    params.next match {
+      case None =>
+      case Some(n) => sb.append("next=" + n.toString + "&")
+    }
+    sb.append(s"batch=${params.batch}&full_op=${params.fullOp}")
+    val previous = if (params.previous.isEmpty) null else params.previous.get
+    val next = if (params.next.isEmpty) null else params.next.get
+    server.httpGet(sb.toString(), headers = defaultHeaders, andExpect = expected)
   }
 
   private def assertGetAccounts(index: Option[Int], poolName: String, walletName: String, expected: Status): Response = {

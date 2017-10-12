@@ -67,6 +67,8 @@ class DaemonCacheTest extends AssertionsForJUnit {
   @Test def verifyGetAccountOperations(): Unit = {
     val user1 = Await.result(cache.getUserDirectlyFromDB(PUB_KEY_3), Duration.Inf)
     val pool1 = Await.result(DefaultDaemonCache.dbDao.getPool(user1.get.id.get, POOL_NAME), Duration.Inf)
+    val withTxs = Await.result(cache.getAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, 1, 1), Duration.Inf)
+    withTxs.operations.foreach(op => assertNotNull(op.transaction))
     val ops = Await.result(cache.getAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, 20, 0), Duration.Inf)
     assert(ops.previous.isEmpty)
     assert(20 === ops.operations.size)
@@ -81,6 +83,9 @@ class DaemonCacheTest extends AssertionsForJUnit {
 
     val previousOfNextNextOps = Await.result(cache.getPreviousBatchAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, nextnextOps.previous.get, 0), Duration.Inf)
     assert(nextOps === previousOfNextNextOps)
+
+    val theVeryFirstOps = Await.result(cache.getPreviousBatchAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, previousOfNextNextOps.previous.get, 0), Duration.Inf)
+    assert(ops === theVeryFirstOps)
 
     val maxi = Await.result(cache.getAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, Int.MaxValue, 0), Duration.Inf)
     assert(maxi.operations.size < Int.MaxValue)
