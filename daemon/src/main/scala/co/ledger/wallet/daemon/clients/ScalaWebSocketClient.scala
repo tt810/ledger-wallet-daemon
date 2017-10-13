@@ -47,8 +47,12 @@ class ScalaWebSocketClient extends co.ledger.core.WebSocketClient with Logging{
   }
 
   @OnMessage
-  def processMessage(message: String): Unit = {
-    println(message)
+  def processMessage(message: String, session: Session): Unit = {
+    info(LogMsgMaker.newInstance("Processing message")
+      .append("raw_message", message)
+      .append("session", session.getId)
+      .toString())
+    println("*************************************** " + message)
   }
 
   override def send(connection: WebSocketConnection, data: String) = {
@@ -77,8 +81,9 @@ class ScalaWebSocketClient extends co.ledger.core.WebSocketClient with Logging{
       try {
         @Nullable val session = sessions.remove(connection.getConnectionId)
         if(session != null) session.close()
-        info(LogMsgMaker.newInstance("Session closed")
+        info(LogMsgMaker.newInstance("Disconnecting, session closed")
           .append("session", session.getId)
+          .append("connection", connection.getConnectionId)
           .toString())
       } catch {
         case e: Throwable => {
