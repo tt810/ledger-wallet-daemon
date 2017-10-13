@@ -7,7 +7,11 @@ import scala.concurrent.{ExecutionContext, Future}
 object SerialExecutionContext {
   object Implicits{
     implicit lazy val global = SerialExecutionContextWrapper(ExecutionContext.Implicits.global)
-    implicit lazy val single = SerialExecutionContextWrapper(ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor()))
+  }
+
+  def singleNamedThread(prefix: String) = {
+    val threadPoolExecutor = Executors.newFixedThreadPool(1, Pools.newNamedThreadFactory(prefix))
+    SerialExecutionContextWrapper(ExecutionContext.fromExecutor(threadPoolExecutor))
   }
 }
 
@@ -19,7 +23,6 @@ class SerialExecutionContextWrapper(implicit val ec: ExecutionContext) extends E
   }
 
   override def reportFailure(cause: Throwable): Unit = ec.reportFailure(cause)
-
 }
 
 object SerialExecutionContextWrapper {

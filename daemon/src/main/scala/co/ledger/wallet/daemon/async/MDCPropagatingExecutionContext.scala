@@ -1,5 +1,7 @@
 package co.ledger.wallet.daemon.async
 
+import java.util.concurrent.Executors
+
 import org.slf4j.MDC
 
 import scala.concurrent.ExecutionContext
@@ -41,6 +43,11 @@ trait MDCPropagatingExecutionContext extends ExecutionContext{
 object MDCPropagatingExecutionContext {
   object Implicits {
     implicit lazy val global = MDCPropagatingExecutionContextWrapper(ExecutionContext.Implicits.global)
+  }
+
+  def cachedNamedThreads(prefix: String) = {
+    val threadPoolExecutor = Executors.newCachedThreadPool(Pools.newNamedThreadFactory(prefix))
+    MDCPropagatingExecutionContextWrapper(ExecutionContext.fromExecutor(threadPoolExecutor))
   }
 }
 

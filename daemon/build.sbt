@@ -26,6 +26,9 @@ libraryDependencies ++= Seq(
 
   "org.bitcoinj" % "bitcoinj-core" % "0.14.4",
   "io.github.andrebeat" %% "scala-pool" % "0.4.0",
+  "javax.websocket" % "javax.websocket-api" % "1.1" % "provided",
+
+  "com.google.guava" % "guava" % "23.0",
 
   "com.twitter" %% "finatra-http" % versions.finatra,
   "com.twitter" %% "finatra-jackson" % versions.finatra,

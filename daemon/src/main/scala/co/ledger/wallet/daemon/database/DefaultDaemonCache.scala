@@ -5,28 +5,25 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Singleton
 
 import co.ledger.core
+import co.ledger.core.implicits._
 import co.ledger.core.{AccountCreationInfo, implicits}
+import co.ledger.wallet.daemon.async.{MDCPropagatingExecutionContext, SerialExecutionContext}
+import co.ledger.wallet.daemon.clients.ClientFactory
+import co.ledger.wallet.daemon.exceptions.{CurrencyNotFoundException, InvalidArgumentException, _}
 import co.ledger.wallet.daemon.libledger_core.async.ScalaThreadDispatcher
 import co.ledger.wallet.daemon.libledger_core.crypto.SecureRandomRNG
 import co.ledger.wallet.daemon.libledger_core.debug.NoOpLogPrinter
 import co.ledger.wallet.daemon.libledger_core.filesystem.ScalaPathResolver
-import co.ledger.wallet.daemon.libledger_core.net.{ScalaHttpClient, ScalaWebSocketClient}
-import co.ledger.wallet.daemon.utils.{AsArrayList, HexUtils}
-import org.bitcoinj.core.Sha256Hash
-import co.ledger.core.implicits._
-import co.ledger.wallet.daemon.{DaemonConfiguration, exceptions, models}
-import co.ledger.wallet.daemon.async.{MDCPropagatingExecutionContext, SerialExecutionContext}
-import co.ledger.wallet.daemon.exceptions._
-import co.ledger.wallet.daemon.exceptions.CurrencyNotFoundException
-import co.ledger.wallet.daemon.exceptions.InvalidArgumentException
 import co.ledger.wallet.daemon.models._
 import co.ledger.wallet.daemon.services.LogMsgMaker
+import co.ledger.wallet.daemon.utils.{AsArrayList, HexUtils}
+import co.ledger.wallet.daemon.{DaemonConfiguration, exceptions, models}
 import com.twitter.inject.Logging
+import org.bitcoinj.core.Sha256Hash
 import slick.jdbc.JdbcBackend.Database
 
-import scala.concurrent.Future
-import collection.JavaConverters._
-import scala.concurrent.ExecutionContext
+import scala.collection.JavaConverters._
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * TODO: Add wallets and accounts to cache
@@ -475,7 +472,8 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
 }
 
 object DefaultDaemonCache extends Logging {
-  private val _singleExecuter: ExecutionContext = SerialExecutionContext.Implicits.single
+  private val _singleExecuter: ExecutionContext = SerialExecutionContext.singleNamedThread("database-initialization-thread-pool")
+
 
   def migrateDatabase(): Future[Unit] = {
     implicit val ec = _singleExecuter
@@ -510,8 +508,8 @@ object DefaultDaemonCache extends Logging {
   private def buildPool(pool: PoolDto)(implicit ec: ExecutionContext): Future[core.WalletPool] = {
     val identifier = poolIdentifier(pool.userId, pool.name)
     core.WalletPoolBuilder.createInstance()
-      .setHttpClient(new ScalaHttpClient)
-      .setWebsocketClient(new ScalaWebSocketClient)
+      .setHttpClient(ClientFactory.httpClient)
+      .setWebsocketClient(ClientFactory.webSocketClient)
       .setLogPrinter(new NoOpLogPrinter(dispatcher.getMainExecutionContext))
       .setThreadDispatcher(dispatcher)
       .setPathResolver(new ScalaPathResolver(identifier))

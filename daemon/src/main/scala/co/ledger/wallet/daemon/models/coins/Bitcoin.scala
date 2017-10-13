@@ -32,7 +32,7 @@ object Bitcoin {
       newBlockView(from.getBlock),
       if(from.getFees == null) None else Option(from.getFees.toLong),
       from.getHash,
-      from.geTime(),
+      from.getTime(),
       from.getInputs.asScala.toSeq.map(newInputView(_)),
       from.getLockTime,
       from.getOutputs.asScala.toSeq.map(newOutputView(_))
