@@ -1,13 +1,17 @@
 package co.ledger.wallet.daemon.async
 
-import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 import scala.concurrent.{ExecutionContext, Future}
 
 object SerialExecutionContext {
   object Implicits{
     implicit lazy val global = SerialExecutionContextWrapper(ExecutionContext.Implicits.global)
-    implicit lazy val single = SerialExecutionContextWrapper(ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor()))
+  }
+
+  def singleNamedThread(prefix: String) = {
+    val threadPoolExecutor = new NamedThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, prefix)
+    SerialExecutionContextWrapper(ExecutionContext.fromExecutor(threadPoolExecutor))
   }
 }
 
@@ -19,7 +23,6 @@ class SerialExecutionContextWrapper(implicit val ec: ExecutionContext) extends E
   }
 
   override def reportFailure(cause: Throwable): Unit = ec.reportFailure(cause)
-
 }
 
 object SerialExecutionContextWrapper {
