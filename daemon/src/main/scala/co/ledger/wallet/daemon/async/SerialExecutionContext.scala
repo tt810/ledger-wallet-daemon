@@ -1,6 +1,6 @@
 package co.ledger.wallet.daemon.async
 
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.Executors
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -10,7 +10,7 @@ object SerialExecutionContext {
   }
 
   def singleNamedThread(prefix: String) = {
-    val threadPoolExecutor = new NamedThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, prefix)
+    val threadPoolExecutor = Executors.newFixedThreadPool(1, Pools.newNamedThreadFactory(prefix))
     SerialExecutionContextWrapper(ExecutionContext.fromExecutor(threadPoolExecutor))
   }
 }

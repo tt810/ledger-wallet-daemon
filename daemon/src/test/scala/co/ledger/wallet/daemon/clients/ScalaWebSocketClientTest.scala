@@ -1,8 +1,9 @@
 package co.ledger.wallet.daemon.clients
 
-import java.util.concurrent.Executors
+import java.util.concurrent.{Executors, TimeUnit}
 
 import co.ledger.core.{ErrorCode, WebSocketConnection}
+import co.ledger.wallet.daemon.async.Pools
 import org.junit.Test
 import org.scalatest.junit.AssertionsForJUnit
 
@@ -12,19 +13,22 @@ class ScalaWebSocketClientTest extends AssertionsForJUnit {
   @Test def verifyThreadedConnection(): Unit = {
     val client = ClientFactory.webSocketClient
     val nThreads = 10
-    val executor = Executors.newFixedThreadPool(nThreads)
-    val f = new Runnable {
-      override def run(): Unit = client.connect("ws://echo.websocket.org", new TestWebSocketConnection)
+    val executor = Executors.newFixedThreadPool(nThreads, Pools.newNamedThreadFactory("scala-web-socket-client-test"))
+    val connect = new Runnable {
+      override def run(): Unit = {
+        val connection = new TestWebSocketConnection
+        client.connect("ws://echo.websocket.org", connection)
+        client.send(connection, "It's me")
+        client.disconnect(connection)
+      }
     }
-    (0 to nThreads).foreach(_ => executor.submit(f))
+    (0 to nThreads).foreach(_ => executor.submit(connect))
 
-    Thread.sleep(20000L)
-    val keys = ScalaWebSocketClient.sessions.keySet()
-    assert(11 === keys.size())
-    (1 to (nThreads + 1)).foreach(n => assert(keys.contains(n)))
+    executor.shutdown()
+    val done = executor.awaitTermination(20, TimeUnit.SECONDS)
+    assert(done)
+
   }
-
-
 
   class TestWebSocketConnection extends WebSocketConnection {
     override def onConnect(connectionId: Int): Unit = {
