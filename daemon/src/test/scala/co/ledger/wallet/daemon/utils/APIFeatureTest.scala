@@ -4,7 +4,6 @@ import java.io.File
 import java.util.Date
 
 import co.ledger.wallet.daemon.ServerImpl
-import co.ledger.wallet.daemon.libledger_core.filesystem.ScalaPathResolver
 import co.ledger.wallet.daemon.services.ECDSAService
 import com.lambdaworks.codec.Base64
 import com.twitter.finagle.http.{Response, Status}
@@ -14,6 +13,7 @@ import org.bitcoinj.core.Sha256Hash
 
 import scala.concurrent.Await
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
+import co.ledger.wallet.daemon.libledger_core.filesystem.ScalaPathResolver
 
 import scala.concurrent.duration.Duration
 

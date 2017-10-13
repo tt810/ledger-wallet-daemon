@@ -26,6 +26,11 @@ libraryDependencies ++= Seq(
 
   "org.bitcoinj" % "bitcoinj-core" % "0.14.4",
   "io.github.andrebeat" %% "scala-pool" % "0.4.0",
+//  "com.wire" % "generic-message-proto" % "1.18.0",
+//  "com.wire" % "backend-api-proto" % "1.1",
+  "javax.websocket" % "javax.websocket-api" % "1.1" % "provided",
+  "org.glassfish.tyrus" % "tyrus-client" % "1.13",
+  "org.glassfish.tyrus" % "tyrus-container-grizzly-client" % "1.13",
 
   "com.twitter" %% "finatra-http" % versions.finatra,
   "com.twitter" %% "finatra-jackson" % versions.finatra,
