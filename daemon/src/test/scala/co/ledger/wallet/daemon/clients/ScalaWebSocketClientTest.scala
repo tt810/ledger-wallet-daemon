@@ -18,7 +18,7 @@ class ScalaWebSocketClientTest extends AssertionsForJUnit {
       override def run(): Unit = {
         val connection = new TestWebSocketConnection
         client.connect("ws://echo.websocket.org", connection)
-        client.send(connection, "It's me")
+        client.send(connection, "It's me " + connection.getConnectionId)
         client.disconnect(connection)
       }
     }
