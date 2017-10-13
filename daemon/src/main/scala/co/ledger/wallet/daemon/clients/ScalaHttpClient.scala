@@ -1,18 +1,24 @@
-package co.ledger.wallet.daemon.libledger_core.net
+package co.ledger.wallet.daemon.clients
+
 import java.io.{BufferedInputStream, DataOutputStream}
 import java.net.{HttpURLConnection, URL}
 import java.util
 
 import co.ledger.core.{ErrorCode, HttpMethod, HttpReadBodyResult, HttpRequest}
+import co.ledger.wallet.daemon.services.LogMsgMaker
+import com.twitter.inject.Logging
 
 import scala.collection.JavaConverters._
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
-class ScalaHttpClient extends co.ledger.core.HttpClient {
-  private implicit val ec = scala.concurrent.ExecutionContext.global
+class ScalaHttpClient(implicit val ec: ExecutionContext) extends co.ledger.core.HttpClient with Logging {
 
   override def execute(request: HttpRequest): Unit = Future {
+    debug(LogMsgMaker.newInstance("Executing HTTP request")
+      .append("request_url", request.getUrl)
+      .append("request_method", request.getMethod)
+      .toString())
     val connection = new URL(request.getUrl).openConnection().asInstanceOf[HttpURLConnection]
     connection.setRequestMethod(resolveMethod(request.getMethod))
     for ((key, value) <- request.getHeaders.asScala) {
@@ -64,17 +70,20 @@ class ScalaHttpClient extends co.ledger.core.HttpClient {
       override def readBody(): HttpReadBodyResult = {
         Try {
           val size = response.read(buffer)
+
           if (size < buffer.length) {
             buffer.slice(0, size)
           } else {
             buffer
           }
         } match {
-          case Success(data) =>
+          case Success(data) => {
             new HttpReadBodyResult(null, data)
-          case Failure(ex) =>
+          }
+          case Failure(ex) => {
             val error = new co.ledger.core.Error(ErrorCode.HTTP_ERROR, "An error happened during body reading.")
             new HttpReadBodyResult(error, null)
+          }
         }
       }
     }

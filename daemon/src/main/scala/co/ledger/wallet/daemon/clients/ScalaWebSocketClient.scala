@@ -6,7 +6,7 @@ import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap}
 import javax.annotation.Nullable
 import javax.websocket.{ClientEndpoint, ContainerProvider, OnMessage, Session}
 
-import co.ledger.core.WebSocketConnection
+import co.ledger.core.{ErrorCode, WebSocketConnection}
 import co.ledger.wallet.daemon.services.LogMsgMaker
 import com.twitter.inject.Logging
 import net.jcip.annotations.ThreadSafe
@@ -36,11 +36,13 @@ class ScalaWebSocketClient extends co.ledger.core.WebSocketClient with Logging{
           .append("connection", connection.getConnectionId)
           .toString())
       } catch {
-        case io: Exception => error(LogMsgMaker.newInstance("Failed to connect to server")
-          .append("url", url)
-          .toString(), io)
+        case e: Throwable => {
+          error(LogMsgMaker.newInstance("Failed to connect to server")
+            .append("url", url)
+            .toString(), e)
+          connection.onError(ErrorCode.HTTP_ERROR, e.getMessage)
+        }
       }
-
     }
   }
 
@@ -79,7 +81,10 @@ class ScalaWebSocketClient extends co.ledger.core.WebSocketClient with Logging{
           .append("session", session.getId)
           .toString())
       } catch {
-        case e: Exception => error("Fail to close session", e)
+        case e: Throwable => {
+          error("Fail to disconnect", e)
+          connection.onError(ErrorCode.HTTP_ERROR, e.getMessage)
+        }
       } finally {
         connection.onClose()
       }
@@ -91,6 +96,6 @@ class ScalaWebSocketClient extends co.ledger.core.WebSocketClient with Logging{
 
 object ScalaWebSocketClient {
   private val webSocketContainer = ContainerProvider.getWebSocketContainer
-  private[clients] val sessions: ConcurrentMap[Int, Session] = new ConcurrentHashMap[Int, Session]()
+  private val sessions: ConcurrentMap[Int, Session] = new ConcurrentHashMap[Int, Session]()
   private val connectionCount = new AtomicInteger(0)
 }
