@@ -3,11 +3,12 @@ package co.ledger.wallet.daemon.services
 import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.Future
-import co.ledger.wallet.daemon.database.{DaemonCache, UserDto}
+import co.ledger.wallet.daemon.database.{DaemonCache, SynchronizationResult, UserDto}
 import co.ledger.wallet.daemon.models.WalletPoolView
 
 @Singleton
 class PoolsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
+
   import PoolsService._
 
   def createPool(user: UserDto, poolName: String, configuration: PoolConfiguration): Future[WalletPoolView] = {
@@ -32,6 +33,11 @@ class PoolsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
       .append("user_pub_key", user.pubKey)
       .toString())
     daemonCache.getWalletPool(user.pubKey, poolName)
+  }
+
+  def syncOperations(): Future[Seq[SynchronizationResult]] = {
+    info(LogMsgMaker.newInstance("Synchronizing existing wallet pools").toString())
+    daemonCache.syncOperations()
   }
 
   def removePool(user: UserDto, poolName: String): Future[Unit] = {

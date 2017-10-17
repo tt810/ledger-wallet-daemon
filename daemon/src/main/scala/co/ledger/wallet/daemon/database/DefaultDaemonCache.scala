@@ -2,6 +2,7 @@ package co.ledger.wallet.daemon.database
 
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import javax.annotation.Nullable
 import javax.inject.Singleton
 
 import co.ledger.core
@@ -10,7 +11,7 @@ import co.ledger.core.{AccountCreationInfo, implicits}
 import co.ledger.wallet.daemon.async.{MDCPropagatingExecutionContext, SerialExecutionContext}
 import co.ledger.wallet.daemon.clients.ClientFactory
 import co.ledger.wallet.daemon.exceptions.{CurrencyNotFoundException, InvalidArgumentException, _}
-import co.ledger.wallet.daemon.libledger_core.async.ScalaThreadDispatcher
+import co.ledger.wallet.daemon.libledger_core.async.{LedgerCoreExecutionContext, ScalaThreadDispatcher}
 import co.ledger.wallet.daemon.libledger_core.crypto.SecureRandomRNG
 import co.ledger.wallet.daemon.libledger_core.debug.NoOpLogPrinter
 import co.ledger.wallet.daemon.libledger_core.filesystem.ScalaPathResolver
@@ -23,7 +24,7 @@ import org.bitcoinj.core.Sha256Hash
 import slick.jdbc.JdbcBackend.Database
 
 import scala.collection.JavaConverters._
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 
 /**
   * TODO: Add wallets and accounts to cache
@@ -34,6 +35,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
   import DefaultDaemonCache._
   private val _writeContext = SerialExecutionContext.Implicits.global
+  private val _coreExecutionContext = LedgerCoreExecutionContext.newThreadPool("account-observer-thread-pool")
 
   def createAccount(accountDerivations: AccountDerivationView, user: UserDto, poolName: String, walletName: String): Future[models.AccountView] = {
     info(LogMsgMaker.newInstance("Creating account")
@@ -78,7 +80,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
 
   def createWalletPool(user: UserDto, poolName: String, configuration: String): Future[WalletPoolView] = {
     implicit val ec = _writeContext
-    createPool(user, poolName, configuration).flatMap(corePool => Pool.newView(corePool))
+    createPoolAndRegister(user, poolName, configuration).flatMap(corePool => Pool.newView(corePool))
   }
 
   def createWallet(walletName: String, currencyName: String, poolName: String, user: UserDto): Future[WalletView] = {
@@ -87,14 +89,14 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     }
   }
 
-  def createUser(user: UserDto): Future[Int] = {
+  def createUser(user: UserDto): Future[Long] = {
     implicit val ec = _writeContext
-    dbDao.insertUser(user).map { int =>
+    dbDao.insertUser(user).map { id =>
       userPools.put(user.pubKey, new ConcurrentHashMap[String, core.WalletPool]())
       debug(LogMsgMaker.newInstance("User created")
         .append("user_pub_key", user.pubKey)
         .toString())
-      int
+      id
     }
   }
 
@@ -105,13 +107,12 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
       .append("user_pub_key", user.pubKey)
       .toString())
     // p.release() TODO once WalletPool#release exists
-    dbDao.deletePool(poolName, user.id.get) map { deletedRowCount =>
-      debug(LogMsgMaker.newInstance("Wallet pool deleted")
-        .append("pool_name", poolName)
-        .append("user_pub_key", user.pubKey)
-        .append("delete_row", deletedRowCount)
-        .toString())
-      getNamedPools(user.pubKey).remove(poolName)
+    dbDao.deletePool(poolName, user.id.get) map { deletedPool =>
+      if (deletedPool.isDefined) {
+        assert(deletedPool.get.id.isDefined, "Deleted pool must contain id $deletedPool")
+        @Nullable val pool: core.WalletPool = getNamedPools(user.pubKey).remove(poolName)
+        if (pool != null) unregisterEventReceiver(pool, deletedPool.get.id.get)
+      }
     }
   }
 
@@ -309,6 +310,46 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     dbDao.getUser(pubKey)
   }
 
+  def syncOperations(): Future[Seq[SynchronizationResult]] = {
+    val finalRs = for {
+      pools <- userPools.asScala.values
+      pool <- pools.asScala.values
+      results = for {
+        count <- pool.getWalletCount()
+        wallets <- pool.getWallets(0, count)
+        accounts <- Future.sequence(
+          wallets.asScala.toSeq.map { wallet =>
+            getCoreAccounts(wallet).flatMap { accounts =>
+            Future.sequence(accounts.map { account =>
+              val promise: Promise[SynchronizationResult] = Promise[SynchronizationResult]()
+              val receiver: core.EventReceiver = new SynchronizationEventReceiver(account.getIndex, wallet.getName, pool.getName, promise)
+              account.synchronize().subscribe(_coreExecutionContext, receiver)
+              promise.future
+            })
+          }})
+      } yield accounts.flatten
+    } yield results
+    (Future.sequence(finalRs.toSeq)).map(_.flatten)
+  }
+
+  private def registerEventReceiver(pool: core.WalletPool, poolId: Long)(ec: ExecutionContext): core.EventReceiver = {
+    info(LogMsgMaker.newInstance("Registering event receiver for wallet pool")
+      .append("pool_id", poolId)
+      .append("pool_name", pool.getName)
+      .toString())
+    val eventReceiver: core.EventReceiver = eventReceivers.getOrDefault(poolId, new NewOperationEventReceiver(poolId, dbDao)(ec))
+    pool.getEventBus.subscribe(_coreExecutionContext, eventReceiver)
+    eventReceivers.put(poolId, eventReceiver)
+  }
+
+  private def unregisterEventReceiver(pool: core.WalletPool, poolId: Long): Unit = {
+    info(LogMsgMaker.newInstance("Unregistering event receiver for wallet pool")
+      .append("pool_id", poolId)
+      .append("pool_name", pool.getName)
+      .toString())
+    @Nullable val eventReceiver: core.EventReceiver = eventReceivers.remove(poolId)
+    if(eventReceiver != null) pool.getEventBus.unsubscribe(eventReceiver)
+  }
 
   private[daemon] def getCoreAccount(accountIndex: Int, pubKey: String, poolName: String, walletName: String): Future[(core.Account, core.Wallet)] = {
     getCoreWallet(walletName, poolName, pubKey).flatMap { wallet =>
@@ -412,7 +453,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     }
   }
 
-  private def createPool(user: UserDto, poolName: String, configuration: String)(implicit ec: ExecutionContext): Future[core.WalletPool] = {
+  private def createPoolAndRegister(user: UserDto, poolName: String, configuration: String)(implicit ec: ExecutionContext): Future[core.WalletPool] = {
     info(LogMsgMaker.newInstance("Creating wallet pool")
       .append("pool_name", poolName)
       .append("user", user)
@@ -420,13 +461,15 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
       .toString())
     val newPool = PoolDto(poolName, user.id.get, configuration)
 
-    dbDao.insertPool(newPool).map { (_) =>
+    dbDao.insertPool(newPool).map { poolId =>
       addToCache(user,newPool).map { walletPool =>
         debug(LogMsgMaker.newInstance("Wallet pool created")
           .append("pool_name", poolName)
+          .append("pool_id", poolId)
           .append("user_pub_key", user.pubKey)
           .append("result", newPool)
           .toString())
+        registerEventReceiver(walletPool, poolId)(ec)
         walletPool
       }
     }.recover {
@@ -558,6 +601,7 @@ object DefaultDaemonCache extends Logging {
   private val dispatcher        =   new ScalaThreadDispatcher(MDCPropagatingExecutionContext.Implicits.global)
   private val pooledCurrencies  =   new ConcurrentHashMap[String, ConcurrentHashMap[String, core.Currency]]()
   private val userPools         =   new ConcurrentHashMap[String, ConcurrentHashMap[String, core.WalletPool]]()
+  private val eventReceivers  = new ConcurrentHashMap[Long, core.EventReceiver]()
 }
 
 case class Bulk(offset: Int = 0, bulkSize: Int = 20)

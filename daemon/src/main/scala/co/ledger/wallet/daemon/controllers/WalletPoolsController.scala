@@ -6,11 +6,11 @@ import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.controllers.requests.{CommonMethodValidations, RichRequest}
 import co.ledger.wallet.daemon.controllers.responses.ResponseSerializer
 import co.ledger.wallet.daemon.exceptions._
-import co.ledger.wallet.daemon.services.{LogMsgMaker, PoolsService}
-import com.twitter.finagle.http.Request
 import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
 import co.ledger.wallet.daemon.services.PoolsService.PoolConfiguration
+import co.ledger.wallet.daemon.services.{LogMsgMaker, PoolsService}
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.twitter.finagle.http.Request
 import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.RouteParam
 import com.twitter.finatra.validation.{MethodValidation, NotEmpty}
@@ -40,6 +40,17 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
         Map("response"->"Wallet pool doesn't exist", "pool_name" -> request.pool_name),
         response,
         pe)
+      case e: Throwable => responseSerializer.serializeInternalError(response, e)
+    }
+  }
+
+  post("/pools/operations/synchronize") { request: Request =>
+    info(LogMsgMaker.newInstance("SYNC wallet pools request")
+      .append("request", request)
+      .toString())
+    poolsService.syncOperations().map { result =>
+      result.filter(_.syncResult == false)
+    }.recover {
       case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
