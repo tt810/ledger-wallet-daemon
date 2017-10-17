@@ -52,8 +52,9 @@ class DatabaseDaoTest extends AssertionsForJUnit {
 
   @Test def verifyCreatePoolWithExistUser(): Unit = {
     val pubKey = "23B4A94D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D"
-    Await.result(dbDao.insertUser(UserDto(pubKey, 0)), Duration.Inf)
+    val id = Await.result(dbDao.insertUser(UserDto(pubKey, 0)), Duration.Inf)
     val insertedUser = Await.result(dbDao.getUser(HexUtils.valueOf(pubKey)), Duration.Inf)
+    assert(id === insertedUser.get.id.get)
     val expectedPool = PoolDto("myPool", insertedUser.get.id.get, "")
     Await.result(dbDao.insertPool(expectedPool), Duration.Inf)
     val actualPool =Await.result(dbDao.getPools(insertedUser.get.id.get), Duration.Inf)
@@ -62,15 +63,32 @@ class DatabaseDaoTest extends AssertionsForJUnit {
     assertEquals(expectedPool.userId, actualPool(0).userId)
   }
 
+  @Test def verifyReturnInsertedUserIds(): Unit = {
+    val pubKey1 = "232AA94D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D"
+    val id1 = Await.result(dbDao.insertUser(UserDto(pubKey1, 0)), Duration.Inf)
+    val insertedUser1 = Await.result(dbDao.getUser(HexUtils.valueOf(pubKey1)), Duration.Inf)
+    assert(id1 === insertedUser1.get.id.get)
+    val pubKey2 = "232AA94D8E33308DA08A3A8CA37D22101E212D85A2C0DFABC236A8C6A82E580D6A"
+    val id2 = Await.result(dbDao.insertUser(UserDto(pubKey2, 0)), Duration.Inf)
+    val insertedUser2 = Await.result(dbDao.getUser(HexUtils.valueOf(pubKey2)), Duration.Inf)
+    assert(id2 === insertedUser2.get.id.get)
+    val pubKey3 = "922AA9DD8ED3308DD08A3A8CA378A2101E229D85A111DEEBC236A8C6A82E580D6A"
+    val id3 = Await.result(dbDao.insertUser(UserDto(pubKey3, 0)), Duration.Inf)
+    val insertedUser3 = Await.result(dbDao.getUser(HexUtils.valueOf(pubKey3)), Duration.Inf)
+    assert(id3 === insertedUser3.get.id.get)
+  }
+
   @Test def verifyDeletePoolNotDeletingUserWithNoPool(): Unit = {
     val pubKey = "33B4A94D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D"
     Await.result(dbDao.insertUser(UserDto(pubKey, 0)), Duration.Inf)
     val insertedUser = Await.result(dbDao.getUser(HexUtils.valueOf(pubKey)), Duration.Inf)
-    Await.result(dbDao.insertPool(PoolDto("myPool", insertedUser.get.id.get, "")), Duration.Inf)
+    val poolId = Await.result(dbDao.insertPool(PoolDto("myPool", insertedUser.get.id.get, "")), Duration.Inf)
     val existingPools = Await.result(dbDao.getPools(insertedUser.get.id.get), Duration.Inf)
     assertEquals(1, existingPools.size)
+    assertEquals(poolId, existingPools(0).id.get)
     assertEquals("myPool", existingPools(0).name)
-    Await.result(dbDao.deletePool("myPool", insertedUser.get.id.get), Duration.Inf)
+    val deletedPool = Await.result(dbDao.deletePool("myPool", insertedUser.get.id.get), Duration.Inf)
+    assertEquals(deletedPool, Option(existingPools(0)))
     val leftoverUser = Await.result(dbDao.getUser(HexUtils.valueOf(pubKey)), Duration.Inf)
     assertFalse("User should not be deleted", leftoverUser.isEmpty)
     assertEquals(0, Await.result(dbDao.getPools(insertedUser.get.id.get), Duration.Inf).size)
@@ -182,6 +200,42 @@ class DatabaseDaoTest extends AssertionsForJUnit {
     val nextOp2 = Await.result(
       dbDao.getNextOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1)), Duration.Inf)
     assertFalse(nextOp2.get.next === nextOp.get.next)
+  }
+
+  @Test def verifyUpdateoffset(): Unit = {
+    val pubKey = "04133D4D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D"
+    Await.result(dbDao.insertUser(UserDto(pubKey, 0)), Duration.Inf)
+    val insertedUser = Await.result(dbDao.getUser(HexUtils.valueOf(pubKey)), Duration.Inf)
+    Await.result(dbDao.insertPool(PoolDto("opsPool", insertedUser.get.id.get, "")), Duration.Inf)
+    val insertedPool = (Await.result(dbDao.getPool(insertedUser.get.id.get, "opsPool"), Duration.Inf))
+    val accountLevel = Option(UUID.randomUUID())
+    val walletLevel = Option(UUID.randomUUID())
+    val poolLevel = Option(UUID.randomUUID())
+    Await.result(dbDao.insertOperation(
+      OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1), Option(UUID.randomUUID()), 0, 20, accountLevel)), Duration.Inf)
+    Await.result(dbDao.insertOperation(
+      OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), None, Option(UUID.randomUUID()), 0, 20, walletLevel)), Duration.Inf)
+    Await.result(dbDao.insertOperation(
+      OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, None, None, Option(UUID.randomUUID()), 0, 20, poolLevel)), Duration.Inf)
+    val op1B = Await.result(
+      dbDao.getPreviousOperationInfo(accountLevel.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1)), Duration.Inf)
+    assert(0 === op1B.get.offset)
+    val op2B = Await.result(
+      dbDao.getPreviousOperationInfo(walletLevel.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), None), Duration.Inf)
+    assert(0 === op2B.get.offset)
+    val op3B = Await.result(
+      dbDao.getPreviousOperationInfo(poolLevel.get, insertedUser.get.id.get, insertedPool.get.id.get, None, None), Duration.Inf)
+    assert(0 === op3B.get.offset)
+    Await.result(dbDao.updateOpsOffset(insertedPool.get.id.get, "myWallet", 1), Duration.Inf)
+    val op1 = Await.result(
+      dbDao.getPreviousOperationInfo(accountLevel.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1)), Duration.Inf)
+    assert(1 === op1.get.offset)
+    val op2 = Await.result(
+      dbDao.getPreviousOperationInfo(walletLevel.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), None), Duration.Inf)
+    assert(1 === op2.get.offset)
+    val op3 = Await.result(
+      dbDao.getPreviousOperationInfo(poolLevel.get, insertedUser.get.id.get, insertedPool.get.id.get, None, None), Duration.Inf)
+    assert(1 === op3.get.offset)
   }
 }
 

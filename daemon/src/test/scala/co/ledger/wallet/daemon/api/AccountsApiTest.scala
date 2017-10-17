@@ -2,20 +2,10 @@ package co.ledger.wallet.daemon.api
 
 import java.util.UUID
 
-import co.ledger.wallet.daemon.TestAccountPreparation
-import co.ledger.wallet.daemon.models.{AccountDerivationView, AccountView, CurrencyView, PackedOperationsView}
-import co.ledger.wallet.daemon.modules.Deserializers.CurrencyDeserializer
+import co.ledger.wallet.daemon.models.{AccountDerivationView, AccountView}
 import co.ledger.wallet.daemon.services.OperationQueryParams
 import co.ledger.wallet.daemon.utils.APIFeatureTest
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.module.SimpleModule
-import com.fasterxml.jackson.databind.node.ObjectNode
-import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import com.twitter.finagle.http.{Response, Status}
-
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Promise}
 
 class AccountsApiTest extends APIFeatureTest {
 
@@ -113,7 +103,7 @@ class AccountsApiTest extends APIFeatureTest {
     createPool("op_pool")
     assertWalletCreation("op_pool", "op_wallet", "bitcoin", Status.Ok)
     assertCreateAccount(CORRECT_BODY, "op_pool", "op_wallet", Status.Ok)
-    Await.result(TestAccountPreparation.prepare(0, "03B4A94D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D", "op_pool", "op_wallet", Promise[Boolean]()), Duration.Inf)
+    assertSyncPool(Status.Ok)
     val firstBtch = parse[Map[String, Any]](assertGetAccountOps("op_pool", "op_wallet", 0, OperationQueryParams(None, None, 2, 0), Status.Ok))
 
     val secondBtch = parse[Map[String, Any]](assertGetAccountOps("op_pool", "op_wallet", 0, OperationQueryParams(None, getUUID("next", firstBtch), 10, 0), Status.Ok))

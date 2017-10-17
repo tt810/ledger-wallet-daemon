@@ -44,9 +44,11 @@ trait DaemonCache {
 
   def deleteWalletPool(user: UserDto, poolName: String): Future[Unit]
 
+  def syncOperations(): Future[Seq[SynchronizationResult]]
+
   //**************** user ***************
   def getUserDirectlyFromDB(pubKey: Array[Byte]): Future[Option[UserDto]]
 
-  def createUser(user: UserDto): Future[Int]
+  def createUser(user: UserDto): Future[Long]
 
 }

@@ -2,17 +2,16 @@ package co.ledger.wallet.daemon.database
 
 import java.util.UUID
 
-import co.ledger.wallet.daemon.TestAccountPreparation
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.exceptions._
-import org.junit.Assert._
+import co.ledger.wallet.daemon.models.{AccountDerivationView, DerivationView}
 import djinni.NativeLibLoader
+import org.junit.Assert._
 import org.junit.{BeforeClass, Test}
 import org.scalatest.junit.AssertionsForJUnit
 
-import scala.concurrent.{Await, Promise}
+import scala.concurrent.Await
 import scala.concurrent.duration.Duration
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
-import co.ledger.wallet.daemon.models.{AccountDerivationView, DerivationView}
 
 
 class DaemonCacheTest extends AssertionsForJUnit {
@@ -118,8 +117,7 @@ object DaemonCacheTest {
         user3.get,
         POOL_NAME,
         WALLET_NAME), Duration.Inf)
-    val coreAccount = Await.result(cache.getCoreAccount(0, user3.get.pubKey, POOL_NAME, WALLET_NAME), Duration.Inf)
-    Await.result(TestAccountPreparation.prepare(coreAccount._1, Promise[Boolean]()), Duration.Inf)
+    Await.result(cache.syncOperations(), Duration.Inf)
     DefaultDaemonCache.initialize()
   }
 

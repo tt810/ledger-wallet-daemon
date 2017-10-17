@@ -23,6 +23,6 @@ class LedgerCoreExecutionContext(val ec: ExecutionContext) extends co.ledger.cor
 
 object LedgerCoreExecutionContext {
   def apply(ec: ExecutionContext) = new LedgerCoreExecutionContext(ec)
-  def newThreadPool() = apply(MDCPropagatingExecutionContext.Implicits.global)
+  def newThreadPool(prefix: String) = apply(MDCPropagatingExecutionContext.cachedNamedThreads(prefix))
   def newSerialQueue() = apply(SerialExecutionContext.Implicits.global)
 }

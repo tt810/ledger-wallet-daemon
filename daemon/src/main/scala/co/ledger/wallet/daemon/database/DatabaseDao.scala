@@ -10,6 +10,7 @@ import co.ledger.wallet.daemon.services.LogMsgMaker
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.twitter.inject.Logging
 import slick.jdbc.JdbcBackend.Database
+import slick.jdbc.TransactionIsolation
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -46,14 +47,19 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     }
   }
 
-  def deletePool(poolName: String, userId: Long)(implicit ec: ExecutionContext): Future[Int] = {
-    safeRun(filterPool(poolName, userId).delete).map { int =>
+  def deletePool(poolName: String, userId: Long)(implicit ec: ExecutionContext): Future[Option[PoolDto]] = {
+    val query = filterPool(poolName, userId)
+    val action = for {
+      result <- query.result.headOption
+      _ <- query.delete
+    } yield result
+    db.run(action.withTransactionIsolation(TransactionIsolation.RepeatableRead)).map { row =>
       debug(LogMsgMaker.newInstance("Daemon wallet pool deleted")
         .append("pool_name", poolName)
         .append("user_id", userId)
-        .append("result_row", int)
+        .append("deleted_row", row)
         .toString())
-      int
+      row.map(createPool)
     }
   }
 
@@ -138,48 +144,71 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     safeRun(query.result.headOption).map(_.map(createOperation(_)))
   }
 
-  def insertOperation(operation: OperationDto)(implicit ec: ExecutionContext): Future[Int] = {
-    val query = operations += createOperationRow(operation)
-    safeRun(query).map { int =>
-      debug(LogMsgMaker.newInstance("Daemon operation inserted")
-        .append("operation", operation)
-        .append("result", int)
+  def updateOpsOffset(poolId: Long, walletName: String, accountIndex: Int)
+                     (implicit ec: ExecutionContext): Future[Seq[Int]] = {
+    val targetRows = operations.filter { op =>
+      op.deletedAt.isEmpty &&
+      op.poolId === poolId &&
+        (op.walletName.isEmpty || op.walletName === Option(walletName)) &&
+        (op.accountIndex.isEmpty || op.accountIndex === Option(accountIndex))
+    }
+
+    val actions = targetRows.result.flatMap { rows =>
+      DBIO.sequence(rows.map { row => (for { o <- operations if o.id === row.id } yield o.offset ).update(row.offset + 1)})
+    }
+    safeRun(actions).map { list =>
+      debug(LogMsgMaker.newInstance("Updated target operations")
+        .append("pool_id", poolId)
+        .append("wallet_name", walletName)
+        .append("account_index", accountIndex)
+        .append("updated_rows_count", list.size)
         .toString())
-      int
+      list
     }
   }
 
-  def insertPool(newPool: PoolDto)(implicit ec: ExecutionContext): Future[Int] = {
+  def insertOperation(operation: OperationDto)(implicit ec: ExecutionContext): Future[Long] = {
+    val query = operations.returning(operations.map(_.id)) += createOperationRow(operation)
+    safeRun(query).map { id =>
+      debug(LogMsgMaker.newInstance("Daemon operation inserted")
+        .append("operation", operation)
+        .append("inserted_operation_id", id)
+        .toString())
+      id
+    }
+  }
+
+  def insertPool(newPool: PoolDto)(implicit ec: ExecutionContext): Future[Long] = {
     val query = filterPool(newPool.name, newPool.userId).exists.result.flatMap { exists =>
       if (!exists) {
-        pools += createPoolRow(newPool)
+        pools.returning(pools.map(_.id)) += createPoolRow(newPool)
       } else {
         DBIO.failed(WalletPoolAlreadyExistException(newPool.name))
       }
     }
-    safeRun(query).map { int =>
+    safeRun(query).map { id =>
       debug(LogMsgMaker.newInstance("Daemon wallet pool inserted")
         .append("wallet_pool", newPool)
-        .append("result", int)
+        .append("inserted_pool_id", id)
         .toString())
-      int
+      id
     }
   }
 
-  def insertUser(newUser: UserDto)(implicit ec: ExecutionContext): Future[Int] = {
+  def insertUser(newUser: UserDto)(implicit ec: ExecutionContext): Future[Long] = {
     val query = filterUser(newUser.pubKey).exists.result.flatMap {(exists) =>
       if (!exists) {
-        users += createUserRow(newUser)
+        users.returning(users.map(_.id)) += createUserRow(newUser)
       } else {
         DBIO.failed(UserAlreadyExistException(newUser.pubKey))
       }
     }
-    safeRun(query).map { int =>
+    safeRun(query).map { id =>
       debug(LogMsgMaker.newInstance("Daemon user inserted")
         .append("user", newUser)
-        .append("result", int)
+        .append("inserted_user_id", id)
         .toString())
-      int
+      id
     }
   }
 

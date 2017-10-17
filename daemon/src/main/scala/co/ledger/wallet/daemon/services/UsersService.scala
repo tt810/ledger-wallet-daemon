@@ -3,7 +3,7 @@ package co.ledger.wallet.daemon.services
 import javax.inject.{Inject, Singleton}
 
 import co.ledger.wallet.daemon.DaemonConfiguration
-import co.ledger.wallet.daemon.database.{DaemonCache, DefaultDaemonCache, UserDto}
+import co.ledger.wallet.daemon.database.{DaemonCache, UserDto}
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.twitter.inject.Logging
 import org.bitcoinj.core.Sha256Hash
@@ -14,7 +14,7 @@ import scala.concurrent.{ExecutionContext, Future}
 @Singleton
 class UsersService @Inject()(daemonCache: DaemonCache, ecdsa: ECDSAService) extends DaemonService {
 
-  def createUser(publicKey: String, permissions: Long = 0): Future[Int] = {
+  def createUser(publicKey: String, permissions: Long = 0): Future[Long] = {
     info(LogMsgMaker.newInstance("Create user with params")
       .append("pub_key", publicKey)
       .append("permissions", permissions)
@@ -22,7 +22,7 @@ class UsersService @Inject()(daemonCache: DaemonCache, ecdsa: ECDSAService) exte
     daemonCache.createUser(UserDto(publicKey, permissions))
   }
 
-  def createUser(username: String, password: String)(implicit ec: ExecutionContext): Future[Int] = {
+  def createUser(username: String, password: String)(implicit ec: ExecutionContext): Future[Long] = {
     info(LogMsgMaker.newInstance("Create user with params")
       .append("username", username)
       .append("password", if(password.isEmpty) "XXXXXXX" else "")
@@ -31,7 +31,7 @@ class UsersService @Inject()(daemonCache: DaemonCache, ecdsa: ECDSAService) exte
     createUser(user.getBytes)
   }
 
-  private def createUser(user: Array[Byte])(implicit ec: ExecutionContext): Future[Int] = {
+  private def createUser(user: Array[Byte])(implicit ec: ExecutionContext): Future[Long] = {
     val privKey = Sha256Hash.hash(user)
     pubKey(privKey).flatMap { publicKey =>
       createUser(publicKey)
