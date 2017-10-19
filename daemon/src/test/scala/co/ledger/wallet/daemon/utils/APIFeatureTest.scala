@@ -50,6 +50,10 @@ trait APIFeatureTest extends FeatureTest {
     server.httpDelete(s"/pools/$poolName", "", headers = defaultHeaders)
   }
 
+  def assertSyncPool(expected: Status): Response = {
+    server.httpPost(s"/pools/operations/synchronize", "", headers = defaultHeaders, andExpect = expected)
+  }
+
   private def lwdBasicAuthorisationHeader(seedName: String, time: Date = new Date()) = {
     val ecdsa = server.injector.instance(classOf[ECDSAService])
     val privKey = Sha256Hash.hash(FixturesUtils.seed(seedName).getBytes)

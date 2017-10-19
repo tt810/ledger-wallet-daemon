@@ -1,7 +1,5 @@
 package co.ledger.wallet.daemon.libledger_core.async
 
-import java.util.concurrent.ConcurrentHashMap
-
 import co.ledger.core.{Lock, ThreadDispatcher}
 
 import scala.collection.mutable
@@ -16,7 +14,7 @@ class ScalaThreadDispatcher(mainContext: ExecutionContext) extends ThreadDispatc
     _pools.getOrElseUpdate(name, LedgerCoreExecutionContext.newSerialQueue())
   }
   override def getThreadPoolExecutionContext(name: String): co.ledger.core.ExecutionContext = synchronized {
-    _pools.getOrElseUpdate(name, LedgerCoreExecutionContext.newThreadPool())
+    _pools.getOrElseUpdate(name, LedgerCoreExecutionContext.newThreadPool("scala-thread-dispatcher-thread-pool"))
   }
   override def getMainExecutionContext: co.ledger.core.ExecutionContext = _mainContext
   override def newLock(): Lock = ???
