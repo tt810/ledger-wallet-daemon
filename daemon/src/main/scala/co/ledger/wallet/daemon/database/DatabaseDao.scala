@@ -16,8 +16,8 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
 class DatabaseDao @Inject()(db: Database) extends Logging {
-  import database.Tables.profile.api._
   import database.Tables._
+  import database.Tables.profile.api._
 
   def migrate()(implicit ec: ExecutionContext): Future[Unit] = {
     info("Start database migration")
@@ -54,64 +54,28 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
       _ <- query.delete
     } yield result
     db.run(action.withTransactionIsolation(TransactionIsolation.RepeatableRead)).map { row =>
-      debug(LogMsgMaker.newInstance("Daemon wallet pool deleted")
-        .append("pool_name", poolName)
-        .append("user_id", userId)
-        .append("deleted_row", row)
-        .toString())
       row.map(createPool)
     }
   }
 
-  def getPools(userId: Long)(implicit ec: ExecutionContext): Future[Seq[PoolDto]] = {
-    val query = pools.filter(pool => pool.userId === userId.bind).sortBy(_.id.desc)
-    safeRun(query.result).map { rows =>
-      debug(LogMsgMaker.newInstance("Daemon wallet pools retrieved")
-        .append("user_id", userId)
-        .append("result_row", rows.size)
-        .append("result", rows.map(_.name))
-        .toString())
-      rows.map(createPool)
-    }
-  }
+  def getPools(userId: Long)(implicit ec: ExecutionContext): Future[Seq[PoolDto]] =
+    safeRun(pools.filter(pool => pool.userId === userId.bind).sortBy(_.id.desc).result).map { rows => rows.map(createPool)}
 
-  def getPool(userId: Long, poolName: String)(implicit ec: ExecutionContext): Future[Option[PoolDto]] = {
-    val query = pools.filter(pool => pool.userId === userId && pool.name === poolName).result.headOption
-    safeRun(query).map { row =>
-      debug(LogMsgMaker.newInstance("Daemon wallet pool retrieved")
-        .append("user_id", userId)
-        .append("pool_name", poolName)
-        .append("result", row)
-        .toString())
-      row.map(createPool)
-    }
-  }
+  def getPool(userId: Long, poolName: String)(implicit ec: ExecutionContext): Future[Option[PoolDto]] =
+    safeRun(pools.filter(pool => pool.userId === userId && pool.name === poolName).result.headOption).map { row => row.map(createPool)}
 
   def getUser(targetPubKey: Array[Byte])(implicit ec: ExecutionContext): Future[Option[UserDto]] = {
     getUser(HexUtils.valueOf(targetPubKey))
   }
 
-  def getUser(pubKey: String)(implicit ec: ExecutionContext): Future[Option[UserDto]] = {
-    safeRun(filterUser(pubKey).result).map { rows =>
-      debug(LogMsgMaker.newInstance("Daemon user retrieved")
-        .append("pub_key", pubKey)
-        .append("result_row", rows.size)
-        .append("result", rows.map(_.id))
-        .toString())
-      if(rows.isEmpty) None
-      else Option(createUser(rows.head))
-    }
-  }
+  def getUser(pubKey: String)(implicit ec: ExecutionContext): Future[Option[UserDto]] =
+    safeRun(filterUser(pubKey).result.headOption).map { userRow => userRow.map(createUser)}
 
-  def getUsers()(implicit ec: ExecutionContext): Future[Seq[UserDto]] = {
-    val query = users.result
-    safeRun(query).map { rows =>
-      debug(LogMsgMaker.newInstance("Daemon users retrieved")
-        .append("result_row", rows.size)
-        .append("result", rows.map(_.id))
-        .toString())
-      rows.map(createUser(_))
-    }
+  def getUsers()(implicit ec: ExecutionContext): Future[Seq[UserDto]] =
+    safeRun(users.result).map { rows => rows.map(createUser(_))}
+
+  private[database] def getOperation(id: Long)(implicit ec: ExecutionContext): Future[Option[OperationDto]] = {
+    safeRun(operations.filter(op => op.id === id).result.headOption).map(_.map(createOperation(_)))
   }
 
   def getNextOperationInfo(next: UUID, userId: Long, poolId: Long, walletName: Option[String], accountIndex: Option[Int])
@@ -154,70 +118,40 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     }
 
     val actions = targetRows.result.flatMap { rows =>
-      DBIO.sequence(rows.map { row => (for { o <- operations if o.id === row.id } yield o.offset ).update(row.offset + 1)})
+      DBIO.sequence(rows.map { row =>
+        debug(LogMsgMaker.newInstance("Update offset").append("row", createOperation(row)).toString())
+        (for { o <- operations if o.id === row.id } yield o.offset ).update(row.offset + 1)})
     }
-    safeRun(actions).map { list =>
-      debug(LogMsgMaker.newInstance("Updated target operations")
-        .append("pool_id", poolId)
-        .append("wallet_name", walletName)
-        .append("account_index", accountIndex)
-        .append("updated_rows_count", list.size)
-        .toString())
-      list
-    }
+    safeRun(actions)
   }
 
-  def insertOperation(operation: OperationDto)(implicit ec: ExecutionContext): Future[Long] = {
-    val query = operations.returning(operations.map(_.id)) += createOperationRow(operation)
-    safeRun(query).map { id =>
-      debug(LogMsgMaker.newInstance("Daemon operation inserted")
-        .append("operation", operation)
-        .append("inserted_operation_id", id)
-        .toString())
-      id
-    }
-  }
+  def insertOperation(operation: OperationDto)(implicit ec: ExecutionContext): Future[Long] =
+    safeRun(operations.returning(operations.map(_.id)) += createOperationRow(operation))
 
-  def insertPool(newPool: PoolDto)(implicit ec: ExecutionContext): Future[Long] = {
-    val query = filterPool(newPool.name, newPool.userId).exists.result.flatMap { exists =>
+  def insertPool(newPool: PoolDto)(implicit ec: ExecutionContext): Future[Long] =
+    safeRun(filterPool(newPool.name, newPool.userId).exists.result.flatMap { exists =>
       if (!exists) {
         pools.returning(pools.map(_.id)) += createPoolRow(newPool)
       } else {
         DBIO.failed(WalletPoolAlreadyExistException(newPool.name))
       }
-    }
-    safeRun(query).map { id =>
-      debug(LogMsgMaker.newInstance("Daemon wallet pool inserted")
-        .append("wallet_pool", newPool)
-        .append("inserted_pool_id", id)
-        .toString())
-      id
-    }
-  }
+    })
 
-  def insertUser(newUser: UserDto)(implicit ec: ExecutionContext): Future[Long] = {
-    val query = filterUser(newUser.pubKey).exists.result.flatMap {(exists) =>
+  def insertUser(newUser: UserDto)(implicit ec: ExecutionContext): Future[Long] =
+    safeRun(filterUser(newUser.pubKey).exists.result.flatMap {(exists) =>
       if (!exists) {
         users.returning(users.map(_.id)) += createUserRow(newUser)
       } else {
         DBIO.failed(UserAlreadyExistException(newUser.pubKey))
       }
-    }
-    safeRun(query).map { id =>
-      debug(LogMsgMaker.newInstance("Daemon user inserted")
-        .append("user", newUser)
-        .append("inserted_user_id", id)
-        .toString())
-      id
-    }
-  }
+    })
 
-  private def safeRun[R](query: DBIO[R])(implicit ec: ExecutionContext): Future[R] = {
+  private def safeRun[R](query: DBIO[R])(implicit ec: ExecutionContext): Future[R] =
     db.run(query.transactionally).recoverWith {
       case e: DaemonException => Future.failed(e)
       case others: Throwable => Future.failed(DaemonDatabaseException("Failed to run database query", others))
     }
-  }
+
 
   private def createOperationRow(operation: OperationDto): OperationRow = {
     val currentTime = new Timestamp(new Date().getTime)
@@ -261,6 +195,12 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
 
 }
 
-case class UserDto(pubKey: String, permissions: Long, id: Option[Long] = None)
-case class PoolDto(name: String, userId: Long, configuration: String, id: Option[Long] = None, dbBackend: String = "", dbConnectString: String = "")
-case class OperationDto(userId: Long, poolId: Long, walletName: Option[String], accountIndex: Option[Int], previous: Option[UUID], offset: Long, batch: Int, next: Option[UUID], id: Option[Long] = None)
+case class UserDto(pubKey: String, permissions: Long, id: Option[Long] = None) {
+  override def toString: String = s"UserDto(id: $id, pubKey: $pubKey, permissions: $permissions)"
+}
+case class PoolDto(name: String, userId: Long, configuration: String, id: Option[Long] = None, dbBackend: String = "", dbConnectString: String = "") {
+  override def toString: String = s"PoolDto(id: $id, name: $name, userId: $userId, configuration: $configuration, dbBackend: $dbBackend, dbConnectString: $dbConnectString)"
+}
+case class OperationDto(userId: Long, poolId: Long, walletName: Option[String], accountIndex: Option[Int], previous: Option[UUID], offset: Long, batch: Int, next: Option[UUID], id: Option[Long] = None) {
+  override def toString: String = s"OperationDto(id: $id, userId: $userId, poolId: $poolId, walletName: $walletName, accountIndex: $accountIndex, previous: $previous, offset: $offset, batch: $batch, next: $next)"
+}

@@ -5,6 +5,7 @@ import java.util.UUID
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.models.{AccountDerivationView, DerivationView}
+import com.twitter.util.{Duration => TwitterDuration}
 import djinni.NativeLibLoader
 import org.junit.Assert._
 import org.junit.{BeforeClass, Test}
@@ -12,7 +13,6 @@ import org.scalatest.junit.AssertionsForJUnit
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
-
 
 class DaemonCacheTest extends AssertionsForJUnit {
   import DaemonCacheTest._
@@ -64,13 +64,16 @@ class DaemonCacheTest extends AssertionsForJUnit {
   }
 
   @Test def verifyGetAccountOperations(): Unit = {
+    val firstOp = Await.result(DefaultDaemonCache.dbDao.getOperation(1L), Duration.Inf)
+    println(firstOp)
     val user1 = Await.result(cache.getUserDirectlyFromDB(PUB_KEY_3), Duration.Inf)
     val pool1 = Await.result(DefaultDaemonCache.dbDao.getPool(user1.get.id.get, POOL_NAME), Duration.Inf)
+    Await.result(cache.getAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, firstOp.get.offset.toInt + 100, 0), Duration.Inf)
     val withTxs = Await.result(cache.getAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, 1, 1), Duration.Inf)
     withTxs.operations.foreach(op => assertNotNull(op.transaction))
-    val ops = Await.result(cache.getAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, 20, 0), Duration.Inf)
+    val ops = Await.result(cache.getAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, 2, 0), Duration.Inf)
     assert(ops.previous.isEmpty)
-    assert(20 === ops.operations.size)
+    assert(2 === ops.operations.size)
     assert(ops.previous.isEmpty)
     ops.operations.foreach(op => assertNull(op.transaction))
     val nextOps = Await.result(cache.getNextBatchAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, ops.next.get, 0), Duration.Inf)
@@ -117,7 +120,9 @@ object DaemonCacheTest {
         user3.get,
         POOL_NAME,
         WALLET_NAME), Duration.Inf)
+    Await.result(cache.getAccountOperations(user3.get, 0, POOL_NAME, WALLET_NAME, 1, 1), Duration.Inf)
     Await.result(cache.syncOperations(), Duration.Inf)
+
     DefaultDaemonCache.initialize()
   }
 

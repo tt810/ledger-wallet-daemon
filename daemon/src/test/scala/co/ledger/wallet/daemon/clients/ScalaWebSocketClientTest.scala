@@ -3,7 +3,7 @@ package co.ledger.wallet.daemon.clients
 import java.util.concurrent.{Executors, TimeUnit}
 
 import co.ledger.core.{ErrorCode, WebSocketConnection}
-import co.ledger.wallet.daemon.async.Pools
+import com.twitter.concurrent.NamedPoolThreadFactory
 import org.junit.Test
 import org.scalatest.junit.AssertionsForJUnit
 
@@ -13,7 +13,7 @@ class ScalaWebSocketClientTest extends AssertionsForJUnit {
   @Test def verifyThreadedConnection(): Unit = {
     val client = ClientFactory.webSocketClient
     val nThreads = 10
-    val executor = Executors.newFixedThreadPool(nThreads, Pools.newNamedThreadFactory("scala-web-socket-client-test"))
+    val executor = Executors.newFixedThreadPool(nThreads, new NamedPoolThreadFactory("scala-web-socket-client-test"))
     val connect = new Runnable {
       override def run(): Unit = {
         val connection = new TestWebSocketConnection

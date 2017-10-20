@@ -2,6 +2,8 @@ package co.ledger.wallet.daemon.async
 
 import java.util.concurrent.Executors
 
+import com.twitter.concurrent.NamedPoolThreadFactory
+
 import scala.concurrent.{ExecutionContext, Future}
 
 object SerialExecutionContext {
@@ -10,7 +12,7 @@ object SerialExecutionContext {
   }
 
   def singleNamedThread(prefix: String) = {
-    val threadPoolExecutor = Executors.newFixedThreadPool(1, Pools.newNamedThreadFactory(prefix))
+    val threadPoolExecutor = Executors.newFixedThreadPool(1, new NamedPoolThreadFactory(prefix))
     SerialExecutionContextWrapper(ExecutionContext.fromExecutor(threadPoolExecutor))
   }
 }
