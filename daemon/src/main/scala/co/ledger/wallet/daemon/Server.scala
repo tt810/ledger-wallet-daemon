@@ -6,6 +6,7 @@ import co.ledger.wallet.daemon.database.DefaultDaemonCache
 import co.ledger.wallet.daemon.filters._
 import co.ledger.wallet.daemon.mappers.AuthenticationExceptionMapper
 import co.ledger.wallet.daemon.modules.{DaemonCacheModule, DaemonJacksonModule}
+import co.ledger.wallet.daemon.schedulers.SynchronizationScheduler
 import co.ledger.wallet.daemon.services.UsersService
 import com.twitter.finagle.http.{Request, Response}
 import com.twitter.finatra.http.HttpServer
@@ -47,7 +48,11 @@ class ServerImpl extends HttpServer {
     NativeLibLoader.loadLibs()
     DefaultDaemonCache.migrateDatabase().flatMap { _ =>
       UsersService.initialize(injector.instance[UsersService](classOf[UsersService])).flatMap { _ =>
-          DefaultDaemonCache.initialize()
+          DefaultDaemonCache.initialize().map { _ =>
+            val scheduler = injector.instance[SynchronizationScheduler](classOf[SynchronizationScheduler])
+            scheduler.schedule
+            println("***********************************scheduled************************")
+          }
       }
     }
   }

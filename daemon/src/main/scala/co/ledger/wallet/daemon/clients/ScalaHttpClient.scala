@@ -15,10 +15,6 @@ import scala.util.{Failure, Success, Try}
 class ScalaHttpClient(implicit val ec: ExecutionContext) extends co.ledger.core.HttpClient with Logging {
 
   override def execute(request: HttpRequest): Unit = Future {
-    debug(LogMsgMaker.newInstance("Executing HTTP request")
-      .append("request_url", request.getUrl)
-      .append("request_method", request.getMethod)
-      .toString())
     val connection = new URL(request.getUrl).openConnection().asInstanceOf[HttpURLConnection]
     connection.setRequestMethod(resolveMethod(request.getMethod))
     for ((key, value) <- request.getHeaders.asScala) {

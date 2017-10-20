@@ -45,11 +45,15 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
   }
 
   post("/pools/operations/synchronize") { request: Request =>
+    implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.cachedNamedThreads("end-point-synchronization-thread-pool")
     info(LogMsgMaker.newInstance("SYNC wallet pools request")
       .append("request", request)
       .toString())
+    val t0 = System.currentTimeMillis()
     poolsService.syncOperations().map { result =>
-      result.filter(_.syncResult == false)
+      val t1 = System.currentTimeMillis()
+      info(s"Synchronization finished, elapsed time: ${(t1 - t0)} milliseconds")
+      result
     }.recover {
       case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }

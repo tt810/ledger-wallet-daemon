@@ -53,4 +53,10 @@ object DaemonConfiguration {
     case others => throw new Exception(s"Unknown database backend $others")
   }
 
+  val synchronizationInterval: (Int, Int) = (
+    if (config.hasPath("synchronization.initial_delay_in_seconds")) config.getInt("synchronization.initial_delay_in_seconds")
+    else 5 * 60,
+    if(config.hasPath("synchronization.interval_in_hours")) config.getInt("synchronization.interval_in_hours")
+    else 24)
+
 }

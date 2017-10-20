@@ -4,7 +4,7 @@ import java.util.UUID
 
 import co.ledger.wallet.daemon.models._
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 trait DaemonCache {
 
@@ -44,7 +44,7 @@ trait DaemonCache {
 
   def deleteWalletPool(user: UserDto, poolName: String): Future[Unit]
 
-  def syncOperations(): Future[Seq[SynchronizationResult]]
+  def syncOperations()(implicit ec: ExecutionContext): Future[Seq[SynchronizationResult]]
 
   //**************** user ***************
   def getUserDirectlyFromDB(pubKey: Array[Byte]): Future[Option[UserDto]]
