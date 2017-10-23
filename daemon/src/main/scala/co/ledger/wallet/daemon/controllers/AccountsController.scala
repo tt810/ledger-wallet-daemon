@@ -69,7 +69,12 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
       .append("wallet_name", request.wallet_name)
       .append("pool_name", request.pool_name)
       .toString())
-    accountsService.account(request.account_index.get, request.user, request.pool_name, request.wallet_name).recover {
+    accountsService.account(request.account_index.get, request.user, request.pool_name, request.wallet_name).map { viewOpt =>
+      viewOpt match {
+        case Some(view) => responseSerializer.serializeOk(view, response)
+        case None => responseSerializer.serializeNotFound(Map("response"->"Account doesn't exist", "account_index" -> request.account_index), response)
+      }
+    }.recover {
       case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
         Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
         response,
@@ -78,10 +83,6 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
         Map("response"->"Wallet doesn't exist", "wallet_name" -> request.wallet_name),
         response,
         wnfe)
-      case anfe: AccountNotFoundException => responseSerializer.serializeNotFound(
-        Map("response"->"Account doesn't exist", "account_index" -> request.account_index),
-        response,
-        anfe)
       case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }

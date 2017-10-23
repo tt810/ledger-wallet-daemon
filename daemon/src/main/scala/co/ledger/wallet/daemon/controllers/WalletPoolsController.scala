@@ -5,7 +5,6 @@ import javax.inject.Inject
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.controllers.requests.{CommonMethodValidations, RichRequest}
 import co.ledger.wallet.daemon.controllers.responses.ResponseSerializer
-import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
 import co.ledger.wallet.daemon.services.PoolsService.PoolConfiguration
 import co.ledger.wallet.daemon.services.{LogMsgMaker, PoolsService}
@@ -35,11 +34,13 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
       .append("request", request)
       .append("pool_name", request.pool_name)
       .toString())
-    poolsService.pool(request.user, request.pool_name).recover {
-      case pe: WalletPoolNotFoundException => responseSerializer.serializeNotFound(
-        Map("response"->"Wallet pool doesn't exist", "pool_name" -> request.pool_name),
-        response,
-        pe)
+    poolsService.pool(request.user, request.pool_name).map { viewOpt =>
+      viewOpt match {
+        case Some(view) => responseSerializer.serializeOk(view, response)
+        case None => responseSerializer.serializeNotFound(
+          Map("response"->"Wallet pool doesn't exist", "pool_name" -> request.pool_name), response)
+      }
+    }.recover {
       case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
@@ -77,10 +78,6 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
       .append("pool_name", poolName)
       .toString())
     poolsService.removePool(request.user.get, poolName).recover {
-      case pe: WalletPoolNotFoundException => responseSerializer.serializeNotFound(
-        Map("response" -> "Wallet pool doesn't exist", "pool_name" -> poolName),
-        response,
-        pe)
       case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }

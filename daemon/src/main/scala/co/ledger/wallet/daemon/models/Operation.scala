@@ -10,25 +10,23 @@ import scala.collection.JavaConverters._
 import com.fasterxml.jackson.annotation.JsonInclude.Include
 import com.fasterxml.jackson.annotation.{JsonInclude, JsonProperty}
 
-object Operation {
+class Operation(private val coreO: core.Operation, private val coreC: core.Currency) extends Currency(coreC) {
 
-  def newView(operation: core.Operation, currencyName: String, walletName: String, accountIndex: Int) = {
-    val currencyFamily = CurrencyFamily.valueOf(operation.getWalletType.name())
+  def toView(walletName: String, accountIndex: Int): OperationView = {
 
-    val uid = operation.getUid
-
-    val trust = newTrustIndicatorView(operation.getTrust)
+    val currencyFamily = CurrencyFamily.valueOf(coreO.getWalletType.name())
+    val uid = coreO.getUid
+    val trust = newTrustIndicatorView(coreO.getTrust)
     val confirmations = 0 //TODO
-    val time = operation.getDate
-    val blockHeight = operation.getBlockHeight  //?
-    val opType = OperationType.valueOf(operation.getOperationType.name())
-    val amount = operation.getAmount.toLong
-    val fees = operation.getFees.toLong
-    val senders = operation.getSenders.asScala.toSeq
-    val recipients = operation.getRecipients.asScala.toSeq
-    val transaction = newTransactionView(operation, currencyFamily)
+    val time = coreO.getDate
+    val blockHeight = coreO.getBlockHeight  //?
+    val opType = OperationType.valueOf(coreO.getOperationType.name())
+    val amount = coreO.getAmount.toLong
+    val fees = coreO.getFees.toLong
+    val senders = coreO.getSenders.asScala.toSeq
+    val recipients = coreO.getRecipients.asScala.toSeq
+    val transaction = newTransactionView(coreO, currencyFamily)
     OperationView(uid, currencyName, currencyFamily, trust, confirmations, time, blockHeight, opType, amount, fees, walletName, accountIndex, senders, recipients, transaction)
-
   }
 
   private def newTransactionView(operation: core.Operation, currencyFamily: CurrencyFamily) = {
@@ -43,6 +41,13 @@ object Operation {
     if (trust == null) None
     else
       Option(TrustIndicatorView(trust.getTrustWeight, TrustLevel.valueOf(trust.getTrustLevel.name()), trust.getConflictingOperationUids.asScala.toSeq, trust.getOrigin))
+  }
+}
+
+object Operation {
+
+  def newInstance(coreO: core.Operation, coreC: core.Currency): Operation = {
+    new Operation(coreO, coreC)
   }
 
 }
