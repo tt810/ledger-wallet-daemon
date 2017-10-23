@@ -5,7 +5,7 @@ import javax.inject.Inject
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.controllers.requests.{CommonMethodValidations, RichRequest}
 import co.ledger.wallet.daemon.controllers.responses.ResponseSerializer
-import co.ledger.wallet.daemon.exceptions.{CurrencyNotFoundException, WalletNotFoundException, WalletPoolNotFoundException}
+import co.ledger.wallet.daemon.exceptions.{CurrencyNotFoundException, WalletPoolNotFoundException}
 import co.ledger.wallet.daemon.services.{LogMsgMaker, WalletsService}
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.finagle.http.Request
@@ -45,15 +45,17 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
       .append("wallet_name", request.wallet_name)
       .append("pool_name", request.pool_name)
       .toString())
-    walletsService.wallet(request.user, request.pool_name, request.wallet_name).recover {
+    walletsService.wallet(request.user, request.pool_name, request.wallet_name).map { viewOpt =>
+      viewOpt match {
+        case Some(view) => responseSerializer.serializeOk(view, response)
+        case None => responseSerializer.serializeNotFound(
+          Map("response"->"Wallet doesn't exist", "wallet_name" -> request.wallet_name), response)
+      }
+    }.recover {
       case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
         Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
         response,
         pnfe)
-      case wnfe: WalletNotFoundException => responseSerializer.serializeNotFound(
-        Map("response"->"Wallet doesn't exist", "wallet_name" -> request.wallet_name),
-        response,
-        wnfe)
       case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }

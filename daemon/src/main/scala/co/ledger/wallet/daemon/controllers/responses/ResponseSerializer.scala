@@ -18,10 +18,15 @@ class ResponseSerializer extends Logging {
       .body(ErrorResponseBody(ErrorCode.Bad_Request, msg))
   }
 
-  def serializeNotFound(msg: Map[String, Any], response: ResponseBuilder, caught: Exception): Response = {
-    info(ErrorCode.Not_Found, caught)
+  def serializeNotFound(msg: Map[String, Any], response: ResponseBuilder): Response = {
+    info(ErrorCode.Not_Found)
     response.notFound()
       .body(ErrorResponseBody(ErrorCode.Not_Found, msg))
+  }
+
+  def serializeOk(obj: Any, response: ResponseBuilder): Response = {
+    info("Request Ok")
+    response.ok(obj)
   }
 }
 

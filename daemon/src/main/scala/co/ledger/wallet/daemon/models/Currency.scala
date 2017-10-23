@@ -7,21 +7,20 @@ import com.fasterxml.jackson.annotation.JsonProperty
 
 import scala.collection.JavaConverters._
 
-object Currency {
+class Currency(coreC: core.Currency) {
 
-  def newView(crCrcy: core.Currency): CurrencyView = {
+  val currencyName = coreC.getName
 
-    val currencyFamily = CurrencyFamily.valueOf(crCrcy.getWalletType.name())
+  val currencyFamily = CurrencyFamily.valueOf(coreC.getWalletType.name())
 
-    CurrencyView(
-      crCrcy.getName,
-      currencyFamily,
-      crCrcy.getBip44CoinType,
-      crCrcy.getPaymentUriScheme,
-      crCrcy.getUnits.asScala.toList.map(newUnitView(_)),
-      newNetworkParamsView(crCrcy, currencyFamily)
-    )
-  }
+  lazy val currencyView = CurrencyView(
+    coreC.getName,
+    currencyFamily,
+    coreC.getBip44CoinType,
+    coreC.getPaymentUriScheme,
+    coreC.getUnits.asScala.toSeq.map(newUnitView(_)),
+    newNetworkParamsView(coreC, currencyFamily)
+  )
 
   private def newUnitView(coreUnit: core.CurrencyUnit): UnitView =
     UnitView(coreUnit.getName, coreUnit.getSymbol, coreUnit.getCode, coreUnit.getNumberOfDecimal)
@@ -31,6 +30,12 @@ object Currency {
     case _ => ???
   }
 
+}
+
+object Currency {
+  def newInstance(coreC: core.Currency): Currency = {
+    new Currency(coreC)
+  }
 }
 
 case class CurrencyView(

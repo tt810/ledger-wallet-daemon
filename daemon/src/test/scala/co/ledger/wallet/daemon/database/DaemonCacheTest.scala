@@ -18,12 +18,13 @@ class DaemonCacheTest extends AssertionsForJUnit {
   import DaemonCacheTest._
 
   @Test def verifyGetPoolNotFound(): Unit = {
-    try {
-      Await.result(cache.getWalletPool(PUB_KEY_1, "pool_not_exist"), Duration.Inf)
-      fail()
-    } catch {
-      case e: WalletPoolNotFoundException => // expected
-    }
+    val pool = Await.result(cache.getWalletPool(PUB_KEY_1, "pool_not_exist"), Duration.Inf)
+    assert(!pool.isDefined)
+  }
+
+  @Test def verifyDeleteNotExistPool(): Unit = {
+      val user1 = Await.result(cache.getUserDirectlyFromDB(PUB_KEY_1), Duration.Inf)
+      Await.result(cache.deleteWalletPool(user1.get, "pool_not_exist"), Duration.Inf)
   }
 
   @Test def verifyGetPoolsWithNotExistUser(): Unit = {
@@ -41,8 +42,8 @@ class DaemonCacheTest extends AssertionsForJUnit {
     val pool13 = Await.result(cache.createWalletPool(UserDto(PUB_KEY_1, 0, Option(1L)), "pool_3", "config"), Duration.Inf)
     val pool1s = Await.result(cache.getWalletPools(PUB_KEY_1), Duration.Inf)
     assertEquals(3, pool1s.size)
-    assertTrue(pool1s.contains(pool11))
-    assertTrue(pool1s.contains(pool12))
+    assertTrue(pool1s.contains(pool11.get))
+    assertTrue(pool1s.contains(pool12.get))
     assertTrue(pool1s.contains(pool13))
   }
 
@@ -57,10 +58,11 @@ class DaemonCacheTest extends AssertionsForJUnit {
   }
 
   @Test def verifyGetCurrencies(): Unit = {
-    val currencies = Await.result(cache.getCurrencies("pool_1"), Duration.Inf)
+    val currencies = Await.result(cache.getCurrencies("pool_1", PUB_KEY_1), Duration.Inf)
     assertEquals(1, currencies.size)
-    val currency = Await.result(cache.getCurrency("bitcoin", "pool_2"), Duration.Inf)
-    assertEquals(currency.name, currencies(0).name)
+    val currency = Await.result(cache.getCurrency("bitcoin", "pool_2", PUB_KEY_1), Duration.Inf)
+    assert(currency.isDefined)
+    assertEquals(currency.get.currencyName, currencies(0).currencyName)
   }
 
   @Test def verifyGetAccountOperations(): Unit = {
