@@ -59,4 +59,8 @@ object DaemonConfiguration {
     if(config.hasPath("synchronization.interval_in_hours")) config.getInt("synchronization.interval_in_hours")
     else 24)
 
+  val realtimeObserverOn: Boolean =
+    if (config.hasPath("realtimeobservation")) config.getBoolean("realtimeobservation")
+    else false
+
 }

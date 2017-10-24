@@ -3,6 +3,7 @@ package co.ledger.wallet.daemon.models
 import java.util.{Date, UUID}
 
 import co.ledger.core
+import co.ledger.wallet.daemon.models.Account.Account
 import co.ledger.wallet.daemon.models.coins.Bitcoin
 import co.ledger.wallet.daemon.models.coins.Coin.TransactionView
 
@@ -10,14 +11,16 @@ import scala.collection.JavaConverters._
 import com.fasterxml.jackson.annotation.JsonInclude.Include
 import com.fasterxml.jackson.annotation.{JsonInclude, JsonProperty}
 
-class Operation(private val coreO: core.Operation, private val coreC: core.Currency) extends Currency(coreC) {
+import scala.concurrent.{ExecutionContext, Future}
 
-  def toView(walletName: String, accountIndex: Int): OperationView = {
+class Operation(private val coreO: core.Operation, private val coreA: core.Account, private val coreW: core.Wallet)
+               (implicit ec: ExecutionContext) extends Account(coreA, coreW) {
+
+  lazy val operationView: Future[OperationView] = {
 
     val currencyFamily = CurrencyFamily.valueOf(coreO.getWalletType.name())
     val uid = coreO.getUid
     val trust = newTrustIndicatorView(coreO.getTrust)
-    val confirmations = 0 //TODO
     val time = coreO.getDate
     val blockHeight = coreO.getBlockHeight  //?
     val opType = OperationType.valueOf(coreO.getOperationType.name())
@@ -26,7 +29,9 @@ class Operation(private val coreO: core.Operation, private val coreC: core.Curre
     val senders = coreO.getSenders.asScala.toSeq
     val recipients = coreO.getRecipients.asScala.toSeq
     val transaction = newTransactionView(coreO, currencyFamily)
-    OperationView(uid, currencyName, currencyFamily, trust, confirmations, time, blockHeight, opType, amount, fees, walletName, accountIndex, senders, recipients, transaction)
+    lastBlockHeight.map { lastHeight => lastHeight - coreO.getBlockHeight }.map { confirmations =>
+      OperationView(uid, currency.currencyName, currencyFamily, trust, confirmations, time, blockHeight, opType, amount, fees, walletName, accountIndex, senders, recipients, transaction)
+    }
   }
 
   private def newTransactionView(operation: core.Operation, currencyFamily: CurrencyFamily) = {
@@ -46,8 +51,9 @@ class Operation(private val coreO: core.Operation, private val coreC: core.Curre
 
 object Operation {
 
-  def newInstance(coreO: core.Operation, coreC: core.Currency): Operation = {
-    new Operation(coreO, coreC)
+  def newInstance(coreO: core.Operation, coreA: core.Account, coreW: core.Wallet)
+                 (implicit ec: ExecutionContext): Operation = {
+    new Operation(coreO, coreA, coreW)
   }
 
 }
@@ -57,7 +63,7 @@ case class OperationView(
                           @JsonProperty("currency_name") currencyName: String,
                           @JsonProperty("currency_family") currencyFamily: CurrencyFamily,
                           @JsonProperty("trust") trust: Option[TrustIndicatorView],
-                          @JsonProperty("confirmations") confirmations: Int,
+                          @JsonProperty("confirmations") confirmations: Long,
                           @JsonProperty("time") time: Date,
                           @JsonProperty("block_height") blockHeight: Long,
                           @JsonProperty("type") opType: OperationType,

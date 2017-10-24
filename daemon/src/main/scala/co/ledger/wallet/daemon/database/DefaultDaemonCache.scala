@@ -4,12 +4,12 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Singleton
 
-import co.ledger.core
-import co.ledger.wallet.daemon.async.{MDCPropagatingExecutionContext, SerialExecutionContext}
+import co.ledger.wallet.daemon.async.{MDCPropagatingExecutionContext, SerialExecutionContext, SerialExecutionContextWrapper}
 import co.ledger.wallet.daemon.exceptions.{OperationNotFoundException, UserNotFoundException, WalletPoolAlreadyExistException, WalletPoolNotFoundException}
 import co.ledger.wallet.daemon.libledger_core.async.LedgerCoreExecutionContext
 import co.ledger.wallet.daemon.models.Account.{Account, Derivation}
 import co.ledger.wallet.daemon.models._
+import co.ledger.wallet.daemon.schedulers.observers.{NewOperationEventReceiver, SynchronizationResult}
 import co.ledger.wallet.daemon.services.LogMsgMaker
 import co.ledger.wallet.daemon.{DaemonConfiguration, exceptions}
 import com.twitter.inject.Logging
@@ -19,9 +19,6 @@ import scala.collection.JavaConverters._
 import scala.collection._
 import scala.concurrent.{ExecutionContext, Future}
 
-/**
-  * TODO: Add wallets and accounts to cache
-  */
 @Singleton
 class DefaultDaemonCache() extends DaemonCache with Logging {
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
@@ -34,7 +31,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
       pools <- userPools.values
       pool <- pools.values
     } yield pool.sync()(_coreExecutionContext)
-    (Future.sequence(finalRs.toSeq)).map(_.flatten)
+    Future.sequence(finalRs.toSeq).map(_.flatten)
   }
 
   def getAccount(accountIndex: Int, pubKey: String, poolName: String, walletName: String): Future[Option[Account]] = {
@@ -108,26 +105,22 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
   }
 
   private def getHardWallet(pubKey: String, poolName: String, walletName: String): Future[Wallet] = {
-    getWallet(walletName, poolName, pubKey).map { optionalW =>
-      optionalW match {
-        case None => throw new exceptions.WalletNotFoundException(walletName)
-        case Some(w) => w
-      }
+    getWallet(walletName, poolName, pubKey).map {
+      case None => throw exceptions.WalletNotFoundException(walletName)
+      case Some(w) => w
     }
   }
 
   private def getHardPool(pubKey: String, poolName: String): Future[Pool] = {
-    getWalletPool(pubKey, poolName).map { optionalPool =>
-      optionalPool match {
-        case Some(pool) => pool
-        case None => throw new WalletPoolNotFoundException(poolName)
-      }
+    getWalletPool(pubKey, poolName).map {
+      case Some(pool) => pool
+      case None => throw WalletPoolNotFoundException(poolName)
     }
   }
 
   private def getNamedPools(pubKey: String): concurrent.Map[String, Pool] = userPools.get(pubKey) match {
     case Some(pools) => pools
-    case None => throw new UserNotFoundException(pubKey)
+    case None => throw UserNotFoundException(pubKey)
   }
 
   def createUser(user: UserDto): Future[Long] = {
@@ -149,7 +142,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
   def getPreviousBatchAccountOperations(user: UserDto, accountIndex: Int, poolName: String, walletName: String, previous: UUID, fullOp: Int): Future[PackedOperationsView] = {
     // fetch poolId, fetch batch and offset info from dbDao, fetch operations from lib return
     getPoolFromDB(user.id.get, poolName).flatMap { dto =>
-      dbDao.getPreviousOperationInfo(previous, user.id.get, dto.id.get, Option(walletName), Option(accountIndex)).flatMap { operationDto => operationDto match {
+      dbDao.getPreviousOperationInfo(previous, user.id.get, dto.id.get, Option(walletName), Option(accountIndex)).flatMap {
         case None => throw new OperationNotFoundException(previous)
         case Some(operation) => getAccountOperations(user, accountIndex, poolName, walletName, operation.offset, operation.batch, fullOp)
           .map { ops =>
@@ -160,18 +153,18 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
               .toString())
             view
           }
-      }}
+      }
     }
   }
 
   def getNextBatchAccountOperations(user: UserDto, accountIndex: Int, poolName: String, walletName: String, next: UUID, fullOp: Int): Future[PackedOperationsView] = {
     // fetch poolId, fetch batch and offset info from dbDao, fetch operations from lib, insert opsDto, return
     getPoolFromDB(user.id.get, poolName).flatMap { poolDto =>
-      dbDao.getNextOperationInfo(next, user.id.get, poolDto.id.get, Option(walletName), Option(accountIndex)).flatMap { operationCandidate => operationCandidate match {
-        case None => throw new OperationNotFoundException(next)
+      dbDao.getNextOperationInfo(next, user.id.get, poolDto.id.get, Option(walletName), Option(accountIndex)).flatMap {
+        case None => throw OperationNotFoundException(next)
         case Some(opCandidate) => {
           getAccountOperations(user, accountIndex, poolName, walletName, opCandidate.offset, opCandidate.batch, fullOp).flatMap { operations =>
-            implicit val ec = _writeContext
+            implicit val ec: SerialExecutionContextWrapper = _writeContext
             val realBatch = if (operations.size < opCandidate.batch) operations.size else opCandidate.batch
             val next = if (realBatch < opCandidate.batch) None else opCandidate.next
             val operationDto = OperationDto(user.id.get, poolDto.id.get, Option(walletName), Option(accountIndex), opCandidate.previous, opCandidate.offset, realBatch, next)
@@ -185,7 +178,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
               view
             }
           }
-        }}
+        }
       }
     }
   }
@@ -194,7 +187,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     // fetch poolId, fetch operations from lib, insert opsDto, return
     getPoolFromDB(user.id.get, poolName).flatMap { poolDto =>
       getAccountOperations(user, accountIndex, poolName, walletName, 0, batch, fullOp).flatMap { operations =>
-        implicit val ec = _writeContext
+        implicit val ec: SerialExecutionContextWrapper = _writeContext
         // check if total operation count less than request batch.
         val realBatch = if (operations.size < batch) operations.size else batch
         val next = if (realBatch < batch) None else Option(UUID.randomUUID())
@@ -212,34 +205,28 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     }
   }
 
-  private def turnOnRealTimeObserver(account: core.Account) = {
-    account.startBlockchainObservation()
-  }
-
   private def getAccountOperations(user: UserDto, accountIndex: Int, poolName: String, walletName: String, offset: Long, batch: Int, fullOp: Int): Future[Seq[OperationView]] = {
     getHardAccount(user.pubKey, poolName, walletName, accountIndex).flatMap { pair =>
-      pair._2.operations(offset, batch, fullOp).map { os =>
-        os.map { o => o.toView(walletName, accountIndex)}
+      pair._2.operations(offset, batch, fullOp).flatMap { os =>
+        Future.sequence(os.map { o => o.operationView })
       }
     }
   }
 
   private def getHardAccount(pubKey: String, poolName: String, walletName: String, accountIndex: Int): Future[(Wallet, Account)] = {
     getHardWallet(pubKey, poolName, walletName).flatMap { wallet =>
-      wallet.account(accountIndex).map { accountO =>
-        accountO match {
-          case Some(a) => (wallet, a)
-          case None => throw new exceptions.AccountNotFoundException(accountIndex)
-        }
+      wallet.account(accountIndex).map {
+        case Some(a) => (wallet, a)
+        case None => throw exceptions.AccountNotFoundException(accountIndex)
       }
     }
   }
 
   private def getPoolFromDB(userId: Long, poolName: String): Future[PoolDto] = {
-    dbDao.getPool(userId, poolName).map { poolOp => poolOp match {
-      case None => throw new WalletPoolNotFoundException(poolName)
+    dbDao.getPool(userId, poolName).map {
+      case None => throw WalletPoolNotFoundException(poolName)
       case Some(dto) => dto
-    }}
+    }
   }
 
   def getUserDirectlyFromDB(pubKey: Array[Byte]): Future[Option[UserDto]] =  {
@@ -256,12 +243,12 @@ object DefaultDaemonCache extends Logging {
   private val _singleExecuter: ExecutionContext = SerialExecutionContext.singleNamedThread("database-initialization-thread-pool")
 
   def migrateDatabase(): Future[Unit] = {
-    implicit val ec = _singleExecuter
+    implicit val ec: ExecutionContext = _singleExecuter
     dbDao.migrate().map(_ => ())
   }
 
   def initialize(): Future[Unit] = {
-    implicit val ec = _singleExecuter
+    implicit val ec: ExecutionContext = _singleExecuter
     info("Start initializing cache...")
     dbDao.getUsers().flatMap { users =>
       debug(LogMsgMaker.newInstance("Retrieved users")

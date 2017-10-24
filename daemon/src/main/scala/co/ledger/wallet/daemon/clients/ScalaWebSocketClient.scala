@@ -4,7 +4,7 @@ import java.net.URI
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap}
 import javax.annotation.Nullable
-import javax.websocket.{ClientEndpoint, ContainerProvider, Session}
+import javax.websocket.{ClientEndpoint, ContainerProvider, OnMessage, Session}
 
 import co.ledger.core.{ErrorCode, WebSocketConnection}
 import co.ledger.wallet.daemon.services.LogMsgMaker
@@ -46,10 +46,10 @@ class ScalaWebSocketClient extends co.ledger.core.WebSocketClient with Logging{
     }
   }
 
-//  @OnMessage
-//  def processMessage(message: String, session: Session): Unit = {
-//
-//  }
+  @OnMessage
+  def processMessage(message: String, session: Session): Unit = {
+
+  }
 
   override def send(connection: WebSocketConnection, data: String) = {
 

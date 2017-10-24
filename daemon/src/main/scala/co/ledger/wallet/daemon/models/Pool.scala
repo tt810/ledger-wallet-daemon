@@ -4,12 +4,14 @@ import java.util.concurrent.ConcurrentHashMap
 
 import co.ledger.core
 import co.ledger.core.implicits.{CurrencyNotFoundException => CoreCurrencyNotFoundException, WalletNotFoundException => CoreWalletNotFoundException, _}
+import co.ledger.wallet.daemon.DaemonConfiguration
 import co.ledger.wallet.daemon.clients.ClientFactory
-import co.ledger.wallet.daemon.database.{PoolDto, SynchronizationResult}
+import co.ledger.wallet.daemon.database.PoolDto
 import co.ledger.wallet.daemon.exceptions.CurrencyNotFoundException
 import co.ledger.wallet.daemon.libledger_core.crypto.SecureRandomRNG
 import co.ledger.wallet.daemon.libledger_core.debug.NoOpLogPrinter
 import co.ledger.wallet.daemon.libledger_core.filesystem.ScalaPathResolver
+import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import co.ledger.wallet.daemon.services.LogMsgMaker
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -23,7 +25,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class Pool(private val coreP: core.WalletPool)(implicit ec: ExecutionContext) extends Logging {
   private var eventReceivers: concurrent.Map[core.EventReceiver, Unit] = new ConcurrentHashMap[core.EventReceiver, Unit]().asScala
 
-  val name = coreP.getName
+  val name: String = coreP.getName
 
   lazy val view: Future[WalletPoolView] = coreP.getWalletCount().map(WalletPoolView(coreP.getName, _))
 
@@ -87,7 +89,10 @@ class Pool(private val coreP: core.WalletPool)(implicit ec: ExecutionContext) ex
           coreP.getWallet(walletName).map(Wallet.newInstance(_))
         }
       }
-      coreW.flatten
+      coreW.flatten.map { w =>
+        if (DaemonConfiguration.realtimeObserverOn) w.startRealTimeObserver()
+        w
+      }
     }.recover {
       case e: CoreCurrencyNotFoundException => throw new CurrencyNotFoundException(currencyName)
     }
@@ -96,13 +101,13 @@ class Pool(private val coreP: core.WalletPool)(implicit ec: ExecutionContext) ex
   def registerEventReceiver(eventReceiver: core.EventReceiver, coreEC: core.ExecutionContext) = {
     eventReceivers.put(eventReceiver, Unit)
     coreP.getEventBus.subscribe(coreEC, eventReceiver)
-    debug(LogMsgMaker.newInstance("Register").append("event_receiver", eventReceiver).append("pool_name", name).toString())
+    debug(LogMsgMaker.newInstance(s"Register ${eventReceiver.getClass.getSimpleName}").append("pool_name", name).toString())
   }
 
   def unregisterEventReceivers() = {
     eventReceivers.keys.foreach { eventReceiver =>
       coreP.getEventBus.unsubscribe(eventReceiver)
-      debug(LogMsgMaker.newInstance("Unregister").append("event_receiver", eventReceiver).append("pool_name", name).toString())
+      debug(LogMsgMaker.newInstance(s"Unregister ${eventReceiver.getClass.getSimpleName}").append("pool_name", name).toString())
     }
   }
 
@@ -114,8 +119,16 @@ class Pool(private val coreP: core.WalletPool)(implicit ec: ExecutionContext) ex
     */
   def sync()(coreEC: core.ExecutionContext): Future[Seq[SynchronizationResult]] = {
     wallets().flatMap { wallets =>
-      Future.sequence(wallets.map { wallet => wallet.sync(name)(coreEC) }).map(_.flatten)
+      Future.sequence(wallets.map { wallet => wallet.syncWallet(name)(coreEC) }).map(_.flatten)
     }
+  }
+
+  def startRealTimeObserver(): Unit = {
+    wallets().map { ws => ws.map(_.startRealTimeObserver()) }
+  }
+
+  def stopRealTimeObserver() = {
+    wallets().map { ws => ws.map(_.stopRealTimeObserver()) }
   }
 
   override def equals(that: Any): Boolean = {

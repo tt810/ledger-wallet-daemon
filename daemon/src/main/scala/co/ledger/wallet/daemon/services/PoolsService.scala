@@ -3,8 +3,9 @@ package co.ledger.wallet.daemon.services
 import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.{ExecutionContext, Future}
-import co.ledger.wallet.daemon.database.{DaemonCache, SynchronizationResult, UserDto}
+import co.ledger.wallet.daemon.database.{DaemonCache, UserDto}
 import co.ledger.wallet.daemon.models.WalletPoolView
+import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 
 @Singleton
 class PoolsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
