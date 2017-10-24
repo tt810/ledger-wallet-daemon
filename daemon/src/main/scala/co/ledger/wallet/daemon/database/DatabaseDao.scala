@@ -6,7 +6,6 @@ import javax.inject.{Inject, Singleton}
 
 import co.ledger.wallet.daemon.database.DBMigrations.Migrations
 import co.ledger.wallet.daemon.exceptions._
-import co.ledger.wallet.daemon.services.LogMsgMaker
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.twitter.inject.Logging
 import slick.jdbc.JdbcBackend.Database
@@ -74,60 +73,6 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
   def getUsers()(implicit ec: ExecutionContext): Future[Seq[UserDto]] =
     safeRun(users.result).map { rows => rows.map(createUser(_))}
 
-  private[database] def getOperation(id: Long)(implicit ec: ExecutionContext): Future[Option[OperationDto]] = {
-    safeRun(operations.filter(op => op.id === id).result.headOption).map(_.map(createOperation(_)))
-  }
-
-  def getNextOperationInfo(next: UUID, userId: Long, poolId: Long, walletName: Option[String], accountIndex: Option[Int])
-                          (implicit ec: ExecutionContext): Future[Option[OperationDto]] = {
-    val query = operations.filter { op =>
-      op.deletedAt.isEmpty &&
-      op.next.isDefined && op.next === Option(next.toString) &&
-        op.userId === userId &&
-        op.poolId === poolId &&
-        ((op.walletName.isEmpty && walletName.isEmpty) || (op.walletName === walletName)) &&
-        ((op.accountIndex.isEmpty && accountIndex.isEmpty) || (op.accountIndex === accountIndex))
-    }
-    safeRun(query.result.headOption).map { op =>
-      op.map { current =>
-        OperationDto(userId, poolId, walletName, accountIndex, Option(next), current.batch + current.offset, current.batch, Option(UUID.randomUUID()))
-      }
-    }
-  }
-
-  def getPreviousOperationInfo(previous: UUID, userId: Long, poolId: Long, walletName: Option[String], accountIndex: Option[Int])
-                              (implicit ec: ExecutionContext): Future[Option[OperationDto]] = {
-    val query = operations.filter { op =>
-      op.deletedAt.isEmpty &&
-      op.next.isDefined && op.next === Option(previous.toString) &&
-        op.userId === userId &&
-        op.poolId === poolId &&
-        ((op.walletName.isEmpty && walletName.isEmpty) || (op.walletName === walletName)) &&
-        ((op.accountIndex.isEmpty && accountIndex.isEmpty) || (op.accountIndex === accountIndex))
-    }
-    safeRun(query.result.headOption).map(_.map(createOperation(_)))
-  }
-
-  def updateOpsOffset(poolId: Long, walletName: String, accountIndex: Int)
-                     (implicit ec: ExecutionContext): Future[Seq[Int]] = {
-    val targetRows = operations.filter { op =>
-      op.deletedAt.isEmpty &&
-      op.poolId === poolId &&
-        (op.walletName.isEmpty || op.walletName === Option(walletName)) &&
-        (op.accountIndex.isEmpty || op.accountIndex === Option(accountIndex))
-    }
-
-    val actions = targetRows.result.flatMap { rows =>
-      DBIO.sequence(rows.map { row =>
-        debug(LogMsgMaker.newInstance("Update offset").append("row", createOperation(row)).toString())
-        (for { o <- operations if o.id === row.id } yield o.offset ).update(row.offset + 1)})
-    }
-    safeRun(actions)
-  }
-
-  def insertOperation(operation: OperationDto)(implicit ec: ExecutionContext): Future[Long] =
-    safeRun(operations.returning(operations.map(_.id)) += createOperationRow(operation))
-
   def insertPool(newPool: PoolDto)(implicit ec: ExecutionContext): Future[Long] =
     safeRun(filterPool(newPool.name, newPool.userId).exists.result.flatMap { exists =>
       if (!exists) {
@@ -151,16 +96,6 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
       case e: DaemonException => Future.failed(e)
       case others: Throwable => Future.failed(DaemonDatabaseException("Failed to run database query", others))
     }
-
-
-  private def createOperationRow(operation: OperationDto): OperationRow = {
-    val currentTime = new Timestamp(new Date().getTime)
-    OperationRow(0, operation.userId, operation.poolId, operation.walletName, operation.accountIndex, fromUUID(operation.previous), operation.offset, operation.batch, fromUUID(operation.next), currentTime, None)
-  }
-
-  private def createOperation(opRow: OperationRow): OperationDto = {
-    OperationDto(opRow.userId, opRow.poolId, opRow.walletName, opRow.accountIndex, toUUID(opRow.previous), opRow.offset, opRow.batch, toUUID(opRow.next), Option(opRow.id))
-  }
 
   private def createPoolRow(pool: PoolDto): PoolRow =
     PoolRow(0, pool.name, pool.userId, new Timestamp(new Date().getTime), pool.configuration, pool.dbBackend, pool.dbConnectString)
@@ -200,7 +135,4 @@ case class UserDto(pubKey: String, permissions: Long, id: Option[Long] = None) {
 }
 case class PoolDto(name: String, userId: Long, configuration: String, id: Option[Long] = None, dbBackend: String = "", dbConnectString: String = "") {
   override def toString: String = s"PoolDto(id: $id, name: $name, userId: $userId, configuration: $configuration, dbBackend: $dbBackend, dbConnectString: $dbConnectString)"
-}
-case class OperationDto(userId: Long, poolId: Long, walletName: Option[String], accountIndex: Option[Int], previous: Option[UUID], offset: Long, batch: Int, next: Option[UUID], id: Option[Long] = None) {
-  override def toString: String = s"OperationDto(id: $id, userId: $userId, poolId: $poolId, walletName: $walletName, accountIndex: $accountIndex, previous: $previous, offset: $offset, batch: $batch, next: $next)"
 }

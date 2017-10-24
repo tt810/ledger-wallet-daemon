@@ -1,5 +1,7 @@
 package co.ledger.wallet.daemon
 
+import scala.collection.mutable
+
 package object utils {
 
   import com.twitter.util.{Future => TwitterFuture, Promise => TwitterPromise, Return, Throw}
@@ -38,5 +40,9 @@ package object utils {
   def sum(list: List[Long]): Long = list match {
     case Nil => 0
     case x :: xs => x + sum(xs)
+  }
+
+  def newConcurrentSet[T]: mutable.Set[T] = {
+    java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap[T, java.lang.Boolean]()).asScala
   }
 }

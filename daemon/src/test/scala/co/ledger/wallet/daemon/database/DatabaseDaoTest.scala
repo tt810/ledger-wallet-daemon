@@ -1,19 +1,17 @@
 package co.ledger.wallet.daemon.database
 
-import java.util.UUID
-
 import co.ledger.wallet.daemon.DaemonConfiguration
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.exceptions.{DaemonDatabaseException, UserAlreadyExistException}
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.twitter.inject.Logging
-import org.scalatest.junit.AssertionsForJUnit
-import org.junit.{BeforeClass, Test}
 import org.junit.Assert._
+import org.junit.{BeforeClass, Test}
+import org.scalatest.junit.AssertionsForJUnit
 import slick.jdbc.JdbcBackend.Database
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 
 class DatabaseDaoTest extends AssertionsForJUnit {
   import DatabaseDaoTest._
@@ -94,149 +92,6 @@ class DatabaseDaoTest extends AssertionsForJUnit {
     assertEquals(0, Await.result(dbDao.getPools(insertedUser.get.id.get), Duration.Inf).size)
   }
 
-  @Test def verifyAccountOperationPreviousUnique(): Unit = {
-    val pubKey = "03A1994D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D"
-    Await.result(dbDao.insertUser(UserDto(pubKey, 0)), Duration.Inf)
-    val insertedUser = Await.result(dbDao.getUser(HexUtils.valueOf(pubKey)), Duration.Inf)
-    Await.result(dbDao.insertPool(PoolDto("accountPool", insertedUser.get.id.get, "")), Duration.Inf)
-    val insertedPool = (Await.result(dbDao.getPool(insertedUser.get.id.get, "accountPool"), Duration.Inf))
-    val previous = Option(UUID.randomUUID())
-    val next = Option(UUID.randomUUID())
-    Await.result(dbDao.insertOperation(
-      OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1), previous, 0, 20, next)), Duration.Inf)
-    try {
-      Await.result(dbDao.insertOperation(
-        OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1), previous, 0, 20, Option(UUID.randomUUID()))), Duration.Inf)
-      fail()
-    } catch {
-      case e: DaemonDatabaseException => // previous cursor must be unique
-    }
-  }
-
-  @Test def verifyAccountOperationNextUnique(): Unit = {
-    val pubKey = "45A1994D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D"
-    Await.result(dbDao.insertUser(UserDto(pubKey, 0)), Duration.Inf)
-    val insertedUser = Await.result(dbDao.getUser(HexUtils.valueOf(pubKey)), Duration.Inf)
-    Await.result(dbDao.insertPool(PoolDto("accountPool", insertedUser.get.id.get, "")), Duration.Inf)
-    val insertedPool = (Await.result(dbDao.getPool(insertedUser.get.id.get, "accountPool"), Duration.Inf))
-    val previous = Option(UUID.randomUUID())
-    val next = Option(UUID.randomUUID())
-    Await.result(dbDao.insertOperation(
-      OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1), previous, 0, 20, next)), Duration.Inf)
-    try {
-      Await.result(dbDao.insertOperation(
-        OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1), Option(UUID.randomUUID()), 0, 20, next)), Duration.Inf)
-      fail()
-    } catch {
-      case e: DaemonDatabaseException => // next cursor must be unique
-    }
-  }
-
-  @Test def verifyWalletOperationInsertion(): Unit = {
-    val pubKey = "03B2394D8E33308DD0323A8C937322101E229D85A2C0DFABC236A8C6A82E58076D"
-    Await.result(dbDao.insertUser(UserDto(pubKey, 0)), Duration.Inf)
-    val insertedUser = Await.result(dbDao.getUser(HexUtils.valueOf(pubKey)), Duration.Inf)
-    Await.result(dbDao.insertPool(PoolDto("accountPool", insertedUser.get.id.get, "")), Duration.Inf)
-    val insertedPool = (Await.result(dbDao.getPool(insertedUser.get.id.get, "accountPool"), Duration.Inf))
-    val previous = Option(UUID.randomUUID())
-    val next = Option(UUID.randomUUID())
-    Await.result(dbDao.insertOperation(
-      OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), None, previous, 0, 20, next)), Duration.Inf)
-    val preOp = Await.result(
-      dbDao.getPreviousOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), None), Duration.Inf)
-    assert(preOp.isDefined)
-    assert(previous === preOp.get.previous)
-    assert(next === preOp.get.next)
-    assert(0 === preOp.get.offset)
-    assert(20 === preOp.get.batch)
-
-    assert((Await.result(
-      dbDao.getPreviousOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1)), Duration.Inf)).isEmpty)
-    assert((Await.result(
-      dbDao.getPreviousOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, None, None), Duration.Inf)).isEmpty)
-
-    assert(Await.result(dbDao.getNextOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), None), Duration.Inf).isDefined)
-    assert((Await.result(
-      dbDao.getNextOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1)), Duration.Inf)).isEmpty)
-    assert((Await.result(
-      dbDao.getNextOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, None, None), Duration.Inf)).isEmpty)
-  }
-
-  @Test def verifyAccountOperationInsertion(): Unit = {
-    val pubKey = "13B2394D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D"
-    Await.result(dbDao.insertUser(UserDto(pubKey, 0)), Duration.Inf)
-    val insertedUser = Await.result(dbDao.getUser(HexUtils.valueOf(pubKey)), Duration.Inf)
-    Await.result(dbDao.insertPool(PoolDto("accountPool", insertedUser.get.id.get, "")), Duration.Inf)
-    val insertedPool = (Await.result(dbDao.getPool(insertedUser.get.id.get, "accountPool"), Duration.Inf))
-    val previous = Option(UUID.randomUUID())
-    val next = Option(UUID.randomUUID())
-    Await.result(dbDao.insertOperation(
-      OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1), previous, 0, 20, next)), Duration.Inf)
-    val preOp = Await.result(
-      dbDao.getPreviousOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1)), Duration.Inf)
-    val preW = Await.result(
-      dbDao.getPreviousOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), None), Duration.Inf)
-    assert(preW.isEmpty)
-    assert(preOp.isDefined)
-    assert(previous === preOp.get.previous)
-    assert(next === preOp.get.next)
-    assert(0 === preOp.get.offset)
-    assert(20 === preOp.get.batch)
-    val preOp2 = Await.result(
-      dbDao.getPreviousOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1)), Duration.Inf)
-    assert(preOp === preOp2)
-
-    val nextOp = Await.result(
-      dbDao.getNextOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1)), Duration.Inf)
-    val nextW = Await.result(
-      dbDao.getNextOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), None), Duration.Inf)
-    assert(nextW.isEmpty)
-    assert(nextOp.isDefined)
-    assert(next === nextOp.get.previous)
-    assert(20 === nextOp.get.offset)
-    assert(20 === nextOp.get.batch)
-    assert(nextOp.get.next.isDefined)
-
-    val nextOp2 = Await.result(
-      dbDao.getNextOperationInfo(next.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1)), Duration.Inf)
-    assertFalse(nextOp2.get.next === nextOp.get.next)
-  }
-
-  @Test def verifyUpdateoffset(): Unit = {
-    val pubKey = "04133D4D8E33308DD08A3A8C937822101E229D85A2C0DFABC236A8C6A82E58076D"
-    Await.result(dbDao.insertUser(UserDto(pubKey, 0)), Duration.Inf)
-    val insertedUser = Await.result(dbDao.getUser(HexUtils.valueOf(pubKey)), Duration.Inf)
-    Await.result(dbDao.insertPool(PoolDto("opsPool", insertedUser.get.id.get, "")), Duration.Inf)
-    val insertedPool = (Await.result(dbDao.getPool(insertedUser.get.id.get, "opsPool"), Duration.Inf))
-    val accountLevel = Option(UUID.randomUUID())
-    val walletLevel = Option(UUID.randomUUID())
-    val poolLevel = Option(UUID.randomUUID())
-    Await.result(dbDao.insertOperation(
-      OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1), Option(UUID.randomUUID()), 0, 20, accountLevel)), Duration.Inf)
-    Await.result(dbDao.insertOperation(
-      OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), None, Option(UUID.randomUUID()), 0, 20, walletLevel)), Duration.Inf)
-    Await.result(dbDao.insertOperation(
-      OperationDto(insertedUser.get.id.get, insertedPool.get.id.get, None, None, Option(UUID.randomUUID()), 0, 20, poolLevel)), Duration.Inf)
-    val op1B = Await.result(
-      dbDao.getPreviousOperationInfo(accountLevel.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1)), Duration.Inf)
-    assert(0 === op1B.get.offset)
-    val op2B = Await.result(
-      dbDao.getPreviousOperationInfo(walletLevel.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), None), Duration.Inf)
-    assert(0 === op2B.get.offset)
-    val op3B = Await.result(
-      dbDao.getPreviousOperationInfo(poolLevel.get, insertedUser.get.id.get, insertedPool.get.id.get, None, None), Duration.Inf)
-    assert(0 === op3B.get.offset)
-    Await.result(dbDao.updateOpsOffset(insertedPool.get.id.get, "myWallet", 1), Duration.Inf)
-    val op1 = Await.result(
-      dbDao.getPreviousOperationInfo(accountLevel.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), Option(1)), Duration.Inf)
-    assert(1 === op1.get.offset)
-    val op2 = Await.result(
-      dbDao.getPreviousOperationInfo(walletLevel.get, insertedUser.get.id.get, insertedPool.get.id.get, Option("myWallet"), None), Duration.Inf)
-    assert(1 === op2.get.offset)
-    val op3 = Await.result(
-      dbDao.getPreviousOperationInfo(poolLevel.get, insertedUser.get.id.get, insertedPool.get.id.get, None, None), Duration.Inf)
-    assert(1 === op3.get.offset)
-  }
 }
 
 object DatabaseDaoTest extends Logging {
