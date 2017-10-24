@@ -142,9 +142,9 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
   def getPreviousBatchAccountOperations(user: UserDto, accountIndex: Int, poolName: String, walletName: String, previous: UUID, fullOp: Int): Future[PackedOperationsView] = {
     getHardAccount(user.pubKey, poolName, walletName, accountIndex).flatMap { pair =>
       val previousRecord = opsCache.getPreviousOperationRecord(previous)
-      pair._2.operations(previousRecord.getOffset(), previousRecord.getBatch(), fullOp).flatMap { ops =>
+      pair._2.operations(previousRecord.offset(), previousRecord.batch, fullOp).flatMap { ops =>
         Future.sequence(ops.map { op => op.operationView })
-          .map { os => PackedOperationsView(previousRecord.getPrevious(), previousRecord.getNext(), os)}
+          .map { os => PackedOperationsView(previousRecord.previous, previousRecord.next, os)}
       }
     }
   }
@@ -154,13 +154,13 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     getPoolFromDB(user.id.get, poolName).flatMap { poolDto =>
       getHardAccount(user.pubKey, poolName, walletName, accountIndex).flatMap { pair =>
         val candidate = opsCache.getOperationCandidate(next)
-        pair._2.operations(candidate.getOffset(), candidate.getBatch(), fullOp).flatMap { ops =>
-          val realBatch = if (ops.size < candidate.getBatch()) ops.size else candidate.getBatch()
-          val next = if (realBatch < candidate.getBatch()) None else candidate.getNext()
-          val previous = candidate.getPrevious()
-          val operationRecord = opsCache.insertOperation(candidate.getId(), poolDto.id.get, walletName, accountIndex, candidate.getOffset(), candidate.getBatch(), next, previous)
+        pair._2.operations(candidate.offset(), candidate.batch, fullOp).flatMap { ops =>
+          val realBatch = if (ops.size < candidate.batch) ops.size else candidate.batch
+          val next = if (realBatch < candidate.batch) None else candidate.next
+          val previous = candidate.previous
+          val operationRecord = opsCache.insertOperation(candidate.id, poolDto.id.get, walletName, accountIndex, candidate.offset(), candidate.batch, next, previous)
           Future.sequence(ops.map { op => op.operationView  })
-            .map { os => PackedOperationsView(operationRecord.getPrevious(), operationRecord.getNext(), os)}
+            .map { os => PackedOperationsView(operationRecord.previous, operationRecord.next, os)}
         }
       }
     }
@@ -176,7 +176,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
           val previous = None
           val operationRecord = opsCache.insertOperation(UUID.randomUUID(), poolDto.id.get, walletName, accountIndex, offset, batch, next, previous)
           Future.sequence(ops.map { op => op.operationView })
-            .map { os => PackedOperationsView(operationRecord.getPrevious(), operationRecord.getNext(), os) }
+            .map { os => PackedOperationsView(operationRecord.previous, operationRecord.next, os) }
         }
       }
     }
