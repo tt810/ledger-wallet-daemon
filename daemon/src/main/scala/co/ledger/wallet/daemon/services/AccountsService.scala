@@ -19,9 +19,7 @@ class AccountsService @Inject()(defaultDaemonCache: DaemonCache) extends DaemonS
       .append("user_pub_key", user.pubKey)
       .toString())
     defaultDaemonCache.getAccounts(user.pubKey, poolName, walletName).flatMap { wallets =>
-      Future.sequence(wallets.map { wallet =>
-        wallet.toView(walletName)
-      })
+      Future.sequence(wallets.map { wallet => wallet.accountView })
     }
   }
 
@@ -35,7 +33,7 @@ class AccountsService @Inject()(defaultDaemonCache: DaemonCache) extends DaemonS
       .toString())
     defaultDaemonCache.getAccount(accountIndex, user.pubKey, poolName, walletName).flatMap { accountOpt =>
       accountOpt match {
-        case Some(account) => account.toView(walletName).map(Option(_))
+        case Some(account) => account.accountView.map(Option(_))
         case None => Future(None)
       }
     }
@@ -81,7 +79,7 @@ class AccountsService @Inject()(defaultDaemonCache: DaemonCache) extends DaemonS
       .append("wallet_name", walletName)
       .append("user_pub_key", user.pubKey)
       .toString())
-    defaultDaemonCache.createAccount(accountCreationBody, user, poolName, walletName).flatMap(_.toView(walletName))
+    defaultDaemonCache.createAccount(accountCreationBody, user, poolName, walletName).flatMap(_.accountView)
   }
 }
 

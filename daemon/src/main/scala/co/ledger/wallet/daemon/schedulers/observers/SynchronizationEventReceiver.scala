@@ -1,4 +1,4 @@
-package co.ledger.wallet.daemon.database
+package co.ledger.wallet.daemon.schedulers.observers
 
 import co.ledger.core.{Event, EventCode, EventReceiver}
 import com.twitter.inject.Logging

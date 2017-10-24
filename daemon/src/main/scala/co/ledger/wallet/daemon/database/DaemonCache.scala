@@ -4,6 +4,7 @@ import java.util.UUID
 
 import co.ledger.wallet.daemon.models.Account.{Account, Derivation}
 import co.ledger.wallet.daemon.models._
+import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 
 import scala.concurrent.Future
 

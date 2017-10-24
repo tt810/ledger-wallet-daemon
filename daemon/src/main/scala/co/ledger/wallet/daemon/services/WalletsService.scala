@@ -20,7 +20,7 @@ class WalletsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
       .append("user_pub_key", user.pubKey)
       .toString())
     daemonCache.getWallets(Bulk(offset, bulkSize), poolName, user.pubKey).flatMap { pair =>
-      Future.sequence(pair._2.map(_.view)).map(WalletsViewWithCount(pair._1, _))
+      Future.sequence(pair._2.map(_.walletView)).map(WalletsViewWithCount(pair._1, _))
     }
   }
 
@@ -33,7 +33,7 @@ class WalletsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
       .toString())
     daemonCache.getWallet(walletName, poolName, user.pubKey).flatMap { walletOpt =>
       walletOpt match {
-        case Some(wallet) => wallet.view.map(Option(_))
+        case Some(wallet) => wallet.walletView.map(Option(_))
         case None => Future(None)
       }
     }
@@ -47,7 +47,7 @@ class WalletsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
       .append("extra_params", None)
       .append("user_pub_key", user.pubKey)
       .toString())
-    daemonCache.createWallet(walletName, currencyName, poolName, user).flatMap(_.view)
+    daemonCache.createWallet(walletName, currencyName, poolName, user).flatMap(_.walletView)
   }
 
 }

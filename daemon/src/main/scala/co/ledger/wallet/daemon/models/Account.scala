@@ -2,7 +2,7 @@ package co.ledger.wallet.daemon.models
 
 import co.ledger.core
 import co.ledger.core.implicits._
-import co.ledger.wallet.daemon.database.{SynchronizationEventReceiver, SynchronizationResult}
+import co.ledger.wallet.daemon.schedulers.observers.{SynchronizationEventReceiver, SynchronizationResult}
 import com.fasterxml.jackson.annotation.JsonProperty
 
 import scala.collection.JavaConverters._
@@ -10,12 +10,13 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 
 object Account {
 
-  class Account(private val coreA: core.Account, private val coreC: core.Currency)(implicit ec: ExecutionContext) extends Currency(coreC){
+  class Account(private val coreA: core.Account, private val coreW: core.Wallet)
+               (implicit ec: ExecutionContext) extends Wallet(coreW) {
 
-    val index = coreA.getIndex
+    val accountIndex: Int = coreA.getIndex
 
-    def toView(walletName: String): Future[AccountView] = coreA.getBalance().map { balance =>
-      AccountView(walletName, index, balance.toLong, "account key chain", currencyView)
+    lazy val accountView: Future[AccountView] = coreA.getBalance().map { balance =>
+      AccountView(walletName, accountIndex, balance.toLong, "account key chain", currency.currencyView)
     }
 
     def operations(offset: Long, batch: Int, fullOp: Int): Future[Seq[Operation]] = {
@@ -25,17 +26,24 @@ object Account {
         coreA.queryOperations().offset(offset).limit(batch).partial().execute()
       ).map { operations =>
         if (operations.size() <= 0) List[Operation]()
-        else operations.asScala.toSeq.map { o => Operation.newInstance(o, coreC)}
+        else operations.asScala.toSeq.map { o => Operation.newInstance(o, coreA, coreW)}
       }
     }
 
-    def sync(walletName: String, poolName: String)(implicit coreEC: core.ExecutionContext): Future[SynchronizationResult] = {
+    def syncAccount(poolName: String)(implicit coreEC: core.ExecutionContext): Future[SynchronizationResult] = {
       val promise: Promise[SynchronizationResult] = Promise[SynchronizationResult]()
       val receiver: core.EventReceiver = new SynchronizationEventReceiver(coreA.getIndex, walletName, poolName, promise)
       coreA.synchronize().subscribe(coreEC, receiver)
       promise.future
     }
 
+    override def startRealTimeObserver(): Unit = {
+      if(!coreA.isObservingBlockchain) coreA.startBlockchainObservation()
+    }
+
+    override def stopRealTimeObserver(): Unit = {
+      if (coreA.isObservingBlockchain) coreA.stopBlockchainObservation()
+    }
   }
 
   class Derivation(private val accountCreationInfo: core.AccountCreationInfo) {
@@ -49,8 +57,8 @@ object Account {
   }
 
 
-  def newInstance(coreA: core.Account, coreC: core.Currency)(implicit ec: ExecutionContext): Account = {
-    new Account(coreA, coreC)
+  def newInstance(coreA: core.Account, coreW: core.Wallet)(implicit ec: ExecutionContext): Account = {
+    new Account(coreA, coreW)
   }
 
   def newDerivation(coreD: core.AccountCreationInfo): Derivation = {
