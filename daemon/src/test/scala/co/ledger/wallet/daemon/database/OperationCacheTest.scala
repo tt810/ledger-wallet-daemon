@@ -27,11 +27,11 @@ class OperationCacheTest extends AssertionsForJUnit {
     val nextRecord = operationCache.getOperationCandidate(next.get)
     val insertedNext = insertRecord(nextRecord)
     assert(insertedNext != nextRecord)
-    assert(insertedNext.getId() === nextRecord.getId())
-    assert(nextRecord.getOffset() === insertedNext.getOffset())
-    assert(nextRecord.getNext() === insertedNext.getNext())
-    val nextNextRecord = operationCache.getOperationCandidate(nextRecord.getNext().get)
-    assert(nextNextRecord.getId() === nextRecord.getNext().get)
+    assert(insertedNext.id === nextRecord.id)
+    assert(nextRecord.offset() === insertedNext.offset())
+    assert(nextRecord.next === insertedNext.next)
+    val nextNextRecord = operationCache.getOperationCandidate(nextRecord.next.get)
+    assert(nextNextRecord.id === nextRecord.next.get)
   }
 
   @Test def verifyGetPreviousOperations(): Unit = {
@@ -39,19 +39,19 @@ class OperationCacheTest extends AssertionsForJUnit {
     val id = UUID.randomUUID()
     val record = operationCache.insertOperation(id, 1L, "myWallet", 1, 0, 20, next, None)
     val nextRecord = insertRecord(operationCache.getOperationCandidate(next.get))
-    val previousOfNext = operationCache.getPreviousOperationRecord(nextRecord.getPrevious().get)
+    val previousOfNext = operationCache.getPreviousOperationRecord(nextRecord.previous.get)
     assert(previousOfNext === record)
   }
 
   private def insertRecord(record: AtomicRecord) = {
     operationCache.insertOperation(
-      record.getId(),
-      record.getPoolId(),
-      record.getWalletName().get,
-      record.getAccountIndex().get,
-      record.getOffset(),
-      record.getBatch(),
-      record.getNext(),
-      record.getPrevious())
+      record.id,
+      record.poolId,
+      record.walletName.get,
+      record.accountIndex.get,
+      record.offset(),
+      record.batch,
+      record.next,
+      record.previous)
   }
 }

@@ -5,8 +5,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Singleton
 
-import co.ledger.wallet.daemon.exceptions.{AccountNotFoundException, OperationNotFoundException, WalletNotFoundException, WalletPoolNotFoundException}
-import co.ledger.wallet.daemon.services.LogMsgMaker
+import co.ledger.wallet.daemon.exceptions.OperationNotFoundException
 import co.ledger.wallet.daemon.utils
 import com.twitter.inject.Logging
 
@@ -17,44 +16,16 @@ import scala.collection.{concurrent, mutable}
 class OperationCache extends Logging {
 
   def insertOperation(id: UUID, poolId: Long, walletName: String, accountIndex: Int, offset: Long, batch: Int, next: Option[UUID], previous: Option[UUID]): AtomicRecord = {
-    if (!cache.contains(id)) {
+    if (cache.contains(id)) cache(id)
+    else {
       val newRecord = new AtomicRecord(id, poolId, Option(walletName), Option(accountIndex), batch, new AtomicLong(offset), next, previous)
       cache.put(id, newRecord)
-      next match {
-        case Some(nextId) => nexts.put(nextId, id)
-        case _ => // do nothing
-      }
+      next.map { nexts.put(_, id)}
       poolTrees.get(poolId) match {
-        case None => {
-          val walletTrees = new ConcurrentHashMap[String, concurrent.Map[Int, mutable.Set[UUID]]]().asScala
-          val accountTrees = new ConcurrentHashMap[Int, mutable.Set[UUID]]().asScala
-          val ops = utils.newConcurrentSet[UUID]
-          ops += id
-          accountTrees.put(accountIndex, ops)
-          walletTrees.put(walletName, accountTrees)
-          poolTrees.put(poolId, walletTrees)
-        }
-        case Some(walletTrees) => walletTrees.get(walletName) match {
-          case None => {
-            val accountTrees = new ConcurrentHashMap[Int, mutable.Set[UUID]]().asScala
-            val ops = utils.newConcurrentSet[UUID]
-            ops += id
-            accountTrees.put(accountIndex, ops)
-            walletTrees.put(walletName, accountTrees)
-          }
-          case Some(accountTrees) => accountTrees.get(accountIndex) match {
-            case None => {
-              val ops = utils.newConcurrentSet[UUID]
-              ops += id
-              accountTrees.put(accountIndex, ops)
-            }
-            case Some(ops) => ops += id
-          }
-        }
+        case Some(poolTree) => poolTree.insertOperation(walletName, accountIndex, newRecord.id)
+        case None => poolTrees.put(poolId, newPoolTreeInstance(poolId, walletName, accountIndex, newRecord.id))
       }
       newRecord
-    } else {
-      cache(id)
     }
   }
 
@@ -62,7 +33,7 @@ class OperationCache extends Logging {
     cache.get(next) match {
       case None => nexts.get(next) match {
         case Some(current) => cache.get(current) match {
-          case Some(record) => new AtomicRecord(next, record.getPoolId(), record.getWalletName(), record.getAccountIndex(), record.getBatch(), new AtomicLong(record.getBatch() + record.getOffset()), Option(UUID.randomUUID()), Option(current))
+          case Some(record) => new AtomicRecord(next, record.poolId, record.walletName, record.accountIndex, record.batch, new AtomicLong(record.batch + record.offset()), Option(UUID.randomUUID()), Option(current))
           case None => throw OperationNotFoundException(current)
         }
         case None => throw OperationNotFoundException(next)
@@ -79,55 +50,67 @@ class OperationCache extends Logging {
   }
 
   def updateOffset(poolId: Long, walletName: String, accountIndex: Int): Unit = {
-    poolTrees.get(poolId) match {
-      case Some(walletTrees) => walletTrees.get(walletName) match {
-        case Some(accountTrees) => accountTrees.get(accountIndex) match {
-          case Some(ops) => ops.foreach { op => cache.get(op) match {
-            case Some(record) => {
-              val offset = record.incrementOffset()
-              info(LogMsgMaker.newInstance("Update offset").append("pool_id", poolId).append("wallet_name", walletName).append("account_index", accountIndex).append("offset", offset).toString())
-            }
-            case None => throw OperationNotFoundException(op)
-          }}
-          case None => throw AccountNotFoundException(accountIndex)
-        }
-        case None => throw WalletNotFoundException(walletName)
-      }
-      case None => throw WalletPoolNotFoundException(poolId.toString)
-    }
+    if (poolTrees.contains(poolId)) poolTrees(poolId).operations(walletName, accountIndex).map { op => cache(op).incrementOffset()}
+  }
+
+  private def newPoolTreeInstance(pool: Long, wallet: String, account: Int, operation: UUID): PoolTree = {
+    val wallets = new ConcurrentHashMap[String, WalletTree]().asScala
+    wallets.put(wallet, newWalletTreeInstance(wallet, account, operation))
+    new PoolTree(pool, wallets)
   }
 
   private val cache: concurrent.Map[UUID, AtomicRecord] = new ConcurrentHashMap[UUID, AtomicRecord]().asScala
   private val nexts: concurrent.Map[UUID, UUID] = new ConcurrentHashMap[UUID, UUID]().asScala
-  private val poolTrees: concurrent.Map[Long, concurrent.Map[String, concurrent.Map[Int, mutable.Set[UUID]]]] =
-    new ConcurrentHashMap[Long, concurrent.Map[String, concurrent.Map[Int, mutable.Set[UUID]]]]().asScala
+  private val poolTrees: concurrent.Map[Long, PoolTree] = new ConcurrentHashMap[Long, PoolTree]().asScala
 
-  class AtomicRecord (private val id: UUID,
-                      private val poolId: Long,
-                      private val walletName: Option[String],
-                      private val accountIndex: Option[Int],
-                      private val batch: Int,
-                      private val offset: AtomicLong,
-                      private val next: Option[UUID],
-                      private val previous: Option[UUID]) {
+  class PoolTree(val poolId: Long, val wallets: concurrent.Map[String, WalletTree]) {
 
-    def incrementOffset(): Long = offset.incrementAndGet()
+    def insertOperation(wallet: String, account: Int, operation: UUID) = wallets.get(wallet) match {
+      case Some(tree) => tree.insertOperation(account, operation)
+      case None => wallets.put(wallet, newWalletTreeInstance(wallet, account, operation))
+    }
 
-    def getOffset(): Long = offset.get()
+    def operations(wallet: String, account: Int) = if (wallets.contains(wallet)) wallets(wallet).operations(account) else Set.empty[UUID]
+  }
 
-    def getBatch(): Int = batch
+  def newWalletTreeInstance(walletName: String, accountIndex: Int, operation: UUID): WalletTree = {
+    val accounts = new ConcurrentHashMap[Int, AccountTree]().asScala
+    accounts.put(accountIndex, newAccountTreeInstance(accountIndex, operation))
+    new WalletTree(walletName, accounts)
+  }
 
-    def getPrevious(): Option[UUID] = previous
+  class WalletTree(val walletName: String, val accounts: concurrent.Map[Int, AccountTree]) {
 
-    def getNext(): Option[UUID] = next
+    def insertOperation(account: Int, operation: UUID) = accounts.get(account) match {
+      case Some(tree) => tree.insertOperation(operation)
+      case None => accounts.put(account, newAccountTreeInstance(account, operation))
+    }
 
-    def getId(): UUID = id
+    def operations(account: Int): Set[UUID] = if (accounts.contains(account)) accounts(account).operations.toSet else Set.empty[UUID]
+  }
 
-    def getPoolId(): Long = poolId
+  def newAccountTreeInstance(index: Int, operation: UUID): AccountTree = {
+    new AccountTree(index, utils.newConcurrentSet[UUID] += operation)
+  }
 
-    def getWalletName(): Option[String] = walletName
+  class AccountTree(val index: Int, val operations:  mutable.Set[UUID]) {
 
-    def getAccountIndex(): Option[Int] = accountIndex
+    def containsOperation(operationId: UUID) = operations.contains(operationId)
 
+    def insertOperation(operationId: UUID) = operations += operationId
+  }
+
+  class AtomicRecord (val id: UUID,
+                      val poolId: Long,
+                      val walletName: Option[String],
+                      val accountIndex: Option[Int],
+                      val batch: Int,
+                      private val ofst: AtomicLong,
+                      val next: Option[UUID],
+                      val previous: Option[UUID]) {
+
+    def incrementOffset(): Long = ofst.incrementAndGet()
+
+    def offset(): Long = ofst.get()
   }
 }
