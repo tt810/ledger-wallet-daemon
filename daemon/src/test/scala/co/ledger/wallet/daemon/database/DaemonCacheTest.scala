@@ -66,11 +66,8 @@ class DaemonCacheTest extends AssertionsForJUnit {
   }
 
   @Test def verifyGetAccountOperations(): Unit = {
-    val firstOp = Await.result(DefaultDaemonCache.dbDao.getOperation(1L), Duration.Inf)
-    println(firstOp)
     val user1 = Await.result(cache.getUserDirectlyFromDB(PUB_KEY_3), Duration.Inf)
     val pool1 = Await.result(DefaultDaemonCache.dbDao.getPool(user1.get.id.get, POOL_NAME), Duration.Inf)
-    Await.result(cache.getAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, firstOp.get.offset.toInt + 100, 0), Duration.Inf)
     val withTxs = Await.result(cache.getAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, 1, 1), Duration.Inf)
     withTxs.operations.foreach(op => assertNotNull(op.transaction))
     val ops = Await.result(cache.getAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, 2, 0), Duration.Inf)
@@ -124,7 +121,6 @@ object DaemonCacheTest {
         WALLET_NAME), Duration.Inf)
     Await.result(cache.getAccountOperations(user3.get, 0, POOL_NAME, WALLET_NAME, 1, 1), Duration.Inf)
     Await.result(cache.syncOperations(), Duration.Inf)
-
     DefaultDaemonCache.initialize()
   }
 

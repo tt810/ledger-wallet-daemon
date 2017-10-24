@@ -4,8 +4,8 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Singleton
 
-import co.ledger.wallet.daemon.async.{MDCPropagatingExecutionContext, SerialExecutionContext, SerialExecutionContextWrapper}
-import co.ledger.wallet.daemon.exceptions.{OperationNotFoundException, UserNotFoundException, WalletPoolAlreadyExistException, WalletPoolNotFoundException}
+import co.ledger.wallet.daemon.async.{MDCPropagatingExecutionContext, SerialExecutionContext}
+import co.ledger.wallet.daemon.exceptions.{UserNotFoundException, WalletPoolAlreadyExistException, WalletPoolNotFoundException}
 import co.ledger.wallet.daemon.libledger_core.async.LedgerCoreExecutionContext
 import co.ledger.wallet.daemon.models.Account.{Account, Derivation}
 import co.ledger.wallet.daemon.models._
@@ -81,7 +81,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     val poolDto = PoolDto(poolName, user.id.get, configuration)
     dbDao.insertPool(poolDto).map { id =>
       addToCache(user, poolDto).map { pool =>
-        pool.registerEventReceiver(new NewOperationEventReceiver(id, dbDao), _coreExecutionContext)
+        pool.registerEventReceiver(new NewOperationEventReceiver(id, opsCache), _coreExecutionContext)
         pool
       }
     }.recover {
@@ -140,75 +140,44 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
   }
 
   def getPreviousBatchAccountOperations(user: UserDto, accountIndex: Int, poolName: String, walletName: String, previous: UUID, fullOp: Int): Future[PackedOperationsView] = {
-    // fetch poolId, fetch batch and offset info from dbDao, fetch operations from lib return
-    getPoolFromDB(user.id.get, poolName).flatMap { dto =>
-      dbDao.getPreviousOperationInfo(previous, user.id.get, dto.id.get, Option(walletName), Option(accountIndex)).flatMap {
-        case None => throw new OperationNotFoundException(previous)
-        case Some(operation) => getAccountOperations(user, accountIndex, poolName, walletName, operation.offset, operation.batch, fullOp)
-          .map { ops =>
-            val view = PackedOperationsView(operation.previous, operation.next, ops)
-            info(LogMsgMaker.newInstance("Retrieved previous batch account operations")
-              .append("inserted_operation", operation)
-              .append("result_size", view.operations.size)
-              .toString())
-            view
-          }
+    getHardAccount(user.pubKey, poolName, walletName, accountIndex).flatMap { pair =>
+      val previousRecord = opsCache.getPreviousOperationRecord(previous)
+      pair._2.operations(previousRecord.getOffset(), previousRecord.getBatch(), fullOp).flatMap { ops =>
+        Future.sequence(ops.map { op => op.operationView })
+          .map { os => PackedOperationsView(previousRecord.getPrevious(), previousRecord.getNext(), os)}
       }
     }
   }
 
+
   def getNextBatchAccountOperations(user: UserDto, accountIndex: Int, poolName: String, walletName: String, next: UUID, fullOp: Int): Future[PackedOperationsView] = {
-    // fetch poolId, fetch batch and offset info from dbDao, fetch operations from lib, insert opsDto, return
     getPoolFromDB(user.id.get, poolName).flatMap { poolDto =>
-      dbDao.getNextOperationInfo(next, user.id.get, poolDto.id.get, Option(walletName), Option(accountIndex)).flatMap {
-        case None => throw OperationNotFoundException(next)
-        case Some(opCandidate) => {
-          getAccountOperations(user, accountIndex, poolName, walletName, opCandidate.offset, opCandidate.batch, fullOp).flatMap { operations =>
-            implicit val ec: SerialExecutionContextWrapper = _writeContext
-            val realBatch = if (operations.size < opCandidate.batch) operations.size else opCandidate.batch
-            val next = if (realBatch < opCandidate.batch) None else opCandidate.next
-            val operationDto = OperationDto(user.id.get, poolDto.id.get, Option(walletName), Option(accountIndex), opCandidate.previous, opCandidate.offset, realBatch, next)
-            dbDao.insertOperation(operationDto).map { id =>
-              val view = PackedOperationsView(opCandidate.previous, next, operations)
-              info(LogMsgMaker.newInstance("Retrieved next batch account operations")
-                .append("operation_id", id)
-                .append("inserted_operation", operationDto)
-                .append("result_size", view.operations.size)
-                .toString())
-              view
-            }
-          }
+      getHardAccount(user.pubKey, poolName, walletName, accountIndex).flatMap { pair =>
+        val candidate = opsCache.getOperationCandidate(next)
+        pair._2.operations(candidate.getOffset(), candidate.getBatch(), fullOp).flatMap { ops =>
+          val realBatch = if (ops.size < candidate.getBatch()) ops.size else candidate.getBatch()
+          val next = if (realBatch < candidate.getBatch()) None else candidate.getNext()
+          val previous = candidate.getPrevious()
+          val operationRecord = opsCache.insertOperation(candidate.getId(), poolDto.id.get, walletName, accountIndex, candidate.getOffset(), candidate.getBatch(), next, previous)
+          Future.sequence(ops.map { op => op.operationView  })
+            .map { os => PackedOperationsView(operationRecord.getPrevious(), operationRecord.getNext(), os)}
         }
       }
     }
   }
 
   def getAccountOperations(user: UserDto, accountIndex: Int, poolName: String, walletName: String, batch: Int, fullOp: Int): Future[PackedOperationsView] = {
-    // fetch poolId, fetch operations from lib, insert opsDto, return
     getPoolFromDB(user.id.get, poolName).flatMap { poolDto =>
-      getAccountOperations(user, accountIndex, poolName, walletName, 0, batch, fullOp).flatMap { operations =>
-        implicit val ec: SerialExecutionContextWrapper = _writeContext
-        // check if total operation count less than request batch.
-        val realBatch = if (operations.size < batch) operations.size else batch
-        val next = if (realBatch < batch) None else Option(UUID.randomUUID())
-        val operationDto = OperationDto(user.id.get, poolDto.id.get, Option(walletName), Option(accountIndex), None, 0, realBatch, next)
-        dbDao.insertOperation(operationDto).map { id =>
-          val view = PackedOperationsView(None, operationDto.next, operations)
-          info(LogMsgMaker.newInstance("Retrieved account operations")
-            .append("operation_id", id)
-            .append("inserted_operation", operationDto)
-            .append("result_size", view.operations.size)
-            .toString())
-          view
+      getHardAccount(user.pubKey, poolName, walletName, accountIndex).flatMap { pair =>
+        val offset = 0
+        pair._2.operations(offset, batch, fullOp).flatMap { ops =>
+          val realBatch = if (ops.size < batch) ops.size else batch
+          val next = if (realBatch < batch) None else Option(UUID.randomUUID())
+          val previous = None
+          val operationRecord = opsCache.insertOperation(UUID.randomUUID(), poolDto.id.get, walletName, accountIndex, offset, batch, next, previous)
+          Future.sequence(ops.map { op => op.operationView })
+            .map { os => PackedOperationsView(operationRecord.getPrevious(), operationRecord.getNext(), os) }
         }
-      }
-    }
-  }
-
-  private def getAccountOperations(user: UserDto, accountIndex: Int, poolName: String, walletName: String, offset: Long, batch: Int, fullOp: Int): Future[Seq[OperationView]] = {
-    getHardAccount(user.pubKey, poolName, walletName, accountIndex).flatMap { pair =>
-      pair._2.operations(offset, batch, fullOp).flatMap { os =>
-        Future.sequence(os.map { o => o.operationView })
       }
     }
   }
@@ -288,6 +257,7 @@ object DefaultDaemonCache extends Logging {
 
   private[database] val dbDao             =   new DatabaseDao(Database.forConfig(DaemonConfiguration.dbProfileName))
   private val userPools: concurrent.Map[String, concurrent.Map[String, Pool]] =   new ConcurrentHashMap[String, concurrent.Map[String, Pool]]().asScala
+  private[database] val opsCache: OperationCache = new OperationCache()
 }
 
 case class Bulk(offset: Int = 0, bulkSize: Int = 20)
