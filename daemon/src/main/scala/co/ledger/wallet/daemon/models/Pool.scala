@@ -129,6 +129,7 @@ class Pool(private val coreP: core.WalletPool)(implicit ec: ExecutionContext) ex
   }
 
   def stopRealTimeObserver() = {
+    debug(LogMsgMaker.newInstance("Start real time observer").append("name", name).toString())
     wallets().map { ws => ws.map(_.stopRealTimeObserver()) }
   }
 

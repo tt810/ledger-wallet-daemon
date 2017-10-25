@@ -5,36 +5,19 @@ import javax.inject.Singleton
 import co.ledger.core.Secp256k1
 import io.github.andrebeat.pool._
 
-import scala.concurrent.{ExecutionContext, Future}
-
 @Singleton
 class ECDSAService extends DaemonService {
 
-  def sign(data: Array[Byte], privKey: Array[Byte])(implicit ec: ExecutionContext): Future[Array[Byte]] = Future {
-    lease { instance =>
-      debug("Sign...")
-      val result = instance.sign(privKey, data)
-      debug("Signed")
-      result
-    }
+  def sign(data: Array[Byte], privKey: Array[Byte]): Array[Byte] = {
+    lease { instance => instance.sign(privKey, data) }
   }
 
-  def verify(data: Array[Byte], signature: Array[Byte], publicKey: Array[Byte])(implicit ec: ExecutionContext): Future[Boolean] = Future {
-    lease { instance =>
-      debug("Verify....")
-      val result = instance.verify(data, signature, publicKey)
-      debug("Verified")
-      result
-    }
+  def verify(data: Array[Byte], signature: Array[Byte], publicKey: Array[Byte]): Boolean = {
+    lease { instance => instance.verify(data, signature, publicKey) }
   }
 
-  def computePublicKey(privateKey: Array[Byte])(implicit ec: ExecutionContext): Future[Array[Byte]] = Future {
-    lease { instance =>
-      debug("Computing public key...")
-      val result = instance.computePubKey(privateKey, true)
-      debug("Computed public key")
-      result
-    }
+  def computePublicKey(privateKey: Array[Byte]): Array[Byte] = {
+    lease { instance => instance.computePubKey(privateKey, true) }
   }
 
   private def lease = _secp256k1Instances.acquire()

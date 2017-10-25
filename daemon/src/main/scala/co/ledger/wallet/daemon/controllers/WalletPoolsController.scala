@@ -5,10 +5,10 @@ import javax.inject.Inject
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.controllers.requests.{CommonMethodValidations, RichRequest}
 import co.ledger.wallet.daemon.controllers.responses.ResponseSerializer
-import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
+import co.ledger.wallet.daemon.services.PoolsService
 import co.ledger.wallet.daemon.services.PoolsService.PoolConfiguration
-import co.ledger.wallet.daemon.services.{LogMsgMaker, PoolsService}
 import com.fasterxml.jackson.annotation.JsonProperty
+import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
 import com.twitter.finagle.http.Request
 import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.RouteParam
@@ -21,19 +21,14 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
   import WalletPoolsController._
 
   get("/pools") {(request: Request) =>
-    info(LogMsgMaker.newInstance("GET wallet pools request")
-      .append("request", request)
-      .toString())
+    info(s"GET wallet pools $request, Parameters(user: ${request.user.get.id})")
     poolsService.pools(request.user.get).recover {
       case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 
   get("/pools/:pool_name") {(request: PoolRouteRequest) =>
-    info(LogMsgMaker.newInstance("GET wallet pool request")
-      .append("request", request)
-      .append("pool_name", request.pool_name)
-      .toString())
+    info(s"GET wallet pool $request")
     poolsService.pool(request.user, request.pool_name).map {
       case Some(view) => responseSerializer.serializeOk(view, response)
       case None => responseSerializer.serializeNotFound(
@@ -43,11 +38,8 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
     }
   }
 
-  post("/pools/operations/synchronize") { request: Request =>
-    implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.cachedNamedThreads("end-point-synchronization-thread-pool")
-    info(LogMsgMaker.newInstance("SYNC wallet pools request")
-      .append("request", request)
-      .toString())
+  post("/pools/operations/synchronize") {(request: Request) =>
+    info(s"SYNC wallet pools $request, Parameters(user: ${request.user.get.id})")
     val t0 = System.currentTimeMillis()
     poolsService.syncOperations().map { result =>
       val t1 = System.currentTimeMillis()
@@ -59,23 +51,16 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
   }
 
   post("/pools") { (request: CreationRequest) =>
-    info(LogMsgMaker.newInstance("CREATE wallet pool request")
-      .append("request", request.request)
-      .toString())
-    val poolName = request.pool_name
+    info(s"CREATE wallet pool $request")
     // TODO: Deserialize the configuration from the body of the request
-    poolsService.createPool(request.user, poolName, PoolConfiguration()).recover {
+    poolsService.createPool(request.user, request.pool_name, PoolConfiguration()).recover {
       case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 
-  delete("/pools/:pool_name") {(request: Request) =>
-    val poolName = request.getParam("pool_name")
-    info(LogMsgMaker.newInstance("DELETE wallet pool request")
-      .append("request", request)
-      .append("pool_name", poolName)
-      .toString())
-    poolsService.removePool(request.user.get, poolName).recover {
+  delete("/pools/:pool_name") {(request: PoolRouteRequest) =>
+    info(s"DELETE wallet pool $request")
+    poolsService.removePool(request.user, request.pool_name).recover {
       case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
@@ -91,6 +76,7 @@ object WalletPoolsController {
     @MethodValidation
     def validatePoolName: ValidationResult = CommonMethodValidations.validateName("pool_name", pool_name)
 
+    override def toString: String = s"$request, Parameters(user: ${user.id}, pool_name: $pool_name)"
   }
 
   case class PoolRouteRequest(
@@ -98,6 +84,8 @@ object WalletPoolsController {
                                request: Request) extends RichRequest(request) {
     @MethodValidation
     def validatePoolName: ValidationResult = CommonMethodValidations.validateName("pool_name", pool_name)
+
+    override def toString: String = s"$request, Parameters(user: ${user.id}, pool_name: $pool_name)"
   }
 
 }

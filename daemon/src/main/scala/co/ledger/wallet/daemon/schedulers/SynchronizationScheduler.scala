@@ -18,9 +18,11 @@ import scala.util.{Failure, Success}
 class SynchronizationScheduler @Inject()(daemonCache: DaemonCache) extends Timer with Logging {
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.cachedNamedThreads("scheduler-thread-pool")
 
-  lazy val schedule = scheduleSync(Time.fromSeconds(DaemonConfiguration.synchronizationInterval._1), Duration(DaemonConfiguration.synchronizationInterval._2, TimeUnit.SECONDS))
+  lazy val schedule: TimerTask = scheduleSync(
+    Time.fromSeconds(DaemonConfiguration.synchronizationInterval._1),
+    Duration(DaemonConfiguration.synchronizationInterval._2, TimeUnit.HOURS))
 
-  def scheduleSync(when: Time, period: Duration) = schedulePeriodically(when: Time, period: Duration)(synchronizationTask(daemonCache))
+  def scheduleSync(when: Time, period: Duration): TimerTask = schedulePeriodically(when: Time, period: Duration)(synchronizationTask(daemonCache))
 
   override def schedulePeriodically(when: Time, period: Duration)(f: => Unit): TimerTask =
     scheduledThreadPoolTimer.schedule(when, period)(f)
@@ -33,17 +35,16 @@ class SynchronizationScheduler @Inject()(daemonCache: DaemonCache) extends Timer
   private def synchronizationTask(daemonCache: DaemonCache): Unit = try {
     val t0 = System.currentTimeMillis()
     NativeAwait.ready(daemonCache.syncOperations(), NativeDuration.Inf).onComplete {
-      case Success(result) => {
-        result.map { r =>
+      case Success(result) =>
+        result.foreach { r =>
           if (r.syncResult) info(s"Synchronization complete for $r")
           else warn(s"Failed synchronizing $r")
         }
         val t1 = System.currentTimeMillis()
-        info(s"Synchronization finished, elapsed time: ${(t1 - t0)} milliseconds")
-      }
+        info(s"Synchronization finished, elapsed time: ${t1 - t0} milliseconds")
       case Failure(e) => {
         val t1 = System.currentTimeMillis()
-        info(s"Synchronization finished, elapsed time: ${(t1 - t0)} milliseconds")
+        info(s"Synchronization finished, elapsed time: ${t1 - t0} milliseconds")
         e
       }
     }

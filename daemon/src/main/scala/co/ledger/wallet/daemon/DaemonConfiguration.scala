@@ -3,9 +3,9 @@ package co.ledger.wallet.daemon
 import java.util.Locale
 
 import com.typesafe.config.ConfigFactory
-import org.spongycastle.util.encoders.Base64
 import slick.jdbc.JdbcProfile
 
+import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
 import scala.util.Try
 
@@ -13,17 +13,13 @@ object DaemonConfiguration {
   private val config = ConfigFactory.load()
   private val PERMISSION_CREATE_USER: Int = 0x01
 
-  val adminUsers: Seq[String] = if (config.hasPath("demo_users")) {
-    val usersConfig = config.getConfigList("demo_users")
-    var users = new ListBuffer[String]()
-    for (i <- 0 until usersConfig.size()) {
-      val userConfig = usersConfig.get(i)
-      val username = userConfig.getString("username")
-      val password = userConfig.getString("password")
-      users += s"Basic ${Base64.toBase64String(s"$username:$password".getBytes)}"
-    }
-    users.toList
-  } else List[String]()
+  val adminUsers: Seq[(String, String)] = if (config.hasPath("demo_users")) {
+    val usersConfig = config.getConfigList("demo_users").asScala.toSeq
+    for {
+      userConfig <- usersConfig
+    } yield (userConfig.getString("username"), userConfig.getString("password"))
+
+  } else List[(String, String)]()
 
   val whiteListUsers: Seq[(String, Long)] = if (config.hasPath("whitelist")){
     val usersConfig = config.getConfigList("whitelist")

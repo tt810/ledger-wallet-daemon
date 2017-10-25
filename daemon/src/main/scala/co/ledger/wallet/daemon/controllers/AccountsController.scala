@@ -3,17 +3,17 @@ package co.ledger.wallet.daemon.controllers
 import java.util.UUID
 import javax.inject.Inject
 
-import co.ledger.wallet.daemon.exceptions._
-import co.ledger.wallet.daemon.filters.AccountCreationFilter
-import co.ledger.wallet.daemon.services.{AccountsService, LogMsgMaker, OperationQueryParams}
-import com.twitter.finagle.http.Request
-import com.twitter.finatra.http.Controller
-import com.twitter.finatra.request.{QueryParam, RouteParam}
-import co.ledger.wallet.daemon.filters.AccountCreationContext._
-import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.controllers.requests.{CommonMethodValidations, RichRequest}
 import co.ledger.wallet.daemon.controllers.responses.ResponseSerializer
+import co.ledger.wallet.daemon.exceptions._
+import co.ledger.wallet.daemon.filters.AccountCreationContext._
+import co.ledger.wallet.daemon.filters.AccountCreationFilter
+import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
+import co.ledger.wallet.daemon.services.{AccountsService, OperationQueryParams}
+import com.twitter.finagle.http.Request
+import com.twitter.finatra.http.Controller
+import com.twitter.finatra.request.{QueryParam, RouteParam}
 import com.twitter.finatra.validation.{MethodValidation, ValidationResult}
 
 import scala.concurrent.ExecutionContext
@@ -24,78 +24,49 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
   import AccountsController._
 
   get("/pools/:pool_name/wallets/:wallet_name/accounts") { request: AccountRequest =>
-    info(LogMsgMaker.newInstance("GET accounts request")
-      .append("request", request.request)
-      .append("wallet_name", request.wallet_name)
-      .append("pool_name", request.pool_name)
-      .toString())
+    info(s"GET accounts $request")
     accountsService.accounts(request.user, request.pool_name, request.wallet_name).recover {
       case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
         Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
-        response,
-        pnfe)
+        response)
       case wnfe: WalletNotFoundException => responseSerializer.serializeBadRequest(
         Map("response"->"Wallet doesn't exist", "wallet_name" -> request.wallet_name),
-        response,
-        wnfe)
+        response)
       case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 
   get("/pools/:pool_name/wallets/:wallet_name/accounts/next") { request: AccountCreationInfoRequest =>
-    info(LogMsgMaker.newInstance("GET next account creation info request")
-      .append("request", request.request)
-      .append("wallet_name", request.wallet_name)
-      .append("pool_name", request.pool_name)
-      .append("account_index", request.account_index)
-      .toString())
+    info(s"GET account creation info $request")
     accountsService.nextAccountCreationInfo(request.user, request.pool_name, request.wallet_name, request.account_index).recover {
       case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
         Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
-        response,
-        pnfe)
+        response)
       case wnfe: WalletNotFoundException => responseSerializer.serializeBadRequest(
         Map("response" -> "Wallet doesn't exist", "wallet_name" -> request.wallet_name),
-        response,
-        wnfe)
+        response)
       case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 
   get("/pools/:pool_name/wallets/:wallet_name/accounts/:account_index") { request: AccountRequest =>
-    info(LogMsgMaker.newInstance("GET account request")
-      .append("request", request.request)
-      .append("account_index", request.account_index)
-      .append("wallet_name", request.wallet_name)
-      .append("pool_name", request.pool_name)
-      .toString())
+    info(s"GET account $request")
     accountsService.account(request.account_index.get, request.user, request.pool_name, request.wallet_name).map {
       case Some(view) => responseSerializer.serializeOk(view, response)
       case None => responseSerializer.serializeNotFound(Map("response" -> "Account doesn't exist", "account_index" -> request.account_index), response)
     }.recover {
       case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
         Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
-        response,
-        pnfe)
+        response)
       case wnfe: WalletNotFoundException => responseSerializer.serializeBadRequest(
         Map("response"->"Wallet doesn't exist", "wallet_name" -> request.wallet_name),
-        response,
-        wnfe)
+        response)
       case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 
   get("/pools/:pool_name/wallets/:wallet_name/accounts/:account_index/operations") { request: OperationRequest =>
-    info(LogMsgMaker.newInstance("GET account operation request")
-      .append("request", request.request)
-      .append("account_index", request.account_index)
-      .append("previous_cursor", request.previous)
-      .append("next_cursor", request.next)
-      .append("batch", request.batch)
-      .append("is_full_op", request.full_op > 0)
-      .append("wallet_name", request.wallet_name)
-      .append("pool_name", request.pool_name)
-      .toString())
+    info(s"GET account operation $request")
     accountsService.accountOperation(
       request.user,
       request.account_index,
@@ -104,20 +75,16 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
       OperationQueryParams(request.previous, request.next, request.batch, request.full_op)).recover {
         case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
           Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
-          response,
-          pnfe)
+          response)
         case onfe: OperationNotFoundException => responseSerializer.serializeBadRequest(
           Map("response" -> "Operation cursor doesn't exist", "next_cursor" -> request.next, "previous_cursor" -> request.previous),
-          response,
-          onfe)
+          response)
         case wnfe: WalletNotFoundException => responseSerializer.serializeBadRequest(
           Map("response"->"Wallet doesn't exist", "wallet_name" -> request.wallet_name),
-          response,
-          wnfe)
+          response)
         case anfe: AccountNotFoundException => responseSerializer.serializeBadRequest(
           Map("response"->"Account doesn't exist", "account_index" -> request.account_index),
-          response,
-          anfe)
+          response)
         case e: Throwable => responseSerializer.serializeInternalError(response, e)
       }
   }
@@ -126,34 +93,23 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
     .post("/pools/:pool_name/wallets/:wallet_name/accounts") { request: Request =>
       val walletName = request.getParam("wallet_name")
       val poolName = request.getParam("pool_name")
-      info(LogMsgMaker.newInstance("CREATE account request")
-        .append("request", request)
-        .append("wallet_name", walletName)
-        .append("pool_name", poolName)
-        .toString())
+      info(s"CREATE account $request, Parameters(user: ${request.user.get.id}, pool_name: $poolName, wallet_name: $walletName), Body(${request.accountCreationBody}")
       accountsService.createAccount(request.accountCreationBody,request.user.get,poolName,walletName).recover {
         case iae: InvalidArgumentException => responseSerializer.serializeBadRequest(
           Map("response"-> iae.msg, "pool_name" -> poolName, "wallet_name"->walletName),
-          response,
-          iae)
+          response)
         case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
           Map("response" -> "Wallet pool doesn't exist", "pool_name" -> poolName),
-          response,
-          pnfe)
+          response)
         case wnfe: WalletNotFoundException => responseSerializer.serializeBadRequest(
           Map("response"->"Wallet doesn't exist", "wallet_name" -> walletName),
-          response,
-          wnfe)
+          response)
         case e: Throwable => responseSerializer.serializeInternalError(response, e)
       }
   }
 
   delete("/pools/:pool_name/wallets/:wallet_name/accounts") { request: AccountRequest =>
-    info(LogMsgMaker.newInstance("DELETE account request")
-      .append("request", request.request)
-      .append("wallet_name", request.wallet_name)
-      .append("pool_name", request.pool_name)
-      .toString())
+    info(s"DELETE account $request")
     //TODO
   }
 
@@ -172,6 +128,8 @@ object AccountsController {
 
     @MethodValidation
     def validateWalletName: ValidationResult = CommonMethodValidations.validateName("wallet_name", wallet_name)
+
+    override def toString: String = s"$request, Parameters(user: ${user.id}, pool_name: $pool_name, wallet_name: $wallet_name, account_index: $account_index)"
   }
 
   case class AccountCreationInfoRequest(
@@ -188,6 +146,8 @@ object AccountsController {
 
     @MethodValidation
     def validateAccountIndex: ValidationResult = CommonMethodValidations.validateOptionalAccountIndex(account_index)
+
+    override def toString: String = s"$request, Parameters(user: ${user.id}, pool_name: $pool_name, wallet_name: $wallet_name, account_index: $account_index)"
   }
   case class OperationRequest(
                              @RouteParam pool_name: String,
@@ -210,5 +170,7 @@ object AccountsController {
 
     @MethodValidation
     def validateBatch: ValidationResult = ValidationResult.validate(batch > 0, "batch: batch should be greater than zero")
+
+    override def toString: String = s"$request, Parameters(user: ${user.id}, pool_name: $pool_name, wallet_name: $wallet_name, account_index: $account_index, next: $next, previous: $previous, batch: $batch, full_op: $full_op)"
   }
 }

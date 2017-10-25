@@ -100,7 +100,7 @@ class DaemonCacheTest extends AssertionsForJUnit {
 object DaemonCacheTest {
   @BeforeClass def initialization(): Unit = {
     NativeLibLoader.loadLibs()
-    Await.result(DefaultDaemonCache.migrateDatabase(), Duration.Inf)
+    Await.result(cache.dbMigration, Duration.Inf)
     Await.result(DefaultDaemonCache.dbDao.insertUser(UserDto(PUB_KEY_1, 0, None)), Duration.Inf)
     Await.result(DefaultDaemonCache.dbDao.insertUser(UserDto(PUB_KEY_2, 0, None)), Duration.Inf)
     Await.result(DefaultDaemonCache.dbDao.insertUser(UserDto(PUB_KEY_3, 0, None)), Duration.Inf)
@@ -122,7 +122,7 @@ object DaemonCacheTest {
         WALLET_NAME), Duration.Inf)
     Await.result(cache.getAccountOperations(user3.get, 0, POOL_NAME, WALLET_NAME, 1, 1), Duration.Inf)
     Await.result(cache.syncOperations(), Duration.Inf)
-    DefaultDaemonCache.initialize()
+    Await.result(cache.dbMigration, Duration.Inf)
   }
 
   private val cache: DefaultDaemonCache = new DefaultDaemonCache()
