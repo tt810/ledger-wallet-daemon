@@ -54,7 +54,7 @@ class OperationCache extends Logging {
     if (poolTrees.contains(poolId))
       poolTrees(poolId).operations(walletName, accountIndex).map { op =>
         val lastOffset = cache(op).incrementOffset()
-        debug(LogMsgMaker.newInstance("Update offset").append("to", lastOffset).toString())
+        debug(LogMsgMaker.newInstance("Update offset").append("to", lastOffset).append("pool", poolId).append("wallet", walletName).append("account", accountIndex).toString())
       }
   }
 
