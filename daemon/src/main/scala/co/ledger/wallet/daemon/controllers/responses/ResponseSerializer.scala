@@ -12,8 +12,8 @@ class ResponseSerializer extends Logging {
       .body(ErrorResponseBody(ErrorCode.Internal_Error, Map("response"->"Problem occurred when processing the request, check with developers")))
   }
 
-  def serializeBadRequest(msg: Map[String, Any], response: ResponseBuilder, caught: Exception): Response = {
-    info(ErrorCode.Bad_Request, caught)
+  def serializeBadRequest(msg: Map[String, Any], response: ResponseBuilder): Response = {
+    info(ErrorCode.Bad_Request)
     response.badRequest()
       .body(ErrorResponseBody(ErrorCode.Bad_Request, msg))
   }
@@ -25,7 +25,7 @@ class ResponseSerializer extends Logging {
   }
 
   def serializeOk(obj: Any, response: ResponseBuilder): Response = {
-    info("Request Ok")
+    info("Ok")
     response.ok(obj)
   }
 }

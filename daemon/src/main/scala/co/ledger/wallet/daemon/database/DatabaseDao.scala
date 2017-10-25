@@ -1,9 +1,10 @@
 package co.ledger.wallet.daemon.database
 
 import java.sql.Timestamp
-import java.util.{Date, UUID}
+import java.util.Date
 import javax.inject.{Inject, Singleton}
 
+import co.ledger.wallet.daemon.async.{MDCPropagatingExecutionContext, SerialExecutionContext}
 import co.ledger.wallet.daemon.database.DBMigrations.Migrations
 import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.utils.HexUtils
@@ -17,63 +18,68 @@ import scala.concurrent.{ExecutionContext, Future}
 class DatabaseDao @Inject()(db: Database) extends Logging {
   import database.Tables._
   import database.Tables.profile.api._
+  implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.cachedNamedThreads("database-read-thread-pool")
+  private val _writeContext = SerialExecutionContext.cachedNamedThreads("database-write-thread-pool")
 
-  def migrate()(implicit ec: ExecutionContext): Future[Unit] = {
+  def migrate(): Future[Unit] = {
+    implicit val ec: ExecutionContext = SerialExecutionContext.singleNamedThread("database-migration-thread-pool")
     info("Start database migration")
     val lastMigrationVersion = databaseVersions.sortBy(_.version.desc).map(_.version).take(1).result.head
     db.run(lastMigrationVersion.transactionally) recover {
       case _ => -1
-    } flatMap { currentVersion =>
-      {
-        debug(s"Current database version at ${currentVersion}")
+    } flatMap { currentVersion => {
+        info(s"Current database version at $currentVersion")
         val maxVersion = Migrations.keys.toArray.sortWith(_ > _).head
 
         def migrate(version: Int, maxVersion: Int): Future[Unit] = {
           if(version > maxVersion) {
-            debug(s"Database version up to date at $version")
+            info(s"Database version up to date at $maxVersion")
             Future.successful()
           } else {
-            debug(s"Migrating version $version / $maxVersion")
+            info(s"Migrating version $version / $maxVersion")
             val rollbackMigrate = DBIO.seq(Migrations(version), insertDatabaseVersion(version))
             db.run(rollbackMigrate.transactionally).flatMap { _ =>
-              debug(s"version $version / $maxVersion migration done")
+              info(s"version $version / $maxVersion migration done")
               migrate(version + 1, maxVersion)
             }
           }
         }
+
         migrate(currentVersion + 1, maxVersion)
       }
     }
   }
 
-  def deletePool(poolName: String, userId: Long)(implicit ec: ExecutionContext): Future[Option[PoolDto]] = {
+  def deletePool(poolName: String, userId: Long): Future[Option[PoolDto]] = {
+    implicit val ec: ExecutionContext = _writeContext
     val query = filterPool(poolName, userId)
     val action = for {
       result <- query.result.headOption
       _ <- query.delete
     } yield result
-    db.run(action.withTransactionIsolation(TransactionIsolation.RepeatableRead)).map { row =>
+    db.run(action.withTransactionIsolation(TransactionIsolation.Serializable)).map { row =>
       row.map(createPool)
     }
   }
 
-  def getPools(userId: Long)(implicit ec: ExecutionContext): Future[Seq[PoolDto]] =
+  def getPools(userId: Long): Future[Seq[PoolDto]] =
     safeRun(pools.filter(pool => pool.userId === userId.bind).sortBy(_.id.desc).result).map { rows => rows.map(createPool)}
 
-  def getPool(userId: Long, poolName: String)(implicit ec: ExecutionContext): Future[Option[PoolDto]] =
+  def getPool(userId: Long, poolName: String): Future[Option[PoolDto]] =
     safeRun(pools.filter(pool => pool.userId === userId && pool.name === poolName).result.headOption).map { row => row.map(createPool)}
 
-  def getUser(targetPubKey: Array[Byte])(implicit ec: ExecutionContext): Future[Option[UserDto]] = {
+  def getUser(targetPubKey: Array[Byte]): Future[Option[UserDto]] = {
     getUser(HexUtils.valueOf(targetPubKey))
   }
 
-  def getUser(pubKey: String)(implicit ec: ExecutionContext): Future[Option[UserDto]] =
+  def getUser(pubKey: String): Future[Option[UserDto]] =
     safeRun(filterUser(pubKey).result.headOption).map { userRow => userRow.map(createUser)}
 
-  def getUsers()(implicit ec: ExecutionContext): Future[Seq[UserDto]] =
-    safeRun(users.result).map { rows => rows.map(createUser(_))}
+  def getUsers: Future[Seq[UserDto]] =
+    safeRun(users.result).map { rows => rows.map(createUser)}
 
-  def insertPool(newPool: PoolDto)(implicit ec: ExecutionContext): Future[Long] =
+  def insertPool(newPool: PoolDto): Future[Long] = {
+    implicit val ec: ExecutionContext = _writeContext
     safeRun(filterPool(newPool.name, newPool.userId).exists.result.flatMap { exists =>
       if (!exists) {
         pools.returning(pools.map(_.id)) += createPoolRow(newPool)
@@ -81,17 +87,20 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
         DBIO.failed(WalletPoolAlreadyExistException(newPool.name))
       }
     })
+  }
 
-  def insertUser(newUser: UserDto)(implicit ec: ExecutionContext): Future[Long] =
-    safeRun(filterUser(newUser.pubKey).exists.result.flatMap {(exists) =>
+  def insertUser(newUser: UserDto): Future[Long] = {
+    implicit val ec: ExecutionContext = _writeContext
+    safeRun(filterUser(newUser.pubKey).exists.result.flatMap { (exists) =>
       if (!exists) {
         users.returning(users.map(_.id)) += createUserRow(newUser)
       } else {
         DBIO.failed(UserAlreadyExistException(newUser.pubKey))
       }
     })
+  }
 
-  private def safeRun[R](query: DBIO[R])(implicit ec: ExecutionContext): Future[R] =
+  private def safeRun[R](query: DBIO[R]): Future[R] =
     db.run(query.transactionally).recoverWith {
       case e: DaemonException => Future.failed(e)
       case others: Throwable => Future.failed(DaemonDatabaseException("Failed to run database query", others))
@@ -118,14 +127,6 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
 
   private def filterUser(pubKey: String) = {
     users.filter(_.pubKey === pubKey.bind)
-  }
-
-  private def toUUID(str: Option[String]): Option[UUID] = {
-    str.map(UUID.fromString(_))
-  }
-
-  private def fromUUID(uuid: Option[UUID]): Option[String] = {
-    uuid.map(_.toString)
   }
 
 }

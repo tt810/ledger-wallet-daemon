@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Singleton
 
 import co.ledger.wallet.daemon.exceptions.OperationNotFoundException
+import co.ledger.wallet.daemon.services.LogMsgMaker
 import co.ledger.wallet.daemon.utils
 import com.twitter.inject.Logging
 
@@ -50,7 +51,11 @@ class OperationCache extends Logging {
   }
 
   def updateOffset(poolId: Long, walletName: String, accountIndex: Int): Unit = {
-    if (poolTrees.contains(poolId)) poolTrees(poolId).operations(walletName, accountIndex).map { op => cache(op).incrementOffset()}
+    if (poolTrees.contains(poolId))
+      poolTrees(poolId).operations(walletName, accountIndex).map { op =>
+        val lastOffset = cache(op).incrementOffset()
+        debug(LogMsgMaker.newInstance("Update offset").append("to", lastOffset).toString())
+      }
   }
 
   private def newPoolTreeInstance(pool: Long, wallet: String, account: Int, operation: UUID): PoolTree = {
@@ -65,12 +70,12 @@ class OperationCache extends Logging {
 
   class PoolTree(val poolId: Long, val wallets: concurrent.Map[String, WalletTree]) {
 
-    def insertOperation(wallet: String, account: Int, operation: UUID) = wallets.get(wallet) match {
+    def insertOperation(wallet: String, account: Int, operation: UUID): Unit = wallets.get(wallet) match {
       case Some(tree) => tree.insertOperation(account, operation)
       case None => wallets.put(wallet, newWalletTreeInstance(wallet, account, operation))
     }
 
-    def operations(wallet: String, account: Int) = if (wallets.contains(wallet)) wallets(wallet).operations(account) else Set.empty[UUID]
+    def operations(wallet: String, account: Int): Set[UUID] = if (wallets.contains(wallet)) wallets(wallet).operations(account) else Set.empty[UUID]
   }
 
   def newWalletTreeInstance(walletName: String, accountIndex: Int, operation: UUID): WalletTree = {
@@ -81,7 +86,7 @@ class OperationCache extends Logging {
 
   class WalletTree(val walletName: String, val accounts: concurrent.Map[Int, AccountTree]) {
 
-    def insertOperation(account: Int, operation: UUID) = accounts.get(account) match {
+    def insertOperation(account: Int, operation: UUID): Unit = accounts.get(account) match {
       case Some(tree) => tree.insertOperation(operation)
       case None => accounts.put(account, newAccountTreeInstance(account, operation))
     }
@@ -95,9 +100,9 @@ class OperationCache extends Logging {
 
   class AccountTree(val index: Int, val operations:  mutable.Set[UUID]) {
 
-    def containsOperation(operationId: UUID) = operations.contains(operationId)
+    def containsOperation(operationId: UUID): Boolean = operations.contains(operationId)
 
-    def insertOperation(operationId: UUID) = operations += operationId
+    def insertOperation(operationId: UUID): operations.type = operations += operationId
   }
 
   class AtomicRecord (val id: UUID,

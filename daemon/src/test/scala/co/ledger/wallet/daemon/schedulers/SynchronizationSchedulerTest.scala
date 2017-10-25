@@ -16,12 +16,11 @@ import scala.concurrent.duration.{Duration => NativeDuration}
 
 class SynchronizationSchedulerTest extends AssertionsForJUnit with Logging {
   import com.twitter.util.{Duration, Time}
-  Await.result(DefaultDaemonCache.migrateDatabase(), NativeDuration.Inf)
 
   @Test def verifySchedule(): Unit = Time.withCurrentTimeFrozen { timeControl =>
     val timer = new MockTimer()
     val cache = new DefaultDaemonCache()
-
+    Await.result(cache.dbMigration, NativeDuration.Inf)
     val schedule = timer.doAt(Time.now) {
       val scheduler = new SynchronizationScheduler(cache)
       scheduler.scheduleSync(Time.fromMilliseconds(1), Duration.fromSeconds(5))
@@ -38,7 +37,6 @@ class SynchronizationSchedulerTest extends AssertionsForJUnit with Logging {
           user <- cache.getUser(PUB_KEY_1)
           pool <- cache.createWalletPool(user.get, POOL_NAME, "")
           wallet <- cache.createWallet(WALLET_NAME, "bitcoin", POOL_NAME, user.get)
-          result <- DefaultDaemonCache.initialize()
         } yield user
         Await.result(user, NativeDuration.Inf)
       }

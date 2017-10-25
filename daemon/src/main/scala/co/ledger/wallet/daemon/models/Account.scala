@@ -3,6 +3,7 @@ package co.ledger.wallet.daemon.models
 import co.ledger.core
 import co.ledger.core.implicits._
 import co.ledger.wallet.daemon.schedulers.observers.{SynchronizationEventReceiver, SynchronizationResult}
+import co.ledger.wallet.daemon.services.LogMsgMaker
 import com.fasterxml.jackson.annotation.JsonProperty
 
 import scala.collection.JavaConverters._
@@ -12,6 +13,7 @@ object Account {
 
   class Account(private val coreA: core.Account, private val coreW: core.Wallet)
                (implicit ec: ExecutionContext) extends Wallet(coreW) {
+    private val self = this
 
     val accountIndex: Int = coreA.getIndex
 
@@ -38,12 +40,16 @@ object Account {
     }
 
     override def startRealTimeObserver(): Unit = {
+      debug(LogMsgMaker.newInstance("Start real time observer").append("account", self).toString())
       if(!coreA.isObservingBlockchain) coreA.startBlockchainObservation()
     }
 
     override def stopRealTimeObserver(): Unit = {
+      debug(LogMsgMaker.newInstance("Stop real time observer").append("account", self).toString())
       if (coreA.isObservingBlockchain) coreA.stopBlockchainObservation()
     }
+
+    override def toString: String = s"Account(index: $accountIndex, wallet_name: $walletName)"
   }
 
   class Derivation(private val accountCreationInfo: core.AccountCreationInfo) {
@@ -79,9 +85,14 @@ case class DerivationView(
                            @JsonProperty("owner") owner: String,
                            @JsonProperty("pub_key") pubKey: Option[String],
                            @JsonProperty("chain_code") chainCode: Option[String]
-                         )
+                         ) {
+  override def toString: String = s"DerivationView(path: $path, owner: $owner, pub_key: $pubKey, chain_code: $chainCode)"
+}
 
 case class AccountDerivationView(
                                   @JsonProperty("account_index") accountIndex: Int,
                                   @JsonProperty("derivations") derivations: Seq[DerivationView]
-                                )
+                                ) {
+
+  override def toString: String = s"AccountDerivationView(account_index: $accountIndex, derivations: $derivations)"
+}

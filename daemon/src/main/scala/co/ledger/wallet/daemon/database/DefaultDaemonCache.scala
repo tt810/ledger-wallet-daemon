@@ -4,7 +4,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Singleton
 
-import co.ledger.wallet.daemon.async.{MDCPropagatingExecutionContext, SerialExecutionContext, SerialExecutionContextWrapper}
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.exceptions.{UserNotFoundException, WalletPoolAlreadyExistException, WalletPoolNotFoundException}
 import co.ledger.wallet.daemon.libledger_core.async.LedgerCoreExecutionContext
 import co.ledger.wallet.daemon.models.Account.{Account, Derivation}
@@ -23,8 +23,12 @@ import scala.concurrent.{ExecutionContext, Future}
 class DefaultDaemonCache() extends DaemonCache with Logging {
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
   import DefaultDaemonCache._
-  private val _writeContext = SerialExecutionContext.Implicits.global
+
   private val _coreExecutionContext = LedgerCoreExecutionContext.newThreadPool("account-observer-thread-pool")
+
+  def dbMigration: Future[Unit] = {
+    dbDao.migrate()
+  }
 
   def syncOperations(): Future[Seq[SynchronizationResult]] = {
     getUsers.flatMap { usrs =>
@@ -77,14 +81,12 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
   }
 
   def createWalletPool(user: User, poolName: String, configuration: String): Future[Pool] = {
-    implicit val ec: SerialExecutionContextWrapper = _writeContext
     getHardUser(user.pubKey).flatMap { user =>
       user.addPoolIfNotExit(poolName, configuration)(_coreExecutionContext)
     }
   }
 
   def deleteWalletPool(user: User, poolName: String): Future[Unit] = {
-    implicit val ec: SerialExecutionContextWrapper = _writeContext
     // p.release() TODO once WalletPool#release exists
     getHardUser(user.pubKey).flatMap { user =>
       user.deletePool(poolName)
@@ -120,7 +122,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
   }
 
   def getUsers: Future[Seq[User]] = {
-    dbDao.getUsers().map { usrs =>
+    dbDao.getUsers.map { usrs =>
       usrs.map { user =>
         if(!users.contains(user.pubKey)) users.put(user.pubKey, newUser(user))
         users(user.pubKey)
@@ -129,7 +131,6 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
   }
 
   def createUser(user: UserDto): Future[Long] = {
-    implicit val ec: SerialExecutionContextWrapper = _writeContext
     dbDao.insertUser(user).map { id =>
       users.put(user.pubKey, new User(id, user.pubKey))
       info(LogMsgMaker.newInstance("User created").append("user", users(user.pubKey)).toString())
@@ -199,24 +200,15 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
       case Some(dto) => dto
     }
   }
+
+
 }
 
 object DefaultDaemonCache extends Logging {
-  private val _singleExecuter: ExecutionContext = SerialExecutionContext.singleNamedThread("database-initialization-thread-pool")
 
-  def migrateDatabase(): Future[Unit] = {
-    implicit val ec: ExecutionContext = _singleExecuter
-    dbDao.migrate().map(_ => ())
-  }
-
-  def initialize(): Future[Unit] = {
-    implicit val ec: ExecutionContext = _singleExecuter
-    dbDao.getUsers().flatMap { usrs =>
-      Future.sequence(usrs.map { dto =>
-        users.put(dto.pubKey, newUser(dto))
-        users(dto.pubKey).pools()
-      })
-    }.map { _ => () }
+  def newUser(user: UserDto)(implicit ec: ExecutionContext): User = {
+    assert(user.id.isDefined, "User id must exist")
+    new User(user.id.get, user.pubKey)
   }
 
   private[database] val dbDao             =   new DatabaseDao(Database.forConfig(DaemonConfiguration.dbProfileName))
@@ -287,10 +279,6 @@ object DefaultDaemonCache extends Logging {
 
   }
 
-  def newUser(user: UserDto)(implicit ec: ExecutionContext): User = {
-    assert(user.id.isDefined, "User id must exist")
-    new User(user.id.get, user.pubKey)
-  }
 }
 
 case class Bulk(offset: Int = 0, bulkSize: Int = 20)

@@ -1,20 +1,14 @@
 package co.ledger.wallet.daemon
 
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.controllers._
-import co.ledger.wallet.daemon.database.DefaultDaemonCache
 import co.ledger.wallet.daemon.filters._
 import co.ledger.wallet.daemon.mappers.AuthenticationExceptionMapper
 import co.ledger.wallet.daemon.modules.{DaemonCacheModule, DaemonJacksonModule}
-import co.ledger.wallet.daemon.schedulers.SynchronizationScheduler
-import co.ledger.wallet.daemon.services.UsersService
 import com.twitter.finagle.http.{Request, Response}
 import com.twitter.finatra.http.HttpServer
 import com.twitter.finatra.http.filters.{AccessLoggingFilter, CommonFilters}
 import com.twitter.finatra.http.routing.HttpRouter
 import djinni.NativeLibLoader
-
-import scala.concurrent.ExecutionContext
 
 object Server extends ServerImpl {
 
@@ -42,18 +36,7 @@ class ServerImpl extends HttpServer {
       .exceptionMapper[AuthenticationExceptionMapper]
 
   override protected def warmup(): Unit = {
-    implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
-
     super.warmup()
     NativeLibLoader.loadLibs()
-    DefaultDaemonCache.migrateDatabase().flatMap { _ =>
-      UsersService.initialize(injector.instance[UsersService](classOf[UsersService])).flatMap { _ =>
-          DefaultDaemonCache.initialize().map { _ =>
-            val scheduler = injector.instance[SynchronizationScheduler](classOf[SynchronizationScheduler])
-            scheduler.schedule
-            println("***********************************scheduled************************")
-          }
-      }
-    }
   }
 }

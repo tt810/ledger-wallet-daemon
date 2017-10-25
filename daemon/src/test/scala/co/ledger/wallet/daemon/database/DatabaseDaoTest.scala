@@ -1,7 +1,6 @@
 package co.ledger.wallet.daemon.database
 
 import co.ledger.wallet.daemon.DaemonConfiguration
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.exceptions.{DaemonDatabaseException, UserAlreadyExistException}
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.twitter.inject.Logging
