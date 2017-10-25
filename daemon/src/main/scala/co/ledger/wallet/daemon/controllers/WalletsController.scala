@@ -45,12 +45,10 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
       .append("wallet_name", request.wallet_name)
       .append("pool_name", request.pool_name)
       .toString())
-    walletsService.wallet(request.user, request.pool_name, request.wallet_name).map { viewOpt =>
-      viewOpt match {
-        case Some(view) => responseSerializer.serializeOk(view, response)
-        case None => responseSerializer.serializeNotFound(
-          Map("response"->"Wallet doesn't exist", "wallet_name" -> request.wallet_name), response)
-      }
+    walletsService.wallet(request.user, request.pool_name, request.wallet_name).map {
+      case Some(view) => responseSerializer.serializeOk(view, response)
+      case None => responseSerializer.serializeNotFound(
+        Map("response" -> "Wallet doesn't exist", "wallet_name" -> request.wallet_name), response)
     }.recover {
       case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
         Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
@@ -89,10 +87,10 @@ object WalletsController {
                                request: Request
                              ) extends RichRequest(request) {
     @MethodValidation
-    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+    def validatePoolName: ValidationResult = CommonMethodValidations.validateName("pool_name", pool_name)
 
     @MethodValidation
-    def validateWalletName = CommonMethodValidations.validateName("wallet_name", wallet_name)
+    def validateWalletName: ValidationResult = CommonMethodValidations.validateName("wallet_name", wallet_name)
   }
 
   case class GetWalletsRequest(
@@ -102,13 +100,13 @@ object WalletsController {
                               request: Request
                               ) extends RichRequest(request) {
     @MethodValidation
-    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+    def validatePoolName: ValidationResult = CommonMethodValidations.validateName("pool_name", pool_name)
 
     @MethodValidation
-    def validateOffset = ValidationResult.validate(offset.isEmpty || offset.get >= 0, s"offset: offset can not be less than zero")
+    def validateOffset: ValidationResult = ValidationResult.validate(offset.isEmpty || offset.get >= 0, s"offset: offset can not be less than zero")
 
     @MethodValidation
-    def validateCount = ValidationResult.validate(count.isEmpty || count.get > 0, s"account_index: index can not be less than 1")
+    def validateCount: ValidationResult = ValidationResult.validate(count.isEmpty || count.get > 0, s"account_index: index can not be less than 1")
   }
 
   case class CreateWalletRequest(
@@ -118,9 +116,9 @@ object WalletsController {
                                 request: Request
                                 ) extends RichRequest(request) {
     @MethodValidation
-    def validateWalletName = CommonMethodValidations.validateName("wallet_name", wallet_name)
+    def validateWalletName: ValidationResult = CommonMethodValidations.validateName("wallet_name", wallet_name)
 
     @MethodValidation
-    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+    def validatePoolName: ValidationResult = CommonMethodValidations.validateName("pool_name", pool_name)
   }
 }

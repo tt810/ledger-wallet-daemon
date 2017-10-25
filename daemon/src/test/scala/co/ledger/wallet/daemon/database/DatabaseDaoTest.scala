@@ -34,7 +34,7 @@ class DatabaseDaoTest extends AssertionsForJUnit {
       Await.result(dbDao.insertUser(user2), Duration.Inf)
       fail()
     } catch {
-      case e: UserAlreadyExistException => // Excepted
+      case _: UserAlreadyExistException => // Excepted
     }
   }
 
@@ -44,7 +44,7 @@ class DatabaseDaoTest extends AssertionsForJUnit {
       Await.result(dbDao.insertPool(expectedPool), Duration.Inf)
       fail()
     } catch {
-      case e: DaemonDatabaseException => // user not exist
+      case _: DaemonDatabaseException => // user not exist
     }
   }
 
@@ -57,8 +57,8 @@ class DatabaseDaoTest extends AssertionsForJUnit {
     Await.result(dbDao.insertPool(expectedPool), Duration.Inf)
     val actualPool =Await.result(dbDao.getPools(insertedUser.get.id.get), Duration.Inf)
     assertEquals(1, actualPool.size)
-    assertEquals(expectedPool.name, actualPool(0).name)
-    assertEquals(expectedPool.userId, actualPool(0).userId)
+    assertEquals(expectedPool.name, actualPool.head.name)
+    assertEquals(expectedPool.userId, actualPool.head.userId)
   }
 
   @Test def verifyReturnInsertedUserIds(): Unit = {
@@ -83,10 +83,10 @@ class DatabaseDaoTest extends AssertionsForJUnit {
     val poolId = Await.result(dbDao.insertPool(PoolDto("myPool", insertedUser.get.id.get, "")), Duration.Inf)
     val existingPools = Await.result(dbDao.getPools(insertedUser.get.id.get), Duration.Inf)
     assertEquals(1, existingPools.size)
-    assertEquals(poolId, existingPools(0).id.get)
-    assertEquals("myPool", existingPools(0).name)
+    assertEquals(poolId, existingPools.head.id.get)
+    assertEquals("myPool", existingPools.head.name)
     val deletedPool = Await.result(dbDao.deletePool("myPool", insertedUser.get.id.get), Duration.Inf)
-    assertEquals(deletedPool, Option(existingPools(0)))
+    assertEquals(deletedPool, existingPools.headOption)
     val leftoverUser = Await.result(dbDao.getUser(HexUtils.valueOf(pubKey)), Duration.Inf)
     assertFalse("User should not be deleted", leftoverUser.isEmpty)
     assertEquals(0, Await.result(dbDao.getPools(insertedUser.get.id.get), Duration.Inf).size)

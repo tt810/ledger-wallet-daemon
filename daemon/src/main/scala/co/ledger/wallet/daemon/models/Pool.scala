@@ -79,13 +79,14 @@ class Pool(private val coreP: core.WalletPool)(implicit ec: ExecutionContext) ex
       coreCs.asScala.toSeq.map { core => Currency.newInstance(core)}
     }
 
-  def upsertWallet(walletName: String, currencyName: String): Future[Wallet] = {
+  def addWalletIfNotExit(walletName: String, currencyName: String): Future[Wallet] = {
     coreP.getCurrency(currencyName).flatMap { coreC =>
       val coreW = coreP.createWallet(walletName, coreC, core.DynamicObject.newInstance()).map { wallet =>
+        info(LogMsgMaker.newInstance("Wallet created").append("name", walletName).append("pool_name", name).append("currency_name", currencyName).toString())
         Future.successful(Wallet.newInstance(wallet))
       }.recover {
         case e: WalletAlreadyExistsException => {
-          warn(LogMsgMaker.newInstance("Wallet already exists").append("wallet_name", walletName).append("currency_name", currencyName).toString())
+          warn(LogMsgMaker.newInstance("Wallet already exist").append("name", walletName).append("pool_name", name).append("currency_name", currencyName).toString())
           coreP.getWallet(walletName).map(Wallet.newInstance(_))
         }
       }
