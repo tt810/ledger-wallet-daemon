@@ -60,7 +60,7 @@ class Wallet(private val coreW: core.Wallet)(implicit ec: ExecutionContext) exte
     }
   }
 
-  def upsertAccount(accountDerivations: AccountDerivationView): Future[Account] = {
+  def addAccountIfNotExit(accountDerivations: AccountDerivationView): Future[Account] = {
     val accountCreationInfo = new core.AccountCreationInfo(
       accountDerivations.accountIndex,
       (for (derivationResult <- accountDerivations.derivations) yield derivationResult.owner).asArrayList,
@@ -69,11 +69,12 @@ class Wallet(private val coreW: core.Wallet)(implicit ec: ExecutionContext) exte
       (for (derivationResult <- accountDerivations.derivations) yield HexUtils.valueOf(derivationResult.chainCode.get)).asArrayList
     )
     coreW.newAccountWithInfo(accountCreationInfo).map { coreA =>
+      info(LogMsgMaker.newInstance("Account created").append("index", accountDerivations.accountIndex).append("wallet_name", walletName).toString())
       Future.successful(Account.newInstance(coreA, coreW))
     }.recover {
       case e: implicits.InvalidArgumentException => Future.failed(InvalidArgumentException(e.getMessage, e))
       case alreadyExist: implicits.AccountAlreadyExistsException =>
-        warn(LogMsgMaker.newInstance("Account already exist").append("index", accountDerivations.accountIndex).toString())
+        warn(LogMsgMaker.newInstance("Account already exist").append("index", accountDerivations.accountIndex).append("wallet_name", walletName).toString())
         coreW.getAccount(accountDerivations.accountIndex).map(Account.newInstance(_, coreW))
     }.flatten.map { a =>
       if(DaemonConfiguration.realtimeObserverOn) a.startRealTimeObserver()

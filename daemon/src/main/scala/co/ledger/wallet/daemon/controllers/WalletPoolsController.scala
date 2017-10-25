@@ -12,7 +12,7 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.finagle.http.Request
 import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.RouteParam
-import com.twitter.finatra.validation.{MethodValidation, NotEmpty}
+import com.twitter.finatra.validation.{MethodValidation, NotEmpty, ValidationResult}
 
 import scala.concurrent.ExecutionContext
 
@@ -34,12 +34,10 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
       .append("request", request)
       .append("pool_name", request.pool_name)
       .toString())
-    poolsService.pool(request.user, request.pool_name).map { viewOpt =>
-      viewOpt match {
-        case Some(view) => responseSerializer.serializeOk(view, response)
-        case None => responseSerializer.serializeNotFound(
-          Map("response"->"Wallet pool doesn't exist", "pool_name" -> request.pool_name), response)
-      }
+    poolsService.pool(request.user, request.pool_name).map {
+      case Some(view) => responseSerializer.serializeOk(view, response)
+      case None => responseSerializer.serializeNotFound(
+        Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name), response)
     }.recover {
       case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
@@ -91,7 +89,7 @@ object WalletPoolsController {
                             request: Request
                             ) extends RichRequest(request) {
     @MethodValidation
-    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+    def validatePoolName: ValidationResult = CommonMethodValidations.validateName("pool_name", pool_name)
 
   }
 
@@ -99,7 +97,7 @@ object WalletPoolsController {
                                @RouteParam pool_name: String,
                                request: Request) extends RichRequest(request) {
     @MethodValidation
-    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+    def validatePoolName: ValidationResult = CommonMethodValidations.validateName("pool_name", pool_name)
   }
 
 }

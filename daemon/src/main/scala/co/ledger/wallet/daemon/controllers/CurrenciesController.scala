@@ -10,7 +10,7 @@ import co.ledger.wallet.daemon.services.{CurrenciesService, LogMsgMaker}
 import com.twitter.finagle.http.Request
 import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.RouteParam
-import com.twitter.finatra.validation.MethodValidation
+import com.twitter.finatra.validation.{MethodValidation, ValidationResult}
 
 import scala.concurrent.ExecutionContext
 
@@ -26,12 +26,10 @@ class CurrenciesController @Inject()(currenciesService: CurrenciesService) exten
       .append("currency_name", currencyName)
       .append("pool_name", poolName)
       .toString())
-    currenciesService.currency(currencyName, poolName, request.user.pubKey).map { currencyOpt =>
-      currencyOpt match {
-        case Some(currency) => responseSerializer.serializeOk(currency, response)
-        case None => responseSerializer.serializeNotFound(
-          Map("response"-> "Currency not support", "currency_name" -> currencyName), response)
-      }
+    currenciesService.currency(currencyName, poolName, request.user.pubKey).map {
+      case Some(currency) => responseSerializer.serializeOk(currency, response)
+      case None => responseSerializer.serializeNotFound(
+        Map("response" -> "Currency not support", "currency_name" -> currencyName), response)
     }.recover {
       case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
         Map("response" -> "Wallet pool doesn't exist", "pool_name" -> poolName),
@@ -66,7 +64,7 @@ object CurrenciesController {
                                  request: Request
                                  ) extends RichRequest(request) {
     @MethodValidation
-    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+    def validatePoolName: ValidationResult = CommonMethodValidations.validateName("pool_name", pool_name)
   }
 
   case class GetCurrencyRequest(
@@ -75,7 +73,7 @@ object CurrenciesController {
                                request: Request
                                ) extends RichRequest(request) {
     @MethodValidation
-    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+    def validatePoolName: ValidationResult = CommonMethodValidations.validateName("pool_name", pool_name)
   }
 }
 

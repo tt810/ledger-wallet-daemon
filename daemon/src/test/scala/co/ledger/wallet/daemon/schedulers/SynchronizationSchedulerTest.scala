@@ -35,7 +35,7 @@ class SynchronizationSchedulerTest extends AssertionsForJUnit with Logging {
         NativeLibLoader.loadLibs()
         val user = for {
           id <- cache.createUser(UserDto(PUB_KEY_1, 0, None))
-          user <- cache.getUserDirectlyFromDB(PUB_KEY_1)
+          user <- cache.getUser(PUB_KEY_1)
           pool <- cache.createWalletPool(user.get, POOL_NAME, "")
           wallet <- cache.createWallet(WALLET_NAME, "bitcoin", POOL_NAME, user.get)
           result <- DefaultDaemonCache.initialize()
@@ -70,8 +70,8 @@ class SynchronizationSchedulerTest extends AssertionsForJUnit with Logging {
     assert(insertion.isDefined)
 
     val secondTimeSync = insertion.map { operation =>
-      assert(!operation.next.isDefined)
-      assert(!operation.previous.isDefined)
+      assert(operation.next.isEmpty)
+      assert(operation.previous.isEmpty)
       assert(operation.operations.size === 0)
     }
     com.twitter.util.Await.result(secondTimeSync)

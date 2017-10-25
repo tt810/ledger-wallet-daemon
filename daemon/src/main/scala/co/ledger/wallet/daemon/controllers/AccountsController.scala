@@ -69,11 +69,9 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
       .append("wallet_name", request.wallet_name)
       .append("pool_name", request.pool_name)
       .toString())
-    accountsService.account(request.account_index.get, request.user, request.pool_name, request.wallet_name).map { viewOpt =>
-      viewOpt match {
-        case Some(view) => responseSerializer.serializeOk(view, response)
-        case None => responseSerializer.serializeNotFound(Map("response"->"Account doesn't exist", "account_index" -> request.account_index), response)
-      }
+    accountsService.account(request.account_index.get, request.user, request.pool_name, request.wallet_name).map {
+      case Some(view) => responseSerializer.serializeOk(view, response)
+      case None => responseSerializer.serializeNotFound(Map("response" -> "Account doesn't exist", "account_index" -> request.account_index), response)
     }.recover {
       case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
         Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
@@ -170,10 +168,10 @@ object AccountsController {
                            request: Request
                            ) extends RichRequest(request) {
     @MethodValidation
-    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+    def validatePoolName: ValidationResult = CommonMethodValidations.validateName("pool_name", pool_name)
 
     @MethodValidation
-    def validateWalletName = CommonMethodValidations.validateName("wallet_name", wallet_name)
+    def validateWalletName: ValidationResult = CommonMethodValidations.validateName("wallet_name", wallet_name)
   }
 
   case class AccountCreationInfoRequest(
@@ -183,13 +181,13 @@ object AccountsController {
                                          request: Request
                                        ) extends RichRequest(request) {
     @MethodValidation
-    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+    def validatePoolName: ValidationResult = CommonMethodValidations.validateName("pool_name", pool_name)
 
     @MethodValidation
-    def validateWalletName = CommonMethodValidations.validateName("wallet_name", wallet_name)
+    def validateWalletName: ValidationResult = CommonMethodValidations.validateName("wallet_name", wallet_name)
 
     @MethodValidation
-    def validateAccountIndex = CommonMethodValidations.validateOptionalAccountIndex(account_index)
+    def validateAccountIndex: ValidationResult = CommonMethodValidations.validateOptionalAccountIndex(account_index)
   }
   case class OperationRequest(
                              @RouteParam pool_name: String,
@@ -202,15 +200,15 @@ object AccountsController {
                              request: Request
                              ) extends RichRequest(request) {
     @MethodValidation
-    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+    def validatePoolName: ValidationResult = CommonMethodValidations.validateName("pool_name", pool_name)
 
     @MethodValidation
-    def validateWalletName = CommonMethodValidations.validateName("wallet_name", wallet_name)
+    def validateWalletName: ValidationResult = CommonMethodValidations.validateName("wallet_name", wallet_name)
 
     @MethodValidation
-    def validateAccountIndex = ValidationResult.validate(account_index >= 0, s"account_index: index can not be less than zero")
+    def validateAccountIndex: ValidationResult = ValidationResult.validate(account_index >= 0, s"account_index: index can not be less than zero")
 
     @MethodValidation
-    def validateBatch = ValidationResult.validate(batch > 0, "batch: batch should be greater than zero")
+    def validateBatch: ValidationResult = ValidationResult.validate(batch > 0, "batch: batch should be greater than zero")
   }
 }
