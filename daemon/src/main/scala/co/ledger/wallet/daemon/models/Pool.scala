@@ -1,10 +1,7 @@
 package co.ledger.wallet.daemon.models
 
-import java.util.concurrent.ConcurrentHashMap
-
 import co.ledger.core
 import co.ledger.core.implicits.{CurrencyNotFoundException => CoreCurrencyNotFoundException, WalletNotFoundException => CoreWalletNotFoundException, _}
-import co.ledger.wallet.daemon.DaemonConfiguration
 import co.ledger.wallet.daemon.clients.ClientFactory
 import co.ledger.wallet.daemon.database.PoolDto
 import co.ledger.wallet.daemon.exceptions.CurrencyNotFoundException
@@ -14,6 +11,7 @@ import co.ledger.wallet.daemon.libledger_core.filesystem.ScalaPathResolver
 import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import co.ledger.wallet.daemon.services.LogMsgMaker
 import co.ledger.wallet.daemon.utils.HexUtils
+import co.ledger.wallet.daemon.{DaemonConfiguration, utils}
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.inject.Logging
 import org.bitcoinj.core.Sha256Hash
@@ -22,8 +20,8 @@ import scala.collection.JavaConverters._
 import scala.collection._
 import scala.concurrent.{ExecutionContext, Future}
 
-class Pool(private val coreP: core.WalletPool)(implicit ec: ExecutionContext) extends Logging {
-  private var eventReceivers: concurrent.Map[core.EventReceiver, Unit] = new ConcurrentHashMap[core.EventReceiver, Unit]().asScala
+class Pool(private val coreP: core.WalletPool, val id: Long)(implicit ec: ExecutionContext) extends Logging {
+  private val eventReceivers: mutable.Set[core.EventReceiver] = utils.newConcurrentSet[core.EventReceiver]
 
   val name: String = coreP.getName
 
@@ -79,6 +77,17 @@ class Pool(private val coreP: core.WalletPool)(implicit ec: ExecutionContext) ex
       coreCs.asScala.toSeq.map { core => Currency.newInstance(core)}
     }
 
+  /**
+    * Clear the event receivers on this pool. It will also call `stopRealTimeObserver` method.
+    *
+    * @return
+    */
+  def clear: Future[Unit] = {
+    stopRealTimeObserver().map { _ =>
+      unregisterEventReceivers()
+    }
+  }
+
   def addWalletIfNotExit(walletName: String, currencyName: String): Future[Wallet] = {
     coreP.getCurrency(currencyName).flatMap { coreC =>
       val coreW = coreP.createWallet(walletName, coreC, core.DynamicObject.newInstance()).map { wallet =>
@@ -87,7 +96,7 @@ class Pool(private val coreP: core.WalletPool)(implicit ec: ExecutionContext) ex
       }.recover {
         case e: WalletAlreadyExistsException => {
           warn(LogMsgMaker.newInstance("Wallet already exist").append("name", walletName).append("pool_name", name).append("currency_name", currencyName).toString())
-          coreP.getWallet(walletName).map(Wallet.newInstance(_))
+          coreP.getWallet(walletName).map(Wallet.newInstance)
         }
       }
       coreW.flatten.map { w =>
@@ -99,15 +108,29 @@ class Pool(private val coreP: core.WalletPool)(implicit ec: ExecutionContext) ex
     }
   }
 
-  def registerEventReceiver(eventReceiver: core.EventReceiver, coreEC: core.ExecutionContext) = {
-    eventReceivers.put(eventReceiver, Unit)
-    coreP.getEventBus.subscribe(coreEC, eventReceiver)
-    debug(LogMsgMaker.newInstance(s"Register ${eventReceiver.getClass.getSimpleName}").append("pool_name", name).toString())
+  /**
+    * Subscribe specied event receiver to core pool, also save the event receiver to the local container.
+    *
+    * @param eventReceiver
+    * @param coreEC
+    */
+  def registerEventReceiver(eventReceiver: core.EventReceiver, coreEC: core.ExecutionContext): Unit = {
+    if (! eventReceivers.contains(eventReceiver)) {
+      eventReceivers += eventReceiver
+      coreP.getEventBus.subscribe(coreEC, eventReceiver)
+      debug(LogMsgMaker.newInstance(s"Register ${eventReceiver.getClass.getSimpleName}").append("pool_name", name).toString())
+    } else
+      debug(LogMsgMaker.newInstance(s"${eventReceiver.getClass.getSimpleName} already registered").append("pool_name", name).toString())
   }
 
-  def unregisterEventReceivers() = {
-    eventReceivers.keys.foreach { eventReceiver =>
+  /**
+    * Unsubscribe all event receivers for this pool, including empty the event receivers container in memory.
+    *
+    */
+  def unregisterEventReceivers(): Unit = {
+    eventReceivers.foreach { eventReceiver =>
       coreP.getEventBus.unsubscribe(eventReceiver)
+      eventReceivers.remove(eventReceiver)
       debug(LogMsgMaker.newInstance(s"Unregister ${eventReceiver.getClass.getSimpleName}").append("pool_name", name).toString())
     }
   }
@@ -124,13 +147,23 @@ class Pool(private val coreP: core.WalletPool)(implicit ec: ExecutionContext) ex
     }
   }
 
-  def startRealTimeObserver(): Unit = {
-    wallets().map { ws => ws.map(_.startRealTimeObserver()) }
+  /**
+    * Start real time observer of this pool will start the observers of the underlying wallets and accounts.
+    *
+    * @return
+    */
+  def startRealTimeObserver(): Future[Unit] = {
+    wallets().map { ws => ws.foreach(_.startRealTimeObserver()) }
   }
 
-  def stopRealTimeObserver() = {
+  /**
+    * Stop real time observer of this pool will stop the observers of the underlying wallets and accounts.
+    *
+    * @return
+    */
+  def stopRealTimeObserver(): Future[Unit] = {
     debug(LogMsgMaker.newInstance("Start real time observer").append("name", name).toString())
-    wallets().map { ws => ws.map(_.stopRealTimeObserver()) }
+    wallets().map { ws => ws.foreach(_.stopRealTimeObserver()) }
   }
 
   override def equals(that: Any): Boolean = {
@@ -141,21 +174,21 @@ class Pool(private val coreP: core.WalletPool)(implicit ec: ExecutionContext) ex
   }
 
   override def hashCode: Int = {
-    return this.name.hashCode
+    this.name.hashCode
   }
 
   private def wallets(): Future[Seq[Wallet]] = {
     coreP.getWalletCount().flatMap { count =>
       coreP.getWallets(0, count).map { coreWs =>
-        coreWs.asScala.toSeq.map(Wallet.newInstance(_))
+        coreWs.asScala.toSeq.map(Wallet.newInstance)
       }
     }
   }
 }
 
 object Pool {
-  def newInstance(coreP: core.WalletPool)(implicit ec: ExecutionContext): Pool = {
-    new Pool(coreP)
+  def newInstance(coreP: core.WalletPool, id: Long)(implicit ec: ExecutionContext): Pool = {
+    new Pool(coreP, id)
   }
 
   def newCoreInstance(poolDto: PoolDto): Future[core.WalletPool] = {
@@ -172,7 +205,7 @@ object Pool {
       .build()
   }
 
-  private def corePoolId(userId: Long, poolName: String): String = HexUtils.valueOf(Sha256Hash.hash(s"${userId}:${poolName}".getBytes))
+  private def corePoolId(userId: Long, poolName: String): String = HexUtils.valueOf(Sha256Hash.hash(s"$userId:$poolName".getBytes))
 }
 
 case class WalletPoolView(

@@ -7,8 +7,8 @@ import co.ledger.wallet.daemon.exceptions.InvalidArgumentException
 import co.ledger.wallet.daemon.models.Account.{Account, Derivation}
 import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import co.ledger.wallet.daemon.services.LogMsgMaker
-import co.ledger.wallet.daemon.{DaemonConfiguration, utils}
 import co.ledger.wallet.daemon.utils.{AsArrayList, HexUtils}
+import co.ledger.wallet.daemon.{DaemonConfiguration, utils}
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.inject.Logging
 
@@ -88,12 +88,12 @@ class Wallet(private val coreW: core.Wallet)(implicit ec: ExecutionContext) exte
     }
   }
 
-  def startRealTimeObserver(): Unit = {
-    accounts().map { as => as.foreach(_.startRealTimeObserver()) }
+  def startRealTimeObserver(): Future[Unit] = {
+    accounts().flatMap { as => Future.sequence(as.map(_.startRealTimeObserver())).map (_ => ()) }
   }
 
-  def stopRealTimeObserver(): Unit = {
-    accounts().map { as => as.foreach(_.stopRealTimeObserver()) }
+  def stopRealTimeObserver(): Future[Unit] = {
+    accounts().flatMap { as => Future.sequence(as.map(_.stopRealTimeObserver())).map (_ => ()) }
   }
 
   private def getBalance(count: Int): Future[Long] = {
