@@ -39,12 +39,12 @@ object Account {
       promise.future
     }
 
-    override def startRealTimeObserver(): Unit = {
+    override def startRealTimeObserver(): Future[Unit] = Future {
       debug(LogMsgMaker.newInstance("Start real time observer").append("account", self).toString())
       if(!coreA.isObservingBlockchain) coreA.startBlockchainObservation()
     }
 
-    override def stopRealTimeObserver(): Unit = {
+    override def stopRealTimeObserver(): Future[Unit] = Future {
       debug(LogMsgMaker.newInstance("Stop real time observer").append("account", self).toString())
       if (coreA.isObservingBlockchain) coreA.stopBlockchainObservation()
     }

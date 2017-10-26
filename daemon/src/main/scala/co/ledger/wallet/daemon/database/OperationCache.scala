@@ -16,6 +16,19 @@ import scala.collection.{concurrent, mutable}
 @Singleton
 class OperationCache extends Logging {
 
+  /**
+    * Create and insert an operation record.
+    *
+    * @param id
+    * @param poolId
+    * @param walletName
+    * @param accountIndex
+    * @param offset
+    * @param batch
+    * @param next
+    * @param previous
+    * @return
+    */
   def insertOperation(id: UUID, poolId: Long, walletName: String, accountIndex: Int, offset: Long, batch: Int, next: Option[UUID], previous: Option[UUID]): AtomicRecord = {
     if (cache.contains(id)) cache(id)
     else {
@@ -30,32 +43,89 @@ class OperationCache extends Logging {
     }
   }
 
-  def getOperationCandidate(next: UUID): AtomicRecord = {
-    cache.get(next) match {
-      case None => nexts.get(next) match {
+  /**
+    * Getter for obtaining existing operation record as candidate with specified id or if not exist create a new record as candidate.
+    *
+    * The logic matches:
+    *
+    * None        |R1          |R2           |R3          |
+    *             |            |R1.next      |R2.next     |R3.next
+    * R1.previous |R2.previous |R3.previous  |            |
+    *
+    * If (id == R3) then R3 will be returned as candidate
+    * If (id == R3.next) then a new record as the next of R3 will be returned as candidate
+    *
+    * @param id
+    * @return
+    */
+  def getOperationCandidate(id: UUID): AtomicRecord = {
+    cache.get(id) match {
+      case None => nexts.get(id) match {
         case Some(current) => cache.get(current) match {
-          case Some(record) => new AtomicRecord(next, record.poolId, record.walletName, record.accountIndex, record.batch, new AtomicLong(record.batch + record.offset()), Option(UUID.randomUUID()), Option(current))
+          case Some(record) => new AtomicRecord(id, record.poolId, record.walletName, record.accountIndex, record.batch, new AtomicLong(record.batch + record.offset()), Option(UUID.randomUUID()), Option(current))
           case None => throw OperationNotFoundException(current)
         }
-        case None => throw OperationNotFoundException(next)
+        case None => throw OperationNotFoundException(id)
       }
       case Some(op) => op
     }
   }
 
-  def getPreviousOperationRecord(previous: UUID): AtomicRecord = {
-    cache.get(previous) match {
-      case None => throw OperationNotFoundException(previous)
+  /**
+    * Getter for obtaining record with specified id or if not exist the previous record of this id.
+    *
+    * The logic matches:
+    *
+    * None        |R1          |R2           |R3          |
+    *             |            |R1.next      |R2.next     |R3.next
+    * R1.previous |R2.previous |R3.previous  |            |
+    *
+    * If (id == R2.id) then R2 will be returned
+    * If (id == R3.next) then R3 will be returned
+    *
+    * @param id
+    * @return
+    */
+  def getPreviousOperationRecord(id: UUID): AtomicRecord = {
+    cache.get(id) match {
+      case None => nexts.get(id) match {
+        case Some(id) => cache.get(id) match {
+          case None => throw OperationNotFoundException(id)
+          case Some(record) => record
+        }
+        case None => throw OperationNotFoundException(id)
+      }
       case Some(record) => record
     }
   }
 
+  /**
+    * Update offset of existing records with specified identifiers.
+    *
+    * @param poolId
+    * @param walletName
+    * @param accountIndex
+    */
   def updateOffset(poolId: Long, walletName: String, accountIndex: Int): Unit = {
     if (poolTrees.contains(poolId))
       poolTrees(poolId).operations(walletName, accountIndex).map { op =>
         val lastOffset = cache(op).incrementOffset()
         debug(LogMsgMaker.newInstance("Update offset").append("to", lastOffset).append("pool", poolId).append("wallet", walletName).append("account", accountIndex).toString())
       }
+  }
+
+  /**
+    * Delete operations of specified pool id.
+    *
+    * @param pool the pool id.
+    */
+  def deleteOperations(pool: Long): Unit = {
+    poolTrees.remove(pool).foreach { poolTree =>
+      poolTree.operations.foreach { op =>
+        // remove operation record from cache and nexts
+        cache.remove(op).map { record => record.next.map { nextUUID => nexts.remove(nextUUID) } }
+      }
+    }
   }
 
   private def newPoolTreeInstance(pool: Long, wallet: String, account: Int, operation: UUID): PoolTree = {
@@ -76,6 +146,8 @@ class OperationCache extends Logging {
     }
 
     def operations(wallet: String, account: Int): Set[UUID] = if (wallets.contains(wallet)) wallets(wallet).operations(account) else Set.empty[UUID]
+
+    def operations: Set[UUID] = wallets.values.flatMap { wallet => wallet.operations }.toSet
   }
 
   def newWalletTreeInstance(walletName: String, accountIndex: Int, operation: UUID): WalletTree = {
@@ -92,6 +164,8 @@ class OperationCache extends Logging {
     }
 
     def operations(account: Int): Set[UUID] = if (accounts.contains(account)) accounts(account).operations.toSet else Set.empty[UUID]
+
+    def operations: Set[UUID] = accounts.values.flatMap { account => account.operations }.toSet
   }
 
   def newAccountTreeInstance(index: Int, operation: UUID): AccountTree = {

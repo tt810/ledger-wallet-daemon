@@ -2,6 +2,7 @@ package co.ledger.wallet.daemon.database
 
 import java.util.UUID
 
+import co.ledger.wallet.daemon.exceptions.OperationNotFoundException
 import org.junit.Test
 import org.scalatest.junit.AssertionsForJUnit
 
@@ -41,6 +42,32 @@ class OperationCacheTest extends AssertionsForJUnit {
     val nextRecord = insertRecord(operationCache.getOperationCandidate(next.get))
     val previousOfNext = operationCache.getPreviousOperationRecord(nextRecord.previous.get)
     assert(previousOfNext === record)
+  }
+
+  @Test def verifyDeletePool(): Unit = {
+    val next = Option(UUID.randomUUID())
+    val id = UUID.randomUUID()
+    val record = operationCache.insertOperation(id, 1L, "myWallet", 1, 0, 20, next, None)
+    assert(record.offset() === 0)
+    operationCache.updateOffset(1L, "myWallet", 1)
+    val updatedRecord = operationCache.getPreviousOperationRecord(next.get)
+    assert(updatedRecord.id === record.id)
+    assert(updatedRecord.offset() === 1)
+
+    val sameRecord = operationCache.getPreviousOperationRecord(id)
+    assert(sameRecord === updatedRecord)
+
+    val nextRecord = operationCache.getOperationCandidate(next.get)
+    assert(nextRecord.id === next.get)
+    assert(nextRecord.offset() === updatedRecord.offset() + updatedRecord.batch)
+
+    operationCache.deleteOperations(1L)
+    try {
+      operationCache.getPreviousOperationRecord(next.get)
+      fail()
+    } catch {
+      case e: OperationNotFoundException => // expected
+    }
   }
 
   private def insertRecord(record: AtomicRecord) = {
