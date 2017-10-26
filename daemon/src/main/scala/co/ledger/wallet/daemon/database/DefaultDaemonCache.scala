@@ -274,7 +274,8 @@ object DefaultDaemonCache extends Logging {
       else
         Pool.newCoreInstance(p).flatMap { coreP =>
           cachedPools.put(p.name, Pool.newInstance(coreP, id))
-          if (DaemonConfiguration.realtimeObserverOn) cachedPools(p.name).startRealTimeObserver()
+          debug(s"Add to User(id: $id) cache, Pool(name: ${p.name})")
+          if (DaemonConfiguration.realtimeObserverOn) cachedPools(p.name).startCacheAndRealTimeObserver()
           else Future.successful()
         }).map { _ =>
         val pool = cachedPools(p.name)
@@ -283,6 +284,13 @@ object DefaultDaemonCache extends Logging {
       }
     }
 
+    /**
+      * Obtain available pools of this user. The method performs database call(s), adds the missing
+      * pools to cache.
+      *
+      * @return the resulting pool map with pool name as key. The result map may contain less pools
+      *         than the cached pools.
+      */
     def pools(): Future[concurrent.Map[String, Pool]] = dbDao.getPools(id).flatMap { pools =>
       val result = new ConcurrentHashMap[String, Pool]().asScala
       Future.sequence(pools.map { pool =>

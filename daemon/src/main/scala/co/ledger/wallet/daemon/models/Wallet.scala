@@ -96,6 +96,17 @@ class Wallet(private val coreW: core.Wallet)(implicit ec: ExecutionContext) exte
     accounts().flatMap { as => Future.sequence(as.map(_.stopRealTimeObserver())).map (_ => ()) }
   }
 
+  override def equals(that: Any): Boolean = {
+    that match {
+      case that: Wallet => that.isInstanceOf[Wallet] && this.hashCode == that.hashCode
+      case _ => false
+    }
+  }
+
+  override def hashCode: Int = {
+    this.walletName.hashCode
+  }
+
   private def getBalance(count: Int): Future[Long] = {
     coreW.getAccounts(0, count) flatMap { (accounts) =>
       val accs = accounts.asScala.toList
