@@ -3,17 +3,19 @@ package co.ledger.wallet.daemon.models
 import java.util.concurrent.ConcurrentHashMap
 
 import co.ledger.core
-import co.ledger.core.implicits.{CurrencyNotFoundException => CoreCurrencyNotFoundException, WalletNotFoundException => CoreWalletNotFoundException, _}
+import co.ledger.core.implicits.{CurrencyNotFoundException => CoreCurrencyNotFoundException, _}
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.clients.ClientFactory
 import co.ledger.wallet.daemon.database.PoolDto
 import co.ledger.wallet.daemon.exceptions.{CurrencyNotFoundException, WalletNotFoundException}
+import co.ledger.wallet.daemon.libledger_core.async.LedgerCoreExecutionContext
 import co.ledger.wallet.daemon.libledger_core.crypto.SecureRandomRNG
 import co.ledger.wallet.daemon.libledger_core.debug.NoOpLogPrinter
 import co.ledger.wallet.daemon.libledger_core.filesystem.ScalaPathResolver
-import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
+import co.ledger.wallet.daemon.schedulers.observers.{NewBlockEventReceiver, SynchronizationResult}
 import co.ledger.wallet.daemon.services.LogMsgMaker
+import co.ledger.wallet.daemon.utils
 import co.ledger.wallet.daemon.utils.HexUtils
-import co.ledger.wallet.daemon.{DaemonConfiguration, utils}
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.inject.Logging
 import org.bitcoinj.core.Sha256Hash
@@ -23,15 +25,19 @@ import scala.collection._
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.{ExecutionContext, Future}
 
-class Pool(private val coreP: core.WalletPool, val id: Long)(implicit ec: ExecutionContext) extends Logging {
+class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging {
+  implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
+  private val _coreExecutionContext = LedgerCoreExecutionContext.newThreadPool("observer-thread-pool")
   private val eventReceivers: mutable.Set[core.EventReceiver] = utils.newConcurrentSet[core.EventReceiver]
   private val cachedWallets: concurrent.Map[String, Wallet] = new ConcurrentHashMap[String, Wallet]().asScala
   private val cachedCurrencies: concurrent.Map[String, Currency] = new ConcurrentHashMap[String, Currency]().asScala
   private var orderedNames = new ListBuffer[String]()
 
+  private val self = this
+
   val name: String = coreP.getName
 
-  lazy val view: Future[WalletPoolView] = toCacheAndStartListen(orderedNames.length).map { _ =>
+  def view: Future[WalletPoolView] = toCacheAndStartListen(orderedNames.length).map { _ =>
     WalletPoolView(name, orderedNames.length)
   }
 
@@ -111,12 +117,12 @@ class Pool(private val coreP: core.WalletPool, val id: Long)(implicit ec: Execut
   }
 
   private def toCache(coreC: core.Currency): Unit = {
-    debug(s"Add to Pool(name: $name) cache, Currency(name: ${coreC.getName})")
     cachedCurrencies.put(coreC.getName, Currency.newInstance(coreC))
+    debug(s"Add to $self cache, ${cachedCurrencies(coreC.getName)}")
   }
 
   /**
-    * Clear the event receivers on this pool. It will also call `stopRealTimeObserver` method.
+    * Clear the event receivers on this pool and underlying wallets. It will also call `stopRealTimeObserver` method.
     *
     * @return
     */
@@ -147,38 +153,36 @@ class Pool(private val coreP: core.WalletPool, val id: Long)(implicit ec: Execut
     * Subscribe specied event receiver to core pool, also save the event receiver to the local container.
     *
     * @param eventReceiver
-    * @param coreEC
     */
-  def registerEventReceiver(eventReceiver: core.EventReceiver, coreEC: core.ExecutionContext): Unit = {
+  def registerEventReceiver(eventReceiver: core.EventReceiver): Unit = {
     if (! eventReceivers.contains(eventReceiver)) {
       eventReceivers += eventReceiver
-      coreP.getEventBus.subscribe(coreEC, eventReceiver)
-      debug(LogMsgMaker.newInstance(s"Register ${eventReceiver.getClass.getSimpleName}").append("pool_name", name).toString())
+      coreP.getEventBus.subscribe(_coreExecutionContext, eventReceiver)
+      debug(s"Register $eventReceiver")
     } else
-      debug(LogMsgMaker.newInstance(s"${eventReceiver.getClass.getSimpleName} already registered").append("pool_name", name).toString())
+      debug(s"Already registered $eventReceiver")
   }
 
   /**
     * Unsubscribe all event receivers for this pool, including empty the event receivers container in memory.
     *
     */
-  def unregisterEventReceivers(): Unit = {
+  def unregisterEventReceivers: Unit = {
     eventReceivers.foreach { eventReceiver =>
       coreP.getEventBus.unsubscribe(eventReceiver)
       eventReceivers.remove(eventReceiver)
-      debug(LogMsgMaker.newInstance(s"Unregister ${eventReceiver.getClass.getSimpleName}").append("pool_name", name).toString())
+      debug(s"Unregister $eventReceiver")
     }
   }
 
   /**
     * Synchronize all accounts within this pool.
     *
-    * @param coreEC
     * @return
     */
-  def sync()(coreEC: core.ExecutionContext): Future[Seq[SynchronizationResult]] = {
+  def sync(): Future[Seq[SynchronizationResult]] = {
     toCacheAndStartListen(orderedNames.length).flatMap { _ =>
-      Future.sequence(cachedWallets.values.map { wallet => wallet.syncWallet(name)(coreEC) }.toSeq).map(_.flatten)
+      Future.sequence(cachedWallets.values.map { wallet => wallet.syncWallet(name)(_coreExecutionContext) }.toSeq).map(_.flatten)
     }
   }
 
@@ -188,11 +192,7 @@ class Pool(private val coreP: core.WalletPool, val id: Long)(implicit ec: Execut
     * @return
     */
   def startCacheAndRealTimeObserver(): Future[Unit] = {
-    toCacheAndStartListen(orderedNames.length).map { _ =>
-      cachedWallets.values.foreach { wallet =>
-        if (DaemonConfiguration.realtimeObserverOn) wallet.startRealTimeObserver()
-      }
-    }
+    toCacheAndStartListen(orderedNames.length)
   }
 
   /**
@@ -201,42 +201,47 @@ class Pool(private val coreP: core.WalletPool, val id: Long)(implicit ec: Execut
     * @return
     */
   def stopRealTimeObserver(): Unit = {
-    debug(LogMsgMaker.newInstance("Start real time observer").append("name", name).toString())
+    debug(LogMsgMaker.newInstance("Stop real time observer").append("pool", name).toString())
     cachedWallets.values.foreach { wallet => wallet.stopRealTimeObserver() }
   }
 
   override def equals(that: Any): Boolean = {
     that match {
-      case that: Pool => that.isInstanceOf[Pool] && this.hashCode == that.hashCode
+      case that: Pool => that.isInstanceOf[Pool] && self.hashCode == that.hashCode
       case _ => false
     }
   }
 
   override def hashCode: Int = {
-    this.id.hashCode() + this.name.hashCode
+    self.id.hashCode() + self.name.hashCode
   }
 
+  override def toString: String = s"Pool(name: $name, id: $id)"
+
   private def toCacheAndStartListen(offset: Int): Future[Unit] = {
-    coreP.getWalletCount().flatMap { count =>
-      if (count == offset) Future.successful()
-      else {
-        assert(offset < count, "Offset must be less than total wallet count")
-        coreP.getWallets(offset, count).map { coreWs =>
-          coreWs.asScala.toSeq.map(Wallet.newInstance).map { wallet =>
-            orderedNames += wallet.walletName
-            cachedWallets.put(wallet.walletName, wallet)
-            debug(s"Add to Pool(name: $name) cache, Wallet(name: ${wallet.walletName}, currency: ${wallet.currency.currencyName})")
-            wallet.startRealTimeObserver()
-          }
+    if (orderedNames.length > offset) Future { info(s"Pool $name cache was already updated")}
+    else
+      coreP.getWalletCount().flatMap { count =>
+        if (count == offset) Future { info(s"Pool $name cache is up to date")}
+        else if (count < offset) Future { warn(s"Offset should be less than count, possible race condition") }
+        else {
+          coreP.getWallets(offset, count).flatMap { coreWs =>
+            Future.sequence(coreWs.asScala.toSeq.map(Wallet.newInstance).map { wallet =>
+              orderedNames += wallet.walletName
+              cachedWallets.put(wallet.walletName, wallet)
+              debug(s"Add to Pool(name: $name) cache, Wallet(name: ${wallet.walletName})")
+              self.registerEventReceiver(new NewBlockEventReceiver(wallet))
+              wallet.startCacheAndRealTimeObserver()
+            })
+          }.map { _ => ()}
         }
       }
-    }
   }
 
 }
 
 object Pool {
-  def newInstance(coreP: core.WalletPool, id: Long)(implicit ec: ExecutionContext): Pool = {
+  def newInstance(coreP: core.WalletPool, id: Long): Pool = {
     new Pool(coreP, id)
   }
 

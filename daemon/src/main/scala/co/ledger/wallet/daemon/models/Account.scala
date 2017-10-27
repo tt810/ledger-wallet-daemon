@@ -2,23 +2,26 @@ package co.ledger.wallet.daemon.models
 
 import co.ledger.core
 import co.ledger.core.implicits._
+import co.ledger.wallet.daemon.DaemonConfiguration
 import co.ledger.wallet.daemon.schedulers.observers.{SynchronizationEventReceiver, SynchronizationResult}
 import co.ledger.wallet.daemon.services.LogMsgMaker
+import co.ledger.wallet.daemon.utils.HexUtils
 import com.fasterxml.jackson.annotation.JsonProperty
 
 import scala.collection.JavaConverters._
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{Future, Promise}
 
 object Account {
 
-  class Account(private val coreA: core.Account, private val coreW: core.Wallet)
-               (implicit ec: ExecutionContext) extends Wallet(coreW) {
-    private val self = this
+  class Account(private val coreA: core.Account, private val coreW: core.Wallet) extends Wallet(coreW) {
+    private val accountSelf = this
 
     val accountIndex: Int = coreA.getIndex
 
-    lazy val accountView: Future[AccountView] = coreA.getBalance().map { balance =>
-      AccountView(walletName, accountIndex, balance.toLong, "account key chain", currency.currencyView)
+    def balance: Future[Long] = coreA.getBalance().map { balance => balance.toLong }
+
+    def accountView: Future[AccountView] = balance.map { b =>
+      AccountView(walletName, accountIndex, b, "account key chain", currency.currencyView)
     }
 
     def operations(offset: Long, batch: Int, fullOp: Int): Future[Seq[Operation]] = {
@@ -39,31 +42,44 @@ object Account {
       promise.future
     }
 
-    override def startRealTimeObserver(): Future[Unit] = Future {
-      debug(LogMsgMaker.newInstance("Start real time observer").append("account", self).toString())
-      if(!coreA.isObservingBlockchain) coreA.startBlockchainObservation()
+    def startRealTimeObserver(): Unit = {
+      if (DaemonConfiguration.realtimeObserverOn && !coreA.isObservingBlockchain) coreA.startBlockchainObservation()
+      debug(LogMsgMaker.newInstance(s"Set real time observer on ${coreA.isObservingBlockchain}").append("account", accountSelf).toString())
     }
 
-    override def stopRealTimeObserver(): Future[Unit] = Future {
-      debug(LogMsgMaker.newInstance("Stop real time observer").append("account", self).toString())
+    override def stopRealTimeObserver(): Unit = {
+      debug(LogMsgMaker.newInstance("Stop real time observer").append("account", accountSelf).toString())
       if (coreA.isObservingBlockchain) coreA.stopBlockchainObservation()
     }
 
-    override def toString: String = s"Account(index: $accountIndex, wallet_name: $walletName)"
+    override def toString: String = s"Account(index: $accountIndex)"
   }
 
   class Derivation(private val accountCreationInfo: core.AccountCreationInfo) {
+    val index = accountCreationInfo.getIndex
 
-    lazy val view: AccountDerivationView = AccountDerivationView(
-      accountCreationInfo.getIndex,
-      for {
-        path <- accountCreationInfo.getDerivations.asScala.toList
-        owner <- accountCreationInfo.getOwners.asScala.toList
-      } yield DerivationView(path, owner, None, None))
+    lazy val view: AccountDerivationView = {
+      val paths = accountCreationInfo.getDerivations.asScala.toSeq
+      val owners = accountCreationInfo.getOwners.asScala.toSeq
+      val pubKeys = {
+        val pks = accountCreationInfo.getPublicKeys
+        if (pks.isEmpty) paths.map { _ => null }
+        else pks.asScala.toSeq.map(HexUtils.valueOf(_))
+      }
+      val chainCodes = {
+        val ccs = accountCreationInfo.getChainCodes
+        if (ccs.isEmpty) paths.map { _ => null }
+        else ccs.asScala.toSeq.map(HexUtils.valueOf(_))
+      }
+      val derivations = (0 until paths.size).map { i =>
+        DerivationView(paths(i), owners(i), Option(pubKeys(i)), Option(chainCodes(i)))
+      }
+      AccountDerivationView(index, derivations)
+    }
   }
 
 
-  def newInstance(coreA: core.Account, coreW: core.Wallet)(implicit ec: ExecutionContext): Account = {
+  def newInstance(coreA: core.Account, coreW: core.Wallet): Account = {
     new Account(coreA, coreW)
   }
 

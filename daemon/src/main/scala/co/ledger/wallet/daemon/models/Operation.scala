@@ -6,32 +6,32 @@ import co.ledger.core
 import co.ledger.wallet.daemon.models.Account.Account
 import co.ledger.wallet.daemon.models.coins.Bitcoin
 import co.ledger.wallet.daemon.models.coins.Coin.TransactionView
-
-import scala.collection.JavaConverters._
 import com.fasterxml.jackson.annotation.JsonInclude.Include
 import com.fasterxml.jackson.annotation.{JsonInclude, JsonProperty}
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.collection.JavaConverters._
+import scala.concurrent.Future
 
-class Operation(private val coreO: core.Operation, private val coreA: core.Account, private val coreW: core.Wallet)
-               (implicit ec: ExecutionContext) extends Account(coreA, coreW) {
+class Operation(private val coreO: core.Operation, private val coreA: core.Account, private val coreW: core.Wallet) extends Account(coreA, coreW) {
 
-  lazy val operationView: Future[OperationView] = {
+  def operationView: Future[OperationView] = {
 
     val currencyFamily = CurrencyFamily.valueOf(coreO.getWalletType.name())
     val uid = coreO.getUid
     val trust = newTrustIndicatorView(coreO.getTrust)
     val time = coreO.getDate
-    val blockHeight = coreO.getBlockHeight  //?
     val opType = OperationType.valueOf(coreO.getOperationType.name())
     val amount = coreO.getAmount.toLong
     val fees = coreO.getFees.toLong
     val senders = coreO.getSenders.asScala.toSeq
     val recipients = coreO.getRecipients.asScala.toSeq
     val transaction = newTransactionView(coreO, currencyFamily)
-    lastBlockHeight.map { lastHeight => lastHeight - coreO.getBlockHeight }.map { confirmations =>
-      OperationView(uid, currency.currencyName, currencyFamily, trust, confirmations, time, blockHeight, opType, amount, fees, walletName, accountIndex, senders, recipients, transaction)
-    }
+    confirmations.map(OperationView(uid, currency.currencyName, currencyFamily, trust, _, time, blockHeight, opType, amount, fees, walletName, accountIndex, senders, recipients, transaction))
+  }
+
+  private def confirmations: Future[Long] = {
+    if (blockHeight < 0) initialBlockHeight.map { _ => blockHeight - coreO.getBlockHeight }
+    else Future.successful(blockHeight - coreO.getBlockHeight)
   }
 
   private def newTransactionView(operation: core.Operation, currencyFamily: CurrencyFamily) = {
@@ -51,8 +51,7 @@ class Operation(private val coreO: core.Operation, private val coreA: core.Accou
 
 object Operation {
 
-  def newInstance(coreO: core.Operation, coreA: core.Account, coreW: core.Wallet)
-                 (implicit ec: ExecutionContext): Operation = {
+  def newInstance(coreO: core.Operation, coreA: core.Account, coreW: core.Wallet): Operation = {
     new Operation(coreO, coreA, coreW)
   }
 
