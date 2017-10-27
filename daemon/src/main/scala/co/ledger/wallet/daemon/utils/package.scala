@@ -37,11 +37,6 @@ package object utils {
     def asArrayList : java.util.ArrayList[T] = new java.util.ArrayList[T](input.asJava)
   }
 
-  def sum(list: List[Long]): Long = list match {
-    case Nil => 0
-    case x :: xs => x + sum(xs)
-  }
-
   def newConcurrentSet[T]: mutable.Set[T] = {
     java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap[T, java.lang.Boolean]()).asScala
   }

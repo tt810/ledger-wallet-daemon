@@ -2,26 +2,34 @@ package co.ledger.wallet.daemon.schedulers.observers
 
 import co.ledger.core._
 import co.ledger.wallet.daemon.database.OperationCache
+import com.twitter.inject.Logging
 
-class NewOperationEventReceiver(private val poolId: Long, private val opsCache: OperationCache) extends EventReceiver {
+import scala.util.{Failure, Success, Try}
 
-  override def onEvent(event: Event): Unit = {
+class NewOperationEventReceiver(private val poolId: Long, private val opsCache: OperationCache) extends EventReceiver with Logging {
+  private val self = this
+
+  override def onEvent(event: Event): Unit =
     if (EventCode.NEW_OPERATION == event.getCode) {
-      opsCache.updateOffset(
+      Try(opsCache.updateOffset(
         poolId,
         event.getPayload.getString(Account.EV_NEW_OP_WALLET_NAME),
-        event.getPayload.getInt(Account.EV_NEW_OP_ACCOUNT_INDEX))
+        event.getPayload.getInt(Account.EV_NEW_OP_ACCOUNT_INDEX))) match {
+        case Success(_) => //do nothing
+        case Failure(e) => error(s"Failed to update offset with exception", e)
+      }
     }
-  }
 
   private def canEqual(a: Any): Boolean = a.isInstanceOf[NewOperationEventReceiver]
 
   override def equals(that: Any): Boolean = that match {
-    case that: NewOperationEventReceiver => that.canEqual(this) && this.hashCode() == that.hashCode()
+    case that: NewOperationEventReceiver => that.canEqual(this) && self.hashCode() == that.hashCode()
     case _ => false
   }
 
   override def hashCode(): Int = {
     poolId.hashCode()
   }
+
+  override def toString: String = s"NewOperationEventReceiver(pool_id: $poolId)"
 }

@@ -30,6 +30,18 @@ class Currency(coreC: core.Currency) {
     case _ => ???
   }
 
+  override def equals(that: Any): Boolean = {
+    that match {
+      case that: Currency => that.isInstanceOf[Currency] && this.hashCode == that.hashCode
+      case _ => false
+    }
+  }
+
+  override def hashCode: Int = {
+    this.currencyName.hashCode + this.currencyFamily.hashCode()
+  }
+
+  override def toString: String = s"Currency(name: $currencyName, family: $currencyFamily)"
 }
 
 object Currency {

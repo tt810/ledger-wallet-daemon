@@ -6,7 +6,6 @@ import javax.inject.Singleton
 
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.exceptions.{AccountNotFoundException, UserNotFoundException, WalletPoolAlreadyExistException, WalletPoolNotFoundException}
-import co.ledger.wallet.daemon.libledger_core.async.LedgerCoreExecutionContext
 import co.ledger.wallet.daemon.models.Account.{Account, Derivation}
 import co.ledger.wallet.daemon.models._
 import co.ledger.wallet.daemon.schedulers.observers.{NewOperationEventReceiver, SynchronizationResult}
@@ -204,7 +203,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
 
 object DefaultDaemonCache extends Logging {
 
-  def newUser(user: UserDto)(implicit ec: ExecutionContext): User = {
+  def newUser(user: UserDto): User = {
     assert(user.id.isDefined, "User id must exist")
     new User(user.id.get, user.pubKey)
   }
@@ -213,13 +212,13 @@ object DefaultDaemonCache extends Logging {
   private[database] val opsCache: OperationCache = new OperationCache()
   private val users: concurrent.Map[String, User] = new ConcurrentHashMap[String, User]().asScala
 
-  class User(val id: Long, val pubKey: String)(implicit ec: ExecutionContext) extends Logging {
+  class User(val id: Long, val pubKey: String) extends Logging {
+    implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
     private val cachedPools: concurrent.Map[String, Pool] = new ConcurrentHashMap[String, Pool]().asScala
-    private val _coreExecutionContext = LedgerCoreExecutionContext.newThreadPool("account-observer-thread-pool")
 
     def sync(): Future[Seq[SynchronizationResult]] = {
       pools().flatMap { pls =>
-        Future.sequence(pls.values.map { p => p.sync()(_coreExecutionContext) }.toSeq).map (_.flatten)
+        Future.sequence(pls.values.map { p => p.sync() }.toSeq).map (_.flatten)
       }
     }
 
@@ -236,14 +235,15 @@ object DefaultDaemonCache extends Logging {
     def deletePool(name: String): Future[Unit] = {
       dbDao.deletePool(name, id).flatMap { deletedPool =>
         if (deletedPool.isDefined) opsCache.deleteOperations(deletedPool.get.id.get)
-        (cachedPools.remove(name) match {
-          case Some(p) =>
-            p.clear
-          case None => Future.successful()
-        }).map { _ =>
+        clearCache(name).map { _ =>
           info(LogMsgMaker.newInstance("Pool deleted").append("name", name).append("user_id", id).toString())
         }
       }
+    }
+
+    private def clearCache(poolName: String): Future[Unit] = cachedPools.remove(poolName) match {
+      case Some(p) => p.clear
+      case None => Future.successful()
     }
 
     def addPoolIfNotExit(name: String, configuration: String): Future[Pool] = {
@@ -261,26 +261,30 @@ object DefaultDaemonCache extends Logging {
       }
     }
 
+    /**
+      * Getter for individual pool with specified name. This method will perform a daemon database search in order
+      * to get the most up to date information. If specified pool doesn't exist in database but in cache. The cached
+      * pool will be cleared. See `clear` method from Pool for detailed actions.
+      *
+      * @param name
+      * @return
+      */
     def pool(name: String): Future[Option[Pool]] = {
       dbDao.getPool(id, name).flatMap {
-        case Some(pl) => toCacheAndStartListen(pl, pl.id.get).map(Option(_))
-        case None => Future.successful(None)
+        case Some(p) => toCacheAndStartListen(p, p.id.get).map(Option(_))
+        case None => clearCache(name).map { _ => None }
       }
     }
 
     private def toCacheAndStartListen(p: PoolDto, id: Long): Future[Pool] = {
-      (if(cachedPools.contains(p.name))
-        Future.successful()
-      else
-        Pool.newCoreInstance(p).flatMap { coreP =>
+      cachedPools.get(p.name) match {
+        case Some(pool) => Future.successful(pool)
+        case None => Pool.newCoreInstance(p).flatMap { coreP =>
           cachedPools.put(p.name, Pool.newInstance(coreP, id))
-          debug(s"Add to User(id: $id) cache, Pool(name: ${p.name})")
-          if (DaemonConfiguration.realtimeObserverOn) cachedPools(p.name).startCacheAndRealTimeObserver()
-          else Future.successful()
-        }).map { _ =>
-        val pool = cachedPools(p.name)
-        pool.registerEventReceiver(new NewOperationEventReceiver(id, opsCache), _coreExecutionContext)
-        pool
+          debug(s"Add to User(id: $id) cache, ${cachedPools(p.name)}")
+          cachedPools(p.name).registerEventReceiver(new NewOperationEventReceiver(id, opsCache))
+          cachedPools(p.name).startCacheAndRealTimeObserver().map { _ => cachedPools(p.name)}
+        }
       }
     }
 

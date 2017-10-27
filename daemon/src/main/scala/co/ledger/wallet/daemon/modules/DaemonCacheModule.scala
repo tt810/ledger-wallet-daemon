@@ -1,16 +1,19 @@
 package co.ledger.wallet.daemon.modules
 
+import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
 import co.ledger.wallet.daemon.DaemonConfiguration
 import co.ledger.wallet.daemon.database.{DaemonCache, DefaultDaemonCache}
-import co.ledger.wallet.daemon.schedulers.SynchronizationScheduler
 import co.ledger.wallet.daemon.services.UsersService
 import com.google.inject.Provides
+import com.twitter.concurrent.NamedPoolThreadFactory
 import com.twitter.inject.{Injector, TwitterModule}
+import com.twitter.util.{Duration, ScheduledThreadPoolTimer, Time}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 
 object DaemonCacheModule extends TwitterModule {
 
@@ -25,6 +28,23 @@ object DaemonCacheModule extends TwitterModule {
   }
 
   override def singletonPostWarmupComplete(injector: Injector): Unit = {
+    val daemonCache = injector.instance[DaemonCache](classOf[DaemonCache])
+
+    def synchronizationTask(): Unit = {
+      val t0 = System.currentTimeMillis()
+      Try(Await.result(daemonCache.syncOperations(), 5.minutes)) match {
+        case Success(result) =>
+          result.foreach { r =>
+            if (r.syncResult) info(s"Synchronization complete for $r")
+            else warn(s"Failed synchronizing $r")
+          }
+          val t1 = System.currentTimeMillis()
+          info(s"Synchronization finished, elapsed time: ${t1 - t0} milliseconds")
+        case Failure(e) =>
+          error(s"Synchronization failed with exception", e)
+      }
+    }
+
     val usersService = injector.instance[UsersService](classOf[UsersService])
     DaemonConfiguration.adminUsers.map { user =>
       val existingUser = Await.result(usersService.user(user._1, user._2), 1.minutes)
@@ -34,7 +54,13 @@ object DaemonCacheModule extends TwitterModule {
       val existingUser = Await.result(usersService.user(user._1, user._2), 1.minutes)
       if (existingUser.isEmpty) Await.result(usersService.createUser(user._1, user._2), 1.minutes)
     }
-    val scheduler = injector.instance[SynchronizationScheduler](classOf[SynchronizationScheduler])
-    scheduler.schedule
+    val scheduler = new ScheduledThreadPoolTimer(
+      poolSize = 2,
+      threadFactory = new NamedPoolThreadFactory("scheduler-thread-pool")
+    )
+    scheduler.schedule(
+      Time.fromSeconds(DaemonConfiguration.synchronizationInterval._1),
+      Duration(DaemonConfiguration.synchronizationInterval._2, TimeUnit.HOURS))(synchronizationTask)
+    info(s"Scheduled synchronization job: initial start in ${DaemonConfiguration.synchronizationInterval._1} seconds, interval ${DaemonConfiguration.synchronizationInterval._2} hours")
   }
 }
