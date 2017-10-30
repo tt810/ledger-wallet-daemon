@@ -23,6 +23,10 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
 
   import AccountsController._
 
+  /**
+    * End point queries for account views with specified pool name and wallet name.
+    *
+    */
   get("/pools/:pool_name/wallets/:wallet_name/accounts") { request: AccountRequest =>
     info(s"GET accounts $request")
     accountsService.accounts(request.user, request.pool_name, request.wallet_name).recover {
@@ -36,6 +40,10 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
     }
   }
 
+  /**
+    * End point queries for derivation information view of next account creation.
+    *
+    */
   get("/pools/:pool_name/wallets/:wallet_name/accounts/next") { request: AccountCreationInfoRequest =>
     info(s"GET account creation info $request")
     accountsService.nextAccountCreationInfo(request.user, request.pool_name, request.wallet_name, request.account_index).recover {
@@ -49,6 +57,10 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
     }
   }
 
+  /**
+    * End point queries for account view with specified pool, wallet name, and unique account index.
+    *
+    */
   get("/pools/:pool_name/wallets/:wallet_name/accounts/:account_index") { request: AccountRequest =>
     info(s"GET account $request")
     accountsService.account(request.account_index.get, request.user, request.pool_name, request.wallet_name).map {
@@ -65,6 +77,10 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
     }
   }
 
+  /**
+    * End point queries for operation views with specified pool, wallet name, and unique account index.
+    *
+    */
   get("/pools/:pool_name/wallets/:wallet_name/accounts/:account_index/operations") { request: OperationRequest =>
     info(s"GET account operation $request")
     accountsService.accountOperation(
@@ -89,6 +105,10 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
       }
   }
 
+  /**
+    * End point to create a new account within the specified pool and wallet.
+    *
+    */
   filter[AccountCreationFilter]
     .post("/pools/:pool_name/wallets/:wallet_name/accounts") { request: Request =>
       val walletName = request.getParam("wallet_name")
@@ -106,11 +126,6 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
           response)
         case e: Throwable => responseSerializer.serializeInternalError(response, e)
       }
-  }
-
-  delete("/pools/:pool_name/wallets/:wallet_name/accounts") { request: AccountRequest =>
-    info(s"DELETE account $request")
-    //TODO
   }
 
   private val responseSerializer: ResponseSerializer = ResponseSerializer.newInstance()

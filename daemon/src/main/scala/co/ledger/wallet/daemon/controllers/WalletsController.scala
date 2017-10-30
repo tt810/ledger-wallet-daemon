@@ -20,6 +20,10 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
 
   import WalletsController._
 
+  /**
+    * End point queries for wallets views in specified pool.
+    *
+    */
   get("/pools/:pool_name/wallets") {(request: GetWalletsRequest) =>
     info(s"GET wallets $request")
     walletsService.wallets(
@@ -35,6 +39,10 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
       }
   }
 
+  /**
+    * End point queries for wallet view in specified pool by it's name.
+    *
+    */
   get("/pools/:pool_name/wallets/:wallet_name") { request: GetWalletRequest =>
     info(s"GET wallet $request")
     walletsService.wallet(request.user, request.pool_name, request.wallet_name).map {
@@ -49,6 +57,10 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
     }
   }
 
+  /**
+    * End point to create a instance of wallet within the specified pool.
+    *
+    */
   post("/pools/:pool_name/wallets") {(request: CreateWalletRequest) =>
     info(s"CREATE wallet $request")
     walletsService.createWallet(request.user, request.pool_name, request.wallet_name, request.currency_name).recover {

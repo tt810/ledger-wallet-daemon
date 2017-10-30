@@ -21,7 +21,8 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
 
 class Wallet(private val coreW: core.Wallet) extends Logging {
-  private val walletSelf = this
+  private val self = this
+
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
   implicit def asArrayList[T](input: Seq[T]): AsArrayList[T] = new AsArrayList[T](input)
 
@@ -101,19 +102,19 @@ class Wallet(private val coreW: core.Wallet) extends Logging {
   }
 
   def stopRealTimeObserver(): Unit = {
-    debug(LogMsgMaker.newInstance("Stop real time observer").append("wallet", walletSelf).toString())
+    debug(LogMsgMaker.newInstance("Stop real time observer").append("wallet", self).toString())
     cachedAccounts.values.toSeq.map { account => account.stopRealTimeObserver() }
   }
 
   override def equals(that: Any): Boolean = {
     that match {
-      case that: Wallet => that.isInstanceOf[Wallet] && walletSelf.hashCode == that.hashCode
+      case that: Wallet => that.isInstanceOf[Wallet] && self.hashCode == that.hashCode
       case _ => false
     }
   }
 
   override def hashCode: Int = {
-    walletSelf.walletName.hashCode + walletSelf.currency.hashCode()
+    self.walletName.hashCode + self.currency.hashCode()
   }
 
   override def toString: String = s"Wallet(name: $walletName, currency: ${currency.currencyName})"

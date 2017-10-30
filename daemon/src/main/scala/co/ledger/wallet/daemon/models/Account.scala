@@ -14,7 +14,7 @@ import scala.concurrent.{Future, Promise}
 object Account {
 
   class Account(private val coreA: core.Account, private val coreW: core.Wallet) extends Wallet(coreW) {
-    private val accountSelf = this
+    private val self = this
 
     val accountIndex: Int = coreA.getIndex
 
@@ -44,11 +44,11 @@ object Account {
 
     def startRealTimeObserver(): Unit = {
       if (DaemonConfiguration.realtimeObserverOn && !coreA.isObservingBlockchain) coreA.startBlockchainObservation()
-      debug(LogMsgMaker.newInstance(s"Set real time observer on ${coreA.isObservingBlockchain}").append("account", accountSelf).toString())
+      debug(LogMsgMaker.newInstance(s"Set real time observer on ${coreA.isObservingBlockchain}").append("account", self).toString())
     }
 
     override def stopRealTimeObserver(): Unit = {
-      debug(LogMsgMaker.newInstance("Stop real time observer").append("account", accountSelf).toString())
+      debug(LogMsgMaker.newInstance("Stop real time observer").append("account", self).toString())
       if (coreA.isObservingBlockchain) coreA.stopBlockchainObservation()
     }
 
