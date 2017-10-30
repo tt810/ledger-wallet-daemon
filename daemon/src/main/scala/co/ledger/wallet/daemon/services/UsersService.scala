@@ -35,7 +35,7 @@ class UsersService @Inject()(daemonCache: DaemonCache, ecdsa: ECDSAService) exte
       .append("pub_key", publicKey)
       .append("permissions", permissions)
       .toString())
-    daemonCache.createUser(UserDto(publicKey, permissions))
+    daemonCache.createUser(publicKey, permissions)
   }
 
   /**

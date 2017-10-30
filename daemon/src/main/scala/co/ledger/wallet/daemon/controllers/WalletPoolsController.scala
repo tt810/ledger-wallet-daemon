@@ -20,6 +20,10 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
   import WalletPoolsController._
 
+  /**
+    * End point queries for wallet pools view.
+    *
+    */
   get("/pools") {(request: Request) =>
     info(s"GET wallet pools $request, Parameters(user: ${request.user.get.id})")
     poolsService.pools(request.user.get).recover {
@@ -27,6 +31,11 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
     }
   }
 
+  /**
+    * End point queries for wallet pool view by the specified name of this pool. The
+    * name of a pool is unique per user.
+    *
+    */
   get("/pools/:pool_name") {(request: PoolRouteRequest) =>
     info(s"GET wallet pool $request")
     poolsService.pool(request.user, request.pool_name).map {
@@ -38,6 +47,10 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
     }
   }
 
+  /**
+    * End point to trigger the synchronization process of existing wallet pools of user.
+    *
+    */
   post("/pools/operations/synchronize") {(request: Request) =>
     info(s"SYNC wallet pools $request, Parameters(user: ${request.user.get.id})")
     val t0 = System.currentTimeMillis()
@@ -50,6 +63,10 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
     }
   }
 
+  /**
+    * End point to create a new wallet pool.
+    *
+    */
   post("/pools") { (request: CreationRequest) =>
     info(s"CREATE wallet pool $request")
     // TODO: Deserialize the configuration from the body of the request
@@ -58,6 +75,12 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
     }
   }
 
+  /**
+    * End point to delete a wallet pool instance. The operation will delete the wallet
+    * pool record from daemon database and remove the reference to core library. After the
+    * operation, user will not be able to access the underlying wallets or accounts.
+    *
+    */
   delete("/pools/:pool_name") {(request: PoolRouteRequest) =>
     info(s"DELETE wallet pool $request")
     poolsService.removePool(request.user, request.pool_name).recover {

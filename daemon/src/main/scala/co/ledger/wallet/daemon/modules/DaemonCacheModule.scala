@@ -23,7 +23,7 @@ object DaemonCacheModule extends TwitterModule {
     val cache = new DefaultDaemonCache()
     val t0 = System.currentTimeMillis()
     Await.result(cache.dbMigration, 1.minutes)
-    info(s"Database migration end, elapsed time: ${(System.currentTimeMillis() - t0)} milliseconds")
+    info(s"Database migration end, elapsed time: ${System.currentTimeMillis() - t0} milliseconds")
     cache
   }
 
@@ -60,7 +60,7 @@ object DaemonCacheModule extends TwitterModule {
     )
     scheduler.schedule(
       Time.fromSeconds(DaemonConfiguration.synchronizationInterval._1),
-      Duration(DaemonConfiguration.synchronizationInterval._2, TimeUnit.HOURS))(synchronizationTask)
+      Duration(DaemonConfiguration.synchronizationInterval._2, TimeUnit.HOURS))(synchronizationTask())
     info(s"Scheduled synchronization job: initial start in ${DaemonConfiguration.synchronizationInterval._1} seconds, interval ${DaemonConfiguration.synchronizationInterval._2} hours")
   }
 }

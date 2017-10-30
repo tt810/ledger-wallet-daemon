@@ -128,7 +128,8 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     }
   }
 
-  def createUser(user: UserDto): Future[Long] = {
+  def createUser(pubKey: String, permissions: Long): Future[Long] = {
+    val user = UserDto(pubKey, permissions)
     dbDao.insertUser(user).map { id =>
       users.put(user.pubKey, new User(id, user.pubKey))
       info(LogMsgMaker.newInstance("User created").append("user", users(user.pubKey)).toString())
@@ -229,8 +230,8 @@ object DefaultDaemonCache extends Logging {
       *  3. remove the operations were done on this pool, which includes all underlying wallets and accounts
       *  4. remove the pool from cache.
       *
-      * @param name
-      * @return
+      * @param name the name of wallet pool needs to be deleted.
+      * @return a Future of Unit.
       */
     def deletePool(name: String): Future[Unit] = {
       dbDao.deletePool(name, id).flatMap { deletedPool =>
@@ -266,8 +267,8 @@ object DefaultDaemonCache extends Logging {
       * to get the most up to date information. If specified pool doesn't exist in database but in cache. The cached
       * pool will be cleared. See `clear` method from Pool for detailed actions.
       *
-      * @param name
-      * @return
+      * @param name the name of wallet pool.
+      * @return a Future of `co.ledger.wallet.daemon.models.Pool` instance Option.
       */
     def pool(name: String): Future[Option[Pool]] = {
       dbDao.getPool(id, name).flatMap {

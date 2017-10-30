@@ -9,11 +9,11 @@ import scala.collection.JavaConverters._
 
 class Currency(coreC: core.Currency) {
 
-  val currencyName = coreC.getName
+  val currencyName: String = coreC.getName
 
-  val currencyFamily = CurrencyFamily.valueOf(coreC.getWalletType.name())
+  val currencyFamily: CurrencyFamily = CurrencyFamily.valueOf(coreC.getWalletType.name())
 
-  lazy val currencyView = CurrencyView(
+  lazy val currencyView: CurrencyView = CurrencyView(
     coreC.getName,
     currencyFamily,
     coreC.getBip44CoinType,

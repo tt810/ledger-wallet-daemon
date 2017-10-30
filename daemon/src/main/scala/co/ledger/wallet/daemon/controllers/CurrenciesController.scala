@@ -18,6 +18,12 @@ class CurrenciesController @Inject()(currenciesService: CurrenciesService) exten
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
   import CurrenciesController._
 
+  /**
+    * End point queries for currency view with specified name. The name is unique and follows the
+    * convention <a href="https://en.wikipedia.org/wiki/List_of_cryptocurrencies">List of cryptocurrencies</a>.
+    * Name should be lowercase and predefined by core library.
+    *
+    */
   get("/pools/:pool_name/currencies/:currency_name") { request: GetCurrencyRequest =>
     val poolName = request.pool_name
     val currencyName = request.currency_name
@@ -35,6 +41,10 @@ class CurrenciesController @Inject()(currenciesService: CurrenciesService) exten
     }
   }
 
+  /**
+    * End point queries for currencies view belongs to pool specified by pool name.
+    *
+    */
   get("/pools/:pool_name/currencies") {request: GetCurrenciesRequest =>
     val poolName = request.pool_name
     info(s"GET currencies $request")

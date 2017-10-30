@@ -26,15 +26,15 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.{ExecutionContext, Future}
 
 class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging {
+  private val self = this
+
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
   private val _coreExecutionContext = LedgerCoreExecutionContext.newThreadPool("observer-thread-pool")
   private val eventReceivers: mutable.Set[core.EventReceiver] = utils.newConcurrentSet[core.EventReceiver]
   private val cachedWallets: concurrent.Map[String, Wallet] = new ConcurrentHashMap[String, Wallet]().asScala
   private val cachedCurrencies: concurrent.Map[String, Currency] = new ConcurrentHashMap[String, Currency]().asScala
   private var orderedNames = new ListBuffer[String]()
-
-  private val self = this
-
+  
   val name: String = coreP.getName
 
   def view: Future[WalletPoolView] = toCacheAndStartListen(orderedNames.length).map { _ =>

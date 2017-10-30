@@ -36,4 +36,9 @@ class PoolTest extends AssertionsForJUnit {
     assert(notExistingWallet.isEmpty)
   }
 
+  @Test def verifyOverridedFunctions(): Unit = {
+    assert(wallet != "wallet")
+    assert(testPool != wallet)
+  }
+
 }

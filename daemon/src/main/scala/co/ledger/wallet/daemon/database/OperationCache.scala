@@ -17,17 +17,17 @@ import scala.collection.{concurrent, mutable}
 class OperationCache extends Logging {
 
   /**
-    * Create and insert an operation record.
+    * Create and insert an operation query record.
     *
-    * @param id
-    * @param poolId
-    * @param walletName
-    * @param accountIndex
-    * @param offset
-    * @param batch
-    * @param next
-    * @param previous
-    * @return
+    * @param id the UUID of this operation query record.
+    * @param poolId the identifier of pool in database.
+    * @param walletName the name of wallet.
+    * @param accountIndex the unique index of the account.
+    * @param offset the offset to the last operation of the total operations.
+    * @param batch the size of queried sequence operations.
+    * @param next the UUID of operation query record to find the next operation query parameters.
+    * @param previous the UUID of operation query record to find previous query.
+    * @return a operation query record.
     */
   def insertOperation(id: UUID, poolId: Long, walletName: String, accountIndex: Int, offset: Long, batch: Int, next: Option[UUID], previous: Option[UUID]): AtomicRecord = {
     if (cache.contains(id)) cache(id)
@@ -55,8 +55,9 @@ class OperationCache extends Logging {
     * If (id == R3) then R3 will be returned as candidate
     * If (id == R3.next) then a new record as the next of R3 will be returned as candidate
     *
-    * @param id
-    * @return
+    * @param id the UUID of query record candidate.
+    * @return a operation query record.
+    * @throws OperationNotFoundException when there is no record found with the UUID.
     */
   def getOperationCandidate(id: UUID): AtomicRecord = {
     cache.get(id) match {
@@ -83,8 +84,9 @@ class OperationCache extends Logging {
     * If (id == R2.id) then R2 will be returned
     * If (id == R3.next) then R3 will be returned
     *
-    * @param id
-    * @return
+    * @param id the UUID of query record, the record should already exist.
+    * @return the operation query record.
+    * @throws OperationNotFoundException when there is no record found with the UUID.
     */
   def getPreviousOperationRecord(id: UUID): AtomicRecord = {
     cache.get(id) match {
@@ -102,9 +104,9 @@ class OperationCache extends Logging {
   /**
     * Update offset of existing records with specified identifiers.
     *
-    * @param poolId
-    * @param walletName
-    * @param accountIndex
+    * @param poolId the pool identifier in database.
+    * @param walletName the name of the wallet.
+    * @param accountIndex the unique index of account.
     */
   def updateOffset(poolId: Long, walletName: String, accountIndex: Int): Unit = {
     if (poolTrees.contains(poolId))
@@ -188,8 +190,18 @@ class OperationCache extends Logging {
                       val next: Option[UUID],
                       val previous: Option[UUID]) {
 
+    /**
+      * Method to increment the offset. This operation is thread safe.
+      *
+      * @return the incremented offset.
+      */
     def incrementOffset(): Long = ofst.incrementAndGet()
 
+    /**
+      * Method to retrieve the offset.
+      *
+      * @return the offset.
+      */
     def offset(): Long = ofst.get()
   }
 }
