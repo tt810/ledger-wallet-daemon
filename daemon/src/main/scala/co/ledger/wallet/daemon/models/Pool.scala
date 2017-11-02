@@ -29,7 +29,7 @@ class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging {
   private val self = this
 
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
-  private val _coreExecutionContext = LedgerCoreExecutionContext.newThreadPool("observer-thread-pool")
+  private val _coreExecutionContext = LedgerCoreExecutionContext.observerExecutionContext
   private val eventReceivers: mutable.Set[core.EventReceiver] = utils.newConcurrentSet[core.EventReceiver]
   private val cachedWallets: concurrent.Map[String, Wallet] = new ConcurrentHashMap[String, Wallet]().asScala
   private val cachedCurrencies: concurrent.Map[String, Currency] = new ConcurrentHashMap[String, Currency]().asScala
@@ -182,7 +182,7 @@ class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging {
     */
   def sync(): Future[Seq[SynchronizationResult]] = {
     toCacheAndStartListen(orderedNames.length).flatMap { _ =>
-      Future.sequence(cachedWallets.values.map { wallet => wallet.syncWallet(name)(_coreExecutionContext) }.toSeq).map(_.flatten)
+      Future.sequence(cachedWallets.values.map { wallet => wallet.syncAccounts(name) }.toSeq).map(_.flatten)
     }
   }
 

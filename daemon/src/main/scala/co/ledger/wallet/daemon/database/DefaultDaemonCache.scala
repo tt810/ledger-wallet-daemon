@@ -5,18 +5,20 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Singleton
 
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
+import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.exceptions.{AccountNotFoundException, UserNotFoundException, WalletPoolAlreadyExistException, WalletPoolNotFoundException}
 import co.ledger.wallet.daemon.models.Account.{Account, Derivation}
 import co.ledger.wallet.daemon.models._
 import co.ledger.wallet.daemon.schedulers.observers.{NewOperationEventReceiver, SynchronizationResult}
 import co.ledger.wallet.daemon.services.LogMsgMaker
-import co.ledger.wallet.daemon.{DaemonConfiguration, exceptions}
+import co.ledger.wallet.daemon.exceptions
 import com.twitter.inject.Logging
 import slick.jdbc.JdbcBackend.Database
 
 import scala.collection.JavaConverters._
 import scala.collection._
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 @Singleton
 class DefaultDaemonCache() extends DaemonCache with Logging {
@@ -43,7 +45,12 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
   }
 
   def createAccount(accountDerivations: AccountDerivationView, user: User, poolName: String, walletName: String): Future[Account] = {
-    getHardWallet(user.pubKey, poolName, walletName).flatMap { w => w.addAccountIfNotExit(accountDerivations) }
+    getHardWallet(user.pubKey, poolName, walletName).flatMap { w =>
+      w.addAccountIfNotExit(accountDerivations).andThen {
+        case Success(a) => a.sync(poolName)
+        case Failure(t: Throwable) => t
+      }
+    }
   }
 
   def getCurrency(currencyName: String, poolName: String, pubKey: String): Future[Option[Currency]] = {

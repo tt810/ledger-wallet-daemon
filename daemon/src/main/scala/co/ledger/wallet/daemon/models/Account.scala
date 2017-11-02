@@ -2,7 +2,8 @@ package co.ledger.wallet.daemon.models
 
 import co.ledger.core
 import co.ledger.core.implicits._
-import co.ledger.wallet.daemon.DaemonConfiguration
+import co.ledger.wallet.daemon.configurations.DaemonConfiguration
+import co.ledger.wallet.daemon.libledger_core.async.LedgerCoreExecutionContext
 import co.ledger.wallet.daemon.schedulers.observers.{SynchronizationEventReceiver, SynchronizationResult}
 import co.ledger.wallet.daemon.services.LogMsgMaker
 import co.ledger.wallet.daemon.utils.HexUtils
@@ -15,6 +16,7 @@ object Account {
 
   class Account(private val coreA: core.Account, private val coreW: core.Wallet) extends Wallet(coreW) {
     private val self = this
+    private val _coreExecutionContext = LedgerCoreExecutionContext.observerExecutionContext
 
     val accountIndex: Int = coreA.getIndex
 
@@ -35,10 +37,11 @@ object Account {
       }
     }
 
-    def syncAccount(poolName: String)(implicit coreEC: core.ExecutionContext): Future[SynchronizationResult] = {
+    def sync(poolName: String): Future[SynchronizationResult] = {
       val promise: Promise[SynchronizationResult] = Promise[SynchronizationResult]()
       val receiver: core.EventReceiver = new SynchronizationEventReceiver(coreA.getIndex, walletName, poolName, promise)
-      coreA.synchronize().subscribe(coreEC, receiver)
+      coreA.synchronize().subscribe(_coreExecutionContext, receiver)
+      debug(s"Synchronize $self")
       promise.future
     }
 

@@ -91,9 +91,9 @@ class Wallet(private val coreW: core.Wallet) extends Logging {
     }.flatten
   }
 
-  def syncWallet(poolName: String)(implicit coreEC: core.ExecutionContext): Future[Seq[SynchronizationResult]] = {
+  def syncAccounts(poolName: String): Future[Seq[SynchronizationResult]] = {
     accounts().flatMap { accounts =>
-      Future.sequence(accounts.map { account => account.syncAccount(poolName)})
+      Future.sequence(accounts.map { account => account.sync(poolName)})
     }
   }
 

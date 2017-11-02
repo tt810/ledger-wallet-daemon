@@ -2,7 +2,7 @@ package co.ledger.wallet.daemon.database
 
 import java.sql.Timestamp
 
-import co.ledger.wallet.daemon.DaemonConfiguration
+import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import slick.lifted.ProvenShape
 import slick.sql.SqlProfile.ColumnOption.SqlType
 
