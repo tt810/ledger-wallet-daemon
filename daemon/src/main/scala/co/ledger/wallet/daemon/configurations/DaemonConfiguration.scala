@@ -1,4 +1,4 @@
-package co.ledger.wallet.daemon
+package co.ledger.wallet.daemon.configurations
 
 import java.util.Locale
 

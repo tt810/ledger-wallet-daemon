@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets
 import java.util.Date
 import javax.inject.{Inject, Singleton}
 
-import co.ledger.wallet.daemon.DaemonConfiguration
+import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.database.DaemonCache
 import co.ledger.wallet.daemon.database.DefaultDaemonCache.User
 import co.ledger.wallet.daemon.services.AuthenticationService.{AuthenticationFailedException, AuthentifiedUserContext}

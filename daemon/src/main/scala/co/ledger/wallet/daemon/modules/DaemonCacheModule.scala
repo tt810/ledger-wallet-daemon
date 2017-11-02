@@ -3,7 +3,7 @@ package co.ledger.wallet.daemon.modules
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
-import co.ledger.wallet.daemon.DaemonConfiguration
+import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.database.{DaemonCache, DefaultDaemonCache}
 import co.ledger.wallet.daemon.services.UsersService
 import com.google.inject.Provides
