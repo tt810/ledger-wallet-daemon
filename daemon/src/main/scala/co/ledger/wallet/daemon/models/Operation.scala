@@ -14,24 +14,29 @@ import scala.concurrent.Future
 
 class Operation(private val coreO: core.Operation, private val coreA: core.Account, private val coreW: core.Wallet) extends Account(coreA, coreW) {
 
-  def operationView: Future[OperationView] = {
+  val currencyFamily: CurrencyFamily = CurrencyFamily.valueOf(coreO.getWalletType.name())
+  val uid: String = coreO.getUid
+  val time: Date = coreO.getDate
+  val opType: OperationType = OperationType.valueOf(coreO.getOperationType.name())
+  val amount: Long = coreO.getAmount.toLong
+  val senders: Seq[String] = coreO.getSenders.asScala.toSeq
+  val recipients: Seq[String] = coreO.getRecipients.asScala.toSeq
+  val fees: Long = coreO.getFees.toLong
+  val blockHeight: Option[Long] = Option(coreO.getBlockHeight)
+  lazy val trustView: Option[TrustIndicatorView] = newTrustIndicatorView(coreO.getTrust)
+  lazy val transactionView: TransactionView = newTransactionView(coreO, currencyFamily)
 
-    val currencyFamily = CurrencyFamily.valueOf(coreO.getWalletType.name())
-    val uid = coreO.getUid
-    val trust = newTrustIndicatorView(coreO.getTrust)
-    val time = coreO.getDate
-    val opType = OperationType.valueOf(coreO.getOperationType.name())
-    val amount = coreO.getAmount.toLong
-    val fees = coreO.getFees.toLong
-    val senders = coreO.getSenders.asScala.toSeq
-    val recipients = coreO.getRecipients.asScala.toSeq
-    val transaction = newTransactionView(coreO, currencyFamily)
-    confirmations.map(OperationView(uid, currency.currencyName, currencyFamily, trust, _, time, blockHeight, opType, amount, fees, walletName, accountIndex, senders, recipients, transaction))
-  }
+  def operationView: Future[OperationView] =
+    confirmations.map(OperationView(uid, currency.currencyName, currencyFamily, trustView, _, time, blockHeight, opType, amount, fees, walletName, accountIndex, senders, recipients, transactionView))
 
   private def confirmations: Future[Long] = {
-    if (blockHeight < 0) initialBlockHeight.map { _ => blockHeight - coreO.getBlockHeight }
-    else Future.successful(blockHeight - coreO.getBlockHeight)
+    (if (lastBlockHeight < 0) initialBlockHeight
+    else Future.successful()).map { _ =>
+      blockHeight match {
+        case Some(height) => lastBlockHeight - height
+        case None => 0L
+      }
+    }
   }
 
   private def newTransactionView(operation: core.Operation, currencyFamily: CurrencyFamily) = {
@@ -64,7 +69,7 @@ case class OperationView(
                           @JsonProperty("trust") trust: Option[TrustIndicatorView],
                           @JsonProperty("confirmations") confirmations: Long,
                           @JsonProperty("time") time: Date,
-                          @JsonProperty("block_height") blockHeight: Long,
+                          @JsonProperty("block_height") blockHeight: Option[Long],
                           @JsonProperty("type") opType: OperationType,
                           @JsonProperty("amount") amount: Long,
                           @JsonProperty("fees") fees: Long,

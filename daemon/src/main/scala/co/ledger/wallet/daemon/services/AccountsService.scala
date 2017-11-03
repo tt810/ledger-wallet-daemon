@@ -6,7 +6,7 @@ import javax.inject.{Inject, Singleton}
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.database.DaemonCache
 import co.ledger.wallet.daemon.database.DefaultDaemonCache.User
-import co.ledger.wallet.daemon.models.{AccountDerivationView, AccountView, PackedOperationsView}
+import co.ledger.wallet.daemon.models._
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -31,7 +31,7 @@ class AccountsService @Inject()(defaultDaemonCache: DaemonCache) extends DaemonS
     defaultDaemonCache.getNextAccountCreationInfo(user.pubKey, poolName, walletName, accountIndex).map(_.view)
   }
 
-  def accountOperation(user: User, accountIndex: Int, poolName: String, walletName: String, queryParams: OperationQueryParams): Future[PackedOperationsView] = {
+  def accountOperations(user: User, accountIndex: Int, poolName: String, walletName: String, queryParams: OperationQueryParams): Future[PackedOperationsView] = {
     if(queryParams.next.isEmpty && queryParams.previous.isEmpty) {
       // new request
       info(LogMsgMaker.newInstance("Retrieve latest operations").toString())
@@ -45,6 +45,10 @@ class AccountsService @Inject()(defaultDaemonCache: DaemonCache) extends DaemonS
       defaultDaemonCache.getPreviousBatchAccountOperations(user, accountIndex, poolName, walletName, queryParams.previous.get, queryParams.fullOp)
     }
   }
+
+//  def accountOperation(user: User, uid: String, accountIndex: Int, poolName: String, walletName: String): Future[Option[OperationView]] = {
+//    defaultDaemonCache.getOperation(user, uid, accountIndex, poolName, walletName).map ()
+//  }
 
   def createAccount(accountCreationBody: AccountDerivationView, user: User, poolName: String, walletName: String): Future[AccountView] = {
     defaultDaemonCache.createAccount(accountCreationBody, user, poolName, walletName).flatMap(_.accountView)

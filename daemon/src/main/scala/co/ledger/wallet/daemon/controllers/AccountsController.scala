@@ -83,7 +83,7 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
     */
   get("/pools/:pool_name/wallets/:wallet_name/accounts/:account_index/operations") { request: OperationRequest =>
     info(s"GET account operation $request")
-    accountsService.accountOperation(
+    accountsService.accountOperations(
       request.user,
       request.account_index,
       request.pool_name,
