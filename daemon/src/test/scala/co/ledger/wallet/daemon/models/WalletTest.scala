@@ -4,6 +4,7 @@ import java.util.UUID
 
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.database.PoolDto
+import co.ledger.wallet.daemon.models.Account.Account
 import djinni.NativeLibLoader
 import org.junit.Test
 import org.scalatest.junit.AssertionsForJUnit
@@ -26,7 +27,7 @@ class WalletTest extends AssertionsForJUnit {
 
   private val testWallet = Await.result(testPool.addWalletIfNotExit("test_wallet", "bitcoin"), Duration.Inf)
 
-  private val testAccount = Await.result(testWallet.accounts().flatMap { as =>
+  private val testAccount: Account = Await.result(testWallet.accounts().flatMap { as =>
     assert(as.isEmpty)
     testWallet.accountCreationInfo(None).map { derivation =>
       AccountDerivationView(
@@ -51,4 +52,7 @@ class WalletTest extends AssertionsForJUnit {
     testPool.stopRealTimeObserver()
   }
 
+//  @Test def verifyOperations(): Unit = {
+//    Await.result(testAccount.operation("nonexistoperation", 1), Duration.Inf)
+//  }
 }

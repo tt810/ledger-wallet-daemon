@@ -30,10 +30,10 @@ class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging {
 
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
   private val _coreExecutionContext = LedgerCoreExecutionContext.observerExecutionContext
-  private val eventReceivers: mutable.Set[core.EventReceiver] = utils.newConcurrentSet[core.EventReceiver]
-  private val cachedWallets: concurrent.Map[String, Wallet] = new ConcurrentHashMap[String, Wallet]().asScala
-  private val cachedCurrencies: concurrent.Map[String, Currency] = new ConcurrentHashMap[String, Currency]().asScala
-  private var orderedNames = new ListBuffer[String]()
+  private[this] val eventReceivers: mutable.Set[core.EventReceiver] = utils.newConcurrentSet[core.EventReceiver]
+  private[this] val cachedWallets: concurrent.Map[String, Wallet] = new ConcurrentHashMap[String, Wallet]().asScala
+  private[this] val cachedCurrencies: concurrent.Map[String, Currency] = new ConcurrentHashMap[String, Currency]().asScala
+  private[this] var orderedNames = new ListBuffer[String]()
   
   val name: String = coreP.getName
 

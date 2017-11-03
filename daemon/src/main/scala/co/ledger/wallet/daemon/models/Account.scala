@@ -26,6 +26,16 @@ object Account {
       AccountView(walletName, accountIndex, b, "account key chain", currency.currencyView)
     }
 
+    def operation(uid: String, fullOp: Int): Future[Option[Operation]] = {
+      val queryOperations = coreA.queryOperations()
+      queryOperations.filter().opAnd(core.QueryFilter.operationUidEq(uid))
+      (if (fullOp > 0)
+        queryOperations.complete().execute()
+      else queryOperations.partial().execute()).map { operations =>
+        operations.asScala.toSeq.headOption.map { o => Operation.newInstance(o, coreA, coreW)}
+      }
+    }
+
     def operations(offset: Long, batch: Int, fullOp: Int): Future[Seq[Operation]] = {
       (if (fullOp > 0)
         coreA.queryOperations().offset(offset).limit(batch).complete().execute()

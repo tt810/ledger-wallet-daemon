@@ -222,7 +222,7 @@ object DefaultDaemonCache extends Logging {
 
   class User(val id: Long, val pubKey: String) extends Logging {
     implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
-    private val cachedPools: concurrent.Map[String, Pool] = new ConcurrentHashMap[String, Pool]().asScala
+    private[this] val cachedPools: concurrent.Map[String, Pool] = new ConcurrentHashMap[String, Pool]().asScala
 
     def sync(): Future[Seq[SynchronizationResult]] = {
       pools().flatMap { pls =>

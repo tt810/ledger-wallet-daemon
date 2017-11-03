@@ -26,23 +26,23 @@ class Wallet(private val coreW: core.Wallet) extends Logging {
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
   implicit def asArrayList[T](input: Seq[T]): AsArrayList[T] = new AsArrayList[T](input)
 
-  private val cachedAccounts: concurrent.Map[Int, Account] = new ConcurrentHashMap[Int, Account]().asScala
-  private val accountLen: AtomicInteger = new AtomicInteger(0)
+  private[this] val cachedAccounts: concurrent.Map[Int, Account] = new ConcurrentHashMap[Int, Account]().asScala
+  private[this] val accountLen: AtomicInteger = new AtomicInteger(0)
   private val configuration: Map[String, Any] = Map[String, Any]()
-  private val currentBlockHeight: AtomicLong = new AtomicLong(-1)
+  private[this] val currentBlockHeight: AtomicLong = new AtomicLong(-1)
 
   val walletName: String = coreW.getName
   val currency: Currency = Currency.newInstance(coreW.getCurrency)
 
   protected val initialBlockHeight: Future[Unit] = coreW.getLastBlock().map { lastBlock =>
-    currentBlockHeight.updateAndGet(n => Math.max(lastBlock.getHeight, n))
+    updateBlockHeight(lastBlock.getHeight)
   }
 
-  def blockHeight: Long = currentBlockHeight.get()
+  def lastBlockHeight: Long = currentBlockHeight.get()
 
   def updateBlockHeight(newHeight: Long): Unit = {
     currentBlockHeight.updateAndGet(n => Math.max(n, newHeight))
-    debug(LogMsgMaker.newInstance("Update block height").append("to", blockHeight).append("wallet", walletName).toString())
+    debug(LogMsgMaker.newInstance("Update block height").append("to", lastBlockHeight).append("wallet", walletName).toString())
   }
 
   def walletView: Future[WalletView] = {
