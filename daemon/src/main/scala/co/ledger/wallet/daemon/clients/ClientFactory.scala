@@ -1,6 +1,7 @@
 package co.ledger.wallet.daemon.clients
 
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
+import co.ledger.wallet.daemon.libledger_core.async.ScalaThreadDispatcher
 
 
 object ClientFactory {
@@ -8,4 +9,5 @@ object ClientFactory {
 
   lazy val webSocketClient = new ScalaWebSocketClient
   lazy val httpClient = new ScalaHttpClient
+  lazy val threadDispatcher = new ScalaThreadDispatcher(MDCPropagatingExecutionContext.Implicits.global)
 }

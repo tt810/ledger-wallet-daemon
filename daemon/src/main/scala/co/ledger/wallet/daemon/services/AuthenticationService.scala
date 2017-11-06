@@ -4,13 +4,14 @@ import java.nio.charset.StandardCharsets
 import java.util.Date
 import javax.inject.{Inject, Singleton}
 
-import co.ledger.wallet.daemon.DaemonConfiguration
-import co.ledger.wallet.daemon.database.{DaemonCache, UserDto}
+import co.ledger.wallet.daemon.configurations.DaemonConfiguration
+import co.ledger.wallet.daemon.database.DaemonCache
+import co.ledger.wallet.daemon.database.DefaultDaemonCache.User
 import co.ledger.wallet.daemon.services.AuthenticationService.{AuthenticationFailedException, AuthentifiedUserContext}
+import co.ledger.wallet.daemon.utils._
 import com.twitter.finagle.http.Request
 import com.twitter.util.Future
 import org.bitcoinj.core.Sha256Hash
-import co.ledger.wallet.daemon.utils._
 
 import scala.concurrent.ExecutionContext
 
@@ -21,28 +22,19 @@ class AuthenticationService @Inject()(daemonCache: DaemonCache, ecdsa: ECDSAServ
   def authorize(request: Request)(implicit ec: ExecutionContext): Future[Unit] = {
     try {
       val pubKey = request.authContext.pubKey
-      daemonCache.getUserDirectlyFromDB(pubKey) map { (usr) =>
-        if (usr.isEmpty)
-          throw AuthenticationFailedException("User doesn't exist")
-        usr.get
-      } flatMap {user =>
-        debug(LogMsgMaker.newInstance("Authorizing request")
-          .append("user_pub_key", user.pubKey)
-          .toString())
-        val time = request.authContext.time
-        val date = new Date(time * 1000)
-        val now = new Date()
-        if (Math.abs(now.getTime - date.getTime) > DaemonConfiguration.authTokenDuration) {
-          throw AuthenticationFailedException("Authentication token expired")
-        }
-        val message = Sha256Hash.hash(s"LWD: $time\n".getBytes(StandardCharsets.US_ASCII))
-        val signed = request.authContext.signedMessage
-        ecdsa.verify(message, signed, request.authContext.pubKey).map({(success) =>
-          if (!success)
+      daemonCache.getUser(HexUtils.valueOf(pubKey)) map {
+        case None => throw AuthenticationFailedException("User doesn't exist")
+        case Some(user) =>
+          val loginAtAsLong = request.authContext.time
+          val loginAt = new Date(loginAtAsLong * 1000)
+          val currentTime = new Date()
+          if ( Math.abs(currentTime.getTime - loginAt.getTime) > DaemonConfiguration.authTokenDuration)
+            throw AuthenticationFailedException("Authentication token expired")
+          val msg = Sha256Hash.hash(s"LWD: $loginAtAsLong\n".getBytes(StandardCharsets.US_ASCII))
+          val signed = request.authContext.signedMessage
+          if(!ecdsa.verify(msg, signed, pubKey))
             throw AuthenticationFailedException("User not authorized")
           AuthentifiedUserContext.setUser(request, user)
-          ()
-        })
       } asTwitter()
     } catch {
       case e: IllegalStateException => throw new AuthenticationFailedException("Missing authorization header")
@@ -64,14 +56,14 @@ object AuthenticationService {
     }
   }
 
-  case class AuthentifiedUser(get: UserDto)
+  case class AuthentifiedUser(get: User)
   object AuthentifiedUserContext {
     private val UserField = Request.Schema.newField[AuthentifiedUser]()
 
     implicit class UserContextSyntax(val request: Request) extends AnyVal {
       def user: AuthentifiedUser = request.ctx(UserField)
     }
-    def setUser(request: Request, user: UserDto): Unit = request.ctx.update[AuthentifiedUser](UserField, AuthentifiedUser(user))
+    def setUser(request: Request, user: User): Unit = request.ctx.update[AuthentifiedUser](UserField, AuthentifiedUser(user))
   }
 
 }

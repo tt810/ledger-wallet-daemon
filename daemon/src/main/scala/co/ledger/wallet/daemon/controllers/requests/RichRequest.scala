@@ -5,4 +5,6 @@ import com.twitter.finagle.http.Request
 
 class RichRequest(request: Request) {
   def user = request.user.get
+
+  override def toString: String = s"${request}, Parameters(user: ${user.id})"
 }

@@ -8,6 +8,6 @@ object DBMigrations {
   import database.Tables.profile.api._
   import database.Tables._
   val Migrations = Map(
-    0 -> (users.schema ++ pools.schema ++ operations.schema ++ databaseVersions.schema).create
+    0 -> (users.schema ++ pools.schema ++ databaseVersions.schema).create
   )
 }

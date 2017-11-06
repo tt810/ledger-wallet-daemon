@@ -4,7 +4,7 @@ import java.net.URI
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap}
 import javax.annotation.Nullable
-import javax.websocket.{ClientEndpoint, ContainerProvider, Session}
+import javax.websocket.{ClientEndpoint, ContainerProvider, OnMessage, Session}
 
 import co.ledger.core.{ErrorCode, WebSocketConnection}
 import co.ledger.wallet.daemon.services.LogMsgMaker
@@ -16,7 +16,7 @@ import net.jcip.annotations.ThreadSafe
 class ScalaWebSocketClient extends co.ledger.core.WebSocketClient with Logging{
   import ScalaWebSocketClient._
 
-  override def connect(url: String, connection: WebSocketConnection) = {
+  override def connect(url: String, connection: WebSocketConnection): Unit = {
     if(connection.getConnectionId > 0 && sessions.containsKey(connection.getConnectionId)) {
       val session = sessions.get(connection.getConnectionId)
       warn(LogMsgMaker.newInstance("Connection already exist, ignore request")
@@ -36,22 +36,21 @@ class ScalaWebSocketClient extends co.ledger.core.WebSocketClient with Logging{
           .append("connection", connection.getConnectionId)
           .toString())
       } catch {
-        case e: Throwable => {
+        case e: Throwable =>
           error(LogMsgMaker.newInstance("Failed to connect to server")
             .append("url", url)
             .toString(), e)
           connection.onError(ErrorCode.HTTP_ERROR, e.getMessage)
-        }
       }
     }
   }
 
-//  @OnMessage
-//  def processMessage(message: String, session: Session): Unit = {
-//
-//  }
+  @OnMessage
+  def processMessage(message: String, session: Session): Unit = {
 
-  override def send(connection: WebSocketConnection, data: String) = {
+  }
+
+  override def send(connection: WebSocketConnection, data: String): Unit = {
 
     if(!sessions.containsKey(connection.getConnectionId)) {
       warn(LogMsgMaker.newInstance("Fail to send data, no connection")
@@ -68,7 +67,7 @@ class ScalaWebSocketClient extends co.ledger.core.WebSocketClient with Logging{
   }
 
 
-  override def disconnect(connection: WebSocketConnection) = {
+  override def disconnect(connection: WebSocketConnection): Unit = {
     if (!sessions.containsKey(connection.getConnectionId)) {
       warn(LogMsgMaker.newInstance("Fail to disconnect, not connected")
         .append("connection", connection.getConnectionId)
@@ -82,10 +81,9 @@ class ScalaWebSocketClient extends co.ledger.core.WebSocketClient with Logging{
           .append("connection", connection.getConnectionId)
           .toString())
       } catch {
-        case e: Throwable => {
+        case e: Throwable =>
           error("Fail to disconnect", e)
           connection.onError(ErrorCode.HTTP_ERROR, e.getMessage)
-        }
       } finally {
         connection.onClose()
       }

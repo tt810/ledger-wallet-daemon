@@ -5,8 +5,8 @@ import javax.inject.Inject
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.controllers.requests.{CommonMethodValidations, RichRequest}
 import co.ledger.wallet.daemon.controllers.responses.ResponseSerializer
-import co.ledger.wallet.daemon.exceptions.{CurrencyNotFoundException, WalletNotFoundException, WalletPoolNotFoundException}
-import co.ledger.wallet.daemon.services.{LogMsgMaker, WalletsService}
+import co.ledger.wallet.daemon.exceptions.{CurrencyNotFoundException, WalletPoolNotFoundException}
+import co.ledger.wallet.daemon.services.WalletsService
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.finagle.http.Request
 import com.twitter.finatra.http.Controller
@@ -20,11 +20,12 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
 
   import WalletsController._
 
+  /**
+    * End point queries for wallets views in specified pool.
+    *
+    */
   get("/pools/:pool_name/wallets") {(request: GetWalletsRequest) =>
-    info(LogMsgMaker.newInstance("GET wallets request")
-      .append("request", request.request)
-      .append("pool_name", request.pool_name)
-      .toString())
+    info(s"GET wallets $request")
     walletsService.wallets(
       request.user,
       request.pool_name,
@@ -33,45 +34,42 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
       .recover {
         case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
           Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
-          response,
-          pnfe)
+          response)
         case e: Throwable => responseSerializer.serializeInternalError(response, e)
       }
   }
 
+  /**
+    * End point queries for wallet view in specified pool by it's name.
+    *
+    */
   get("/pools/:pool_name/wallets/:wallet_name") { request: GetWalletRequest =>
-    info(LogMsgMaker.newInstance("GET wallet request")
-      .append("request", request.request)
-      .append("wallet_name", request.wallet_name)
-      .append("pool_name", request.pool_name)
-      .toString())
-    walletsService.wallet(request.user, request.pool_name, request.wallet_name).recover {
+    info(s"GET wallet $request")
+    walletsService.wallet(request.user, request.pool_name, request.wallet_name).map {
+      case Some(view) => responseSerializer.serializeOk(view, response)
+      case None => responseSerializer.serializeNotFound(
+        Map("response" -> "Wallet doesn't exist", "wallet_name" -> request.wallet_name), response)
+    }.recover {
       case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
         Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
-        response,
-        pnfe)
-      case wnfe: WalletNotFoundException => responseSerializer.serializeNotFound(
-        Map("response"->"Wallet doesn't exist", "wallet_name" -> request.wallet_name),
-        response,
-        wnfe)
+        response)
       case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
 
+  /**
+    * End point to create a instance of wallet within the specified pool.
+    *
+    */
   post("/pools/:pool_name/wallets") {(request: CreateWalletRequest) =>
-    info(LogMsgMaker.newInstance("CREATE wallet request")
-      .append("request", request.request)
-      .append("pool_name", request.pool_name)
-      .toString())
+    info(s"CREATE wallet $request")
     walletsService.createWallet(request.user, request.pool_name, request.wallet_name, request.currency_name).recover {
       case cnfe: CurrencyNotFoundException => responseSerializer.serializeBadRequest(
         Map("response"-> "Currency not support", "currency_name" -> request.currency_name),
-        response,
-        cnfe)
+        response)
       case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
         Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
-        response,
-        pnfe)
+        response)
       case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
@@ -87,10 +85,12 @@ object WalletsController {
                                request: Request
                              ) extends RichRequest(request) {
     @MethodValidation
-    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+    def validatePoolName: ValidationResult = CommonMethodValidations.validateName("pool_name", pool_name)
 
     @MethodValidation
-    def validateWalletName = CommonMethodValidations.validateName("wallet_name", wallet_name)
+    def validateWalletName: ValidationResult = CommonMethodValidations.validateName("wallet_name", wallet_name)
+
+    override def toString: String = s"$request, Parameters(user: ${user.id}, pool_name: $pool_name, wallet_name: $wallet_name)"
   }
 
   case class GetWalletsRequest(
@@ -100,13 +100,15 @@ object WalletsController {
                               request: Request
                               ) extends RichRequest(request) {
     @MethodValidation
-    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+    def validatePoolName: ValidationResult = CommonMethodValidations.validateName("pool_name", pool_name)
 
     @MethodValidation
-    def validateOffset = ValidationResult.validate(offset.isEmpty || offset.get >= 0, s"offset: offset can not be less than zero")
+    def validateOffset: ValidationResult = ValidationResult.validate(offset.isEmpty || offset.get >= 0, s"offset: offset can not be less than zero")
 
     @MethodValidation
-    def validateCount = ValidationResult.validate(count.isEmpty || count.get > 0, s"account_index: index can not be less than 1")
+    def validateCount: ValidationResult = ValidationResult.validate(count.isEmpty || count.get > 0, s"account_index: index can not be less than 1")
+
+    override def toString: String = s"$request, Parameters(user: ${user.id}, pool_name: $pool_name, offset: $offset, count: $count)"
   }
 
   case class CreateWalletRequest(
@@ -116,9 +118,11 @@ object WalletsController {
                                 request: Request
                                 ) extends RichRequest(request) {
     @MethodValidation
-    def validateWalletName = CommonMethodValidations.validateName("wallet_name", wallet_name)
+    def validateWalletName: ValidationResult = CommonMethodValidations.validateName("wallet_name", wallet_name)
 
     @MethodValidation
-    def validatePoolName = CommonMethodValidations.validateName("pool_name", pool_name)
+    def validatePoolName: ValidationResult = CommonMethodValidations.validateName("pool_name", pool_name)
+
+    override def toString: String = s"$request, Parameters(user: ${user.id}, pool_name: $pool_name, wallet_name: $wallet_name, currency_name: $currency_name)"
   }
 }

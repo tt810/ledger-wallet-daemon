@@ -2,7 +2,7 @@ package co.ledger.wallet.daemon.database
 
 import java.util.UUID
 
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
+import co.ledger.wallet.daemon.database.DefaultDaemonCache.User
 import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.models.{AccountDerivationView, DerivationView}
 import djinni.NativeLibLoader
@@ -12,18 +12,20 @@ import org.scalatest.junit.AssertionsForJUnit
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
-
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 
 class DaemonCacheTest extends AssertionsForJUnit {
   import DaemonCacheTest._
 
+
   @Test def verifyGetPoolNotFound(): Unit = {
-    try {
-      Await.result(cache.getWalletPool(PUB_KEY_1, "pool_not_exist"), Duration.Inf)
-      fail()
-    } catch {
-      case e: WalletPoolNotFoundException => // expected
-    }
+    val pool = Await.result(cache.getWalletPool(PUB_KEY_1, "pool_not_exist"), Duration.Inf)
+    assert(!pool.isDefined)
+  }
+
+  @Test def verifyDeleteNotExistPool(): Unit = {
+      val user1 = Await.result(cache.getUser(PUB_KEY_1), Duration.Inf)
+      Await.result(cache.deleteWalletPool(user1.get, "pool_not_exist"), Duration.Inf)
   }
 
   @Test def verifyGetPoolsWithNotExistUser(): Unit = {
@@ -38,39 +40,40 @@ class DaemonCacheTest extends AssertionsForJUnit {
   @Test def verifyCreateAndGetPools(): Unit = {
     val pool11 = Await.result(cache.getWalletPool(PUB_KEY_1, "pool_1"), Duration.Inf)
     val pool12 = Await.result(cache.getWalletPool(PUB_KEY_1, "pool_2"), Duration.Inf)
-    val pool13 = Await.result(cache.createWalletPool(UserDto(PUB_KEY_1, 0, Option(1L)), "pool_3", "config"), Duration.Inf)
+    val pool13 = Await.result(cache.createWalletPool(new User(1L, PUB_KEY_1), "pool_3", "config"), Duration.Inf)
     val pool1s = Await.result(cache.getWalletPools(PUB_KEY_1), Duration.Inf)
     assertEquals(3, pool1s.size)
-    assertTrue(pool1s.contains(pool11))
-    assertTrue(pool1s.contains(pool12))
+    assertTrue(pool1s.contains(pool11.get))
+    assertTrue(pool1s.contains(pool12.get))
     assertTrue(pool1s.contains(pool13))
   }
 
   @Test def verifyCreateAndDeletePool(): Unit = {
-    val poolRandom = Await.result(cache.createWalletPool(UserDto(PUB_KEY_2, 0, Option(2L)),UUID.randomUUID().toString, "config"), Duration.Inf)
+    val poolRandom = Await.result(cache.createWalletPool(new User(2L, PUB_KEY_2),UUID.randomUUID().toString, "config"), Duration.Inf)
     val beforeDeletion = Await.result(cache.getWalletPools(PUB_KEY_2), Duration.Inf)
     assertEquals(3, beforeDeletion.size)
     assertTrue(beforeDeletion.contains(poolRandom))
 
-    val afterDeletion = Await.result(cache.deleteWalletPool(UserDto(PUB_KEY_2, 0, Option(2L)), poolRandom.name).flatMap(_=>cache.getWalletPools(PUB_KEY_2)), Duration.Inf)
+    val afterDeletion = Await.result(cache.deleteWalletPool(new User(2L, PUB_KEY_2), poolRandom.name).flatMap(_=>cache.getWalletPools(PUB_KEY_2)), Duration.Inf)
     assertFalse(afterDeletion.contains(poolRandom))
   }
 
   @Test def verifyGetCurrencies(): Unit = {
-    val currencies = Await.result(cache.getCurrencies("pool_1"), Duration.Inf)
+    val currencies = Await.result(cache.getCurrencies("pool_1", PUB_KEY_1), Duration.Inf)
     assertEquals(1, currencies.size)
-    val currency = Await.result(cache.getCurrency("bitcoin", "pool_2"), Duration.Inf)
-    assertEquals(currency.name, currencies(0).name)
+    val currency = Await.result(cache.getCurrency("bitcoin", "pool_2", PUB_KEY_1), Duration.Inf)
+    assert(currency.isDefined)
+    assertEquals(currency.get.currencyName, currencies(0).currencyName)
   }
 
   @Test def verifyGetAccountOperations(): Unit = {
-    val user1 = Await.result(cache.getUserDirectlyFromDB(PUB_KEY_3), Duration.Inf)
-    val pool1 = Await.result(DefaultDaemonCache.dbDao.getPool(user1.get.id.get, POOL_NAME), Duration.Inf)
+    val user1 = Await.result(cache.getUser(PUB_KEY_3), Duration.Inf)
+    val pool1 = Await.result(DefaultDaemonCache.dbDao.getPool(user1.get.id, POOL_NAME), Duration.Inf)
     val withTxs = Await.result(cache.getAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, 1, 1), Duration.Inf)
     withTxs.operations.foreach(op => assertNotNull(op.transaction))
-    val ops = Await.result(cache.getAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, 20, 0), Duration.Inf)
+    val ops = Await.result(cache.getAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, 2, 0), Duration.Inf)
     assert(ops.previous.isEmpty)
-    assert(20 === ops.operations.size)
+    assert(2 === ops.operations.size)
     assert(ops.previous.isEmpty)
     ops.operations.foreach(op => assertNull(op.transaction))
     val nextOps = Await.result(cache.getNextBatchAccountOperations(user1.get, 0, pool1.get.name, WALLET_NAME, ops.next.get, 0), Duration.Inf)
@@ -97,13 +100,13 @@ class DaemonCacheTest extends AssertionsForJUnit {
 object DaemonCacheTest {
   @BeforeClass def initialization(): Unit = {
     NativeLibLoader.loadLibs()
-    Await.result(DefaultDaemonCache.migrateDatabase(), Duration.Inf)
-    Await.result(cache.createUser(UserDto(PUB_KEY_1, 0, None)), Duration.Inf)
-    Await.result(cache.createUser(UserDto(PUB_KEY_2, 0, None)), Duration.Inf)
-    Await.result(cache.createUser(UserDto(PUB_KEY_3, 0, None)), Duration.Inf)
-    val user1 = Await.result(cache.getUserDirectlyFromDB(PUB_KEY_1), Duration.Inf)
-    val user2 = Await.result(cache.getUserDirectlyFromDB(PUB_KEY_2), Duration.Inf)
-    val user3 = Await.result(cache.getUserDirectlyFromDB(PUB_KEY_3), Duration.Inf)
+    Await.result(cache.dbMigration, Duration.Inf)
+    Await.result(DefaultDaemonCache.dbDao.insertUser(UserDto(PUB_KEY_1, 0, None)), Duration.Inf)
+    Await.result(DefaultDaemonCache.dbDao.insertUser(UserDto(PUB_KEY_2, 0, None)), Duration.Inf)
+    Await.result(DefaultDaemonCache.dbDao.insertUser(UserDto(PUB_KEY_3, 0, None)), Duration.Inf)
+    val user1 = Await.result(cache.getUser(PUB_KEY_1), Duration.Inf)
+    val user2 = Await.result(cache.getUser(PUB_KEY_2), Duration.Inf)
+    val user3 = Await.result(cache.getUser(PUB_KEY_3), Duration.Inf)
     Await.result(cache.createWalletPool(user1.get, "pool_1", ""), Duration.Inf)
     Await.result(cache.createWalletPool(user1.get, "pool_2", ""), Duration.Inf)
     Await.result(cache.createWalletPool(user2.get, "pool_1", ""), Duration.Inf)
@@ -117,8 +120,9 @@ object DaemonCacheTest {
         user3.get,
         POOL_NAME,
         WALLET_NAME), Duration.Inf)
+    Await.result(cache.getAccountOperations(user3.get, 0, POOL_NAME, WALLET_NAME, 1, 1), Duration.Inf)
     Await.result(cache.syncOperations(), Duration.Inf)
-    DefaultDaemonCache.initialize()
+    Await.result(cache.dbMigration, Duration.Inf)
   }
 
   private val cache: DefaultDaemonCache = new DefaultDaemonCache()
