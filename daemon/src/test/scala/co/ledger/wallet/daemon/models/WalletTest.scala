@@ -40,15 +40,38 @@ class WalletTest extends AssertionsForJUnit {
       testWallet.addAccountIfNotExit(info) }
   }, Duration.Inf)
 
+  private val account6: Account = Await.result(
+    testWallet.accountCreationInfo(Option(6)).map { derivation =>
+      AccountDerivationView(
+        derivation.index,
+        derivation.view.derivations.zipWithIndex.map { d =>
+          DerivationView(d._1.path, d._1.owner, Option(PUBKEYS(d._2)), Option(CHAINCODES(d._2)))
+        }
+      )
+    }.flatMap { info => testWallet.addAccountIfNotExit(info) } , Duration.Inf)
+
+  private val account4: Account = Await.result(
+    testWallet.accountCreationInfo(Option(4)).map { derivation =>
+      AccountDerivationView(
+        derivation.index,
+        derivation.view.derivations.zipWithIndex.map { d =>
+          DerivationView(d._1.path, d._1.owner, Option(PUBKEYS(d._2)), Option(CHAINCODES(d._2)))
+        }
+      )
+    }.flatMap { info => testWallet.addAccountIfNotExit(info) } , Duration.Inf)
+
   @Test def verifyWalletActivities(): Unit = {
     val accounts = Await.result(testWallet.accounts(), Duration.Inf)
-    assert(1 === accounts.size)
+    assert(3 === accounts.size)
     assert(testAccount === accounts.head)
     val account = Await.result(testWallet.account(testAccount.accountIndex), Duration.Inf)
     assert(account === accounts.headOption)
     val walletView = Await.result(testWallet.walletView, Duration.Inf)
     val accountView = Await.result(testAccount.accountView, Duration.Inf)
     assert(walletView.balance === accountView.balance)
+    assert(0 === testAccount.accountIndex)
+    assert(6 === account6.accountIndex)
+    assert(4 === account4.accountIndex)
     testPool.stopRealTimeObserver()
   }
 

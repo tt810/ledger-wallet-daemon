@@ -41,8 +41,8 @@ class Wallet(private val coreW: core.Wallet) extends Logging {
   def lastBlockHeight: Long = currentBlockHeight.get()
 
   def updateBlockHeight(newHeight: Long): Unit = {
-    currentBlockHeight.updateAndGet(n => Math.max(n, newHeight))
-    debug(LogMsgMaker.newInstance("Update block height").append("to", lastBlockHeight).append("wallet", walletName).toString())
+    val updated = currentBlockHeight.updateAndGet(n => Math.max(n, newHeight))
+    debug(LogMsgMaker.newInstance("Update block height").append("to", updated).append("wallet", walletName).toString())
   }
 
   def walletView: Future[WalletView] = {
@@ -80,7 +80,7 @@ class Wallet(private val coreW: core.Wallet) extends Logging {
       (for (derivationResult <- accountDerivations.derivations) yield HexUtils.valueOf(derivationResult.chainCode.get)).asArrayList
     )
     coreW.newAccountWithInfo(accountCreationInfo).map { coreA =>
-      info(LogMsgMaker.newInstance("Account created").append("index", accountDerivations.accountIndex).append("wallet_name", walletName).toString())
+      info(LogMsgMaker.newInstance("Account created").append("index", coreA.getIndex).append("wallet_name", walletName).toString())
       toCacheAndStartListen(accountLen.get()).map { _ => cachedAccounts(coreA.getIndex) }
     }.recover {
       case e: implicits.InvalidArgumentException => Future.failed(InvalidArgumentException(e.getMessage, e))
