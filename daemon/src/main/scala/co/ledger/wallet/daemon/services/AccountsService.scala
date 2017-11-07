@@ -15,8 +15,8 @@ class AccountsService @Inject()(defaultDaemonCache: DaemonCache) extends DaemonS
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
 
   def accounts(user: User, poolName: String, walletName: String): Future[Seq[AccountView]] = {
-    defaultDaemonCache.getAccounts(user.pubKey, poolName, walletName).flatMap { wallets =>
-      Future.sequence(wallets.map { wallet => wallet.accountView })
+    defaultDaemonCache.getAccounts(user.pubKey, poolName, walletName).flatMap { accounts =>
+      Future.sequence(accounts.map { account => account.accountView })
     }
   }
 
@@ -46,9 +46,12 @@ class AccountsService @Inject()(defaultDaemonCache: DaemonCache) extends DaemonS
     }
   }
 
-//  def accountOperation(user: User, uid: String, accountIndex: Int, poolName: String, walletName: String): Future[Option[OperationView]] = {
-//    defaultDaemonCache.getOperation(user, uid, accountIndex, poolName, walletName).map ()
-//  }
+  def accountOperation(user: User, uid: String, accountIndex: Int, poolName: String, walletName: String, fullOp: Int): Future[Option[OperationView]] = {
+    defaultDaemonCache.getAccountOperation(user, uid, accountIndex, poolName, walletName, fullOp).flatMap {
+      case Some(op) => op.operationView.map(Option(_))
+      case None => Future.successful(None)
+    }
+  }
 
   def createAccount(accountCreationBody: AccountDerivationView, user: User, poolName: String, walletName: String): Future[AccountView] = {
     defaultDaemonCache.createAccount(accountCreationBody, user, poolName, walletName).flatMap(_.accountView)

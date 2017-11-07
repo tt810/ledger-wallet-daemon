@@ -2,6 +2,7 @@ package co.ledger.wallet.daemon.database
 
 import java.util.UUID
 
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.database.DefaultDaemonCache.User
 import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.models.{AccountDerivationView, DerivationView}
@@ -12,7 +13,6 @@ import org.scalatest.junit.AssertionsForJUnit
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 
 class DaemonCacheTest extends AssertionsForJUnit {
   import DaemonCacheTest._
@@ -63,7 +63,7 @@ class DaemonCacheTest extends AssertionsForJUnit {
     assertEquals(1, currencies.size)
     val currency = Await.result(cache.getCurrency("bitcoin", "pool_2", PUB_KEY_1), Duration.Inf)
     assert(currency.isDefined)
-    assertEquals(currency.get.currencyName, currencies(0).currencyName)
+    assertEquals(currency.get.name, currencies(0).name)
   }
 
   @Test def verifyGetAccountOperations(): Unit = {
