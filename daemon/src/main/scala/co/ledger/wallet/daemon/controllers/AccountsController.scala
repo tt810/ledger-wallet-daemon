@@ -81,8 +81,8 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
     * End point queries for operation views with specified pool, wallet name, and unique account index.
     *
     */
-  get("/pools/:pool_name/wallets/:wallet_name/accounts/:account_index/operations") { request: OperationRequest =>
-    info(s"GET account operation $request")
+  get("/pools/:pool_name/wallets/:wallet_name/accounts/:account_index/operations") { request: OperationsRequest =>
+    info(s"GET account operations $request")
     accountsService.accountOperations(
       request.user,
       request.account_index,
@@ -103,6 +103,29 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
           response)
         case e: Throwable => responseSerializer.serializeInternalError(response, e)
       }
+  }
+
+  /**
+    * End point queries for operation view with specified uid.
+    *
+    */
+  get("/pools/:pool_name/wallets/:wallet_name/accounts/:account_index/operations/:uid") { request: OperationResult =>
+    info(s"GET account operation $request")
+    accountsService.accountOperation(request.user, request.uid, request.account_index, request.pool_name, request.wallet_name, request.full_op).map {
+      case Some(view) => responseSerializer.serializeOk(view, response)
+      case None => responseSerializer.serializeNotFound(Map("response" -> "Account operation doesn't exist", "uid" -> request.uid), response)
+    }.recover {
+      case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
+        Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
+        response)
+      case wnfe: WalletNotFoundException => responseSerializer.serializeBadRequest(
+        Map("response"->"Wallet doesn't exist", "wallet_name" -> request.wallet_name),
+        response)
+      case anfe: AccountNotFoundException => responseSerializer.serializeBadRequest(
+        Map("response"->"Account doesn't exist", "account_index" -> request.account_index),
+        response)
+      case e: Throwable => responseSerializer.serializeInternalError(response, e)
+    }
   }
 
   /**
@@ -164,7 +187,7 @@ object AccountsController {
 
     override def toString: String = s"$request, Parameters(user: ${user.id}, pool_name: $pool_name, wallet_name: $wallet_name, account_index: $account_index)"
   }
-  case class OperationRequest(
+  case class OperationsRequest(
                              @RouteParam pool_name: String,
                              @RouteParam wallet_name: String,
                              @RouteParam account_index: Int,
@@ -187,5 +210,25 @@ object AccountsController {
     def validateBatch: ValidationResult = ValidationResult.validate(batch > 0, "batch: batch should be greater than zero")
 
     override def toString: String = s"$request, Parameters(user: ${user.id}, pool_name: $pool_name, wallet_name: $wallet_name, account_index: $account_index, next: $next, previous: $previous, batch: $batch, full_op: $full_op)"
+  }
+
+  case class OperationResult(
+                            @RouteParam pool_name: String,
+                            @RouteParam wallet_name: String,
+                            @RouteParam account_index: Int,
+                            @RouteParam uid: String,
+                            @QueryParam full_op: Int = 0,
+                            request: Request
+                            ) extends RichRequest(request) {
+    @MethodValidation
+    def validatePoolName: ValidationResult = CommonMethodValidations.validateName("pool_name", pool_name)
+
+    @MethodValidation
+    def validateWalletName: ValidationResult = CommonMethodValidations.validateName("wallet_name", wallet_name)
+
+    @MethodValidation
+    def validateAccountIndex: ValidationResult = ValidationResult.validate(account_index >= 0, s"account_index: index can not be less than zero")
+
+    override def toString: String = s"$request, Parameters(user: ${user.id}, pool_name: $pool_name, wallet_name: $wallet_name, account_index: $account_index, uid: $uid, full_op: $full_op)"
   }
 }

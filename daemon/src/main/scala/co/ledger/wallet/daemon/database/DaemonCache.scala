@@ -59,6 +59,20 @@ trait DaemonCache {
   def getAccountOperations(user: User, accountIndex: Int, poolName: String, walletName: String, batch: Int, fullOp: Int): Future[PackedOperationsView]
 
   /**
+    * Getter for account operation instance with specified uid.
+    *
+    * @param user the user who can access the account.
+    * @param uid the unique identifier of operation defined by core lib.
+    * @param accountIndex the unique account index.
+    * @param poolName the name of wallet pool the account belongs to.
+    * @param walletName the name of wallet the account belongs to.
+    * @param fullOp the flag specifying the query result details. If greater than zero, detailed operations,
+    *               including transaction information, will be returned.
+    * @return a Future of optional `co.ledger.wallet.daemon.models.Operation` instance.
+    */
+  def getAccountOperation(user: User, uid: String, accountIndex: Int, poolName: String, walletName: String, fullOp: Int): Future[Option[Operation]]
+
+  /**
     * Getter of account operations batch instances with specified parameters.
     *
     * @param user the user who can access the account.

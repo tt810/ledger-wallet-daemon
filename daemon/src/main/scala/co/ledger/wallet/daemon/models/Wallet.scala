@@ -1,6 +1,5 @@
 package co.ledger.wallet.daemon.models
 
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
 
 import co.ledger.core
@@ -20,33 +19,33 @@ import scala.collection._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
 
-class Wallet(private val coreW: core.Wallet) extends Logging {
-  private val self = this
+class Wallet(private val coreW: core.Wallet) extends Logging with GenCache {
+  private[this] val self = this
 
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
   implicit def asArrayList[T](input: Seq[T]): AsArrayList[T] = new AsArrayList[T](input)
 
-  private[this] val cachedAccounts: concurrent.Map[Int, Account] = new ConcurrentHashMap[Int, Account]().asScala
+  private[this] val cachedAccounts: Cache[Int, Account] = newCache(initialCapacity = 1000)
   private[this] val accountLen: AtomicInteger = new AtomicInteger(0)
   private val configuration: Map[String, Any] = Map[String, Any]()
   private[this] val currentBlockHeight: AtomicLong = new AtomicLong(-1)
 
-  val walletName: String = coreW.getName
+  val name: String = coreW.getName
   val currency: Currency = Currency.newInstance(coreW.getCurrency)
 
-  protected val initialBlockHeight: Future[Unit] = coreW.getLastBlock().map { lastBlock =>
-    updateBlockHeight(lastBlock.getHeight)
-  }
-
-  def lastBlockHeight: Long = currentBlockHeight.get()
+  def lastBlockHeight: Future[Long] =
+    if (currentBlockHeight.get() < 0)
+      coreW.getLastBlock().map { lastBlock => updateBlockHeight(lastBlock.getHeight); currentBlockHeight.get() }
+    else
+      Future.successful(currentBlockHeight.get())
 
   def updateBlockHeight(newHeight: Long): Unit = {
     val updated = currentBlockHeight.updateAndGet(n => Math.max(n, newHeight))
-    debug(LogMsgMaker.newInstance("Update block height").append("to", updated).append("wallet", walletName).toString())
+    debug(LogMsgMaker.newInstance("Update block height").append("to", updated).append("at", newHeight).append("wallet", name).toString())
   }
 
   def walletView: Future[WalletView] = {
-    getBalance().map { b => WalletView(walletName, accountLen.get(), b, currency.currencyView, configuration) }
+    getBalance.map { b => WalletView(name, accountLen.get(), b, currency.currencyView, configuration) }
   }
 
   def account(index: Int): Future[Option[Account]] = {
@@ -80,12 +79,12 @@ class Wallet(private val coreW: core.Wallet) extends Logging {
       (for (derivationResult <- accountDerivations.derivations) yield HexUtils.valueOf(derivationResult.chainCode.get)).asArrayList
     )
     coreW.newAccountWithInfo(accountCreationInfo).map { coreA =>
-      info(LogMsgMaker.newInstance("Account created").append("index", coreA.getIndex).append("wallet_name", walletName).toString())
+      info(LogMsgMaker.newInstance("Account created").append("index", coreA.getIndex).append("wallet_name", name).toString())
       toCacheAndStartListen(accountLen.get()).map { _ => cachedAccounts(coreA.getIndex) }
     }.recover {
       case e: implicits.InvalidArgumentException => Future.failed(InvalidArgumentException(e.getMessage, e))
       case alreadyExist: implicits.AccountAlreadyExistsException =>
-        warn(LogMsgMaker.newInstance("Account already exist").append("index", accountDerivations.accountIndex).append("wallet_name", walletName).toString())
+        warn(LogMsgMaker.newInstance("Account already exist").append("index", accountDerivations.accountIndex).append("wallet_name", name).toString())
         if(cachedAccounts.contains(accountDerivations.accountIndex)) Future.successful(cachedAccounts(accountDerivations.accountIndex))
         else toCacheAndStartListen(accountLen.get()).map { _ => cachedAccounts(accountDerivations.accountIndex) }
     }.flatten
@@ -103,7 +102,7 @@ class Wallet(private val coreW: core.Wallet) extends Logging {
 
   def stopRealTimeObserver(): Unit = {
     debug(LogMsgMaker.newInstance("Stop real time observer").append("wallet", self).toString())
-    cachedAccounts.values.toSeq.map { account => account.stopRealTimeObserver() }
+    cachedAccounts.values.toSeq.foreach { account => account.stopRealTimeObserver() }
   }
 
   override def equals(that: Any): Boolean = {
@@ -114,32 +113,29 @@ class Wallet(private val coreW: core.Wallet) extends Logging {
   }
 
   override def hashCode: Int = {
-    self.walletName.hashCode + self.currency.hashCode()
+    self.name.hashCode + self.currency.hashCode()
   }
 
-  override def toString: String = s"Wallet(name: $walletName, currency: ${currency.currencyName})"
+  override def toString: String = s"Wallet(name: $name, currency: ${currency.name})"
 
   private def toCacheAndStartListen(offset: Int): Future[Unit] = {
-    if (offset < accountLen.get()) Future { info(s"Wallet $walletName cache was already updated")}
+    if (offset < accountLen.get()) Future { info(s"Wallet $name cache was already updated")}
     else
       coreW.getAccountCount().flatMap { count =>
-        if (count == offset) Future { info(s"Wallet $walletName cache is up to date") }
+        if (count == offset) Future { info(s"Wallet $name cache is up to date") }
         else if (count < offset) Future { warn(s"Offset should be less than count, possible race condition")}
-        else {
-          coreW.getAccounts(offset, count).map { coreAs =>
-            coreAs.asScala.toSeq.map { coreA =>
-              cachedAccounts.put(coreA.getIndex, Account.newInstance(coreA, coreW))
-              debug(s"Add to Wallet(name: $walletName) cache, Account(index: ${coreA.getIndex})")
-              cachedAccounts(coreA.getIndex).startRealTimeObserver()
-            }.map { _ =>
-              accountLen.updateAndGet(n => Math.max(n, count))
-            }
+        else coreW.getAccounts(offset, count).map { coreAs =>
+          coreAs.asScala.foreach { coreA =>
+            cachedAccounts.put(coreA.getIndex, Account.newInstance(coreA, self))
+            debug(s"Add ${cachedAccounts(coreA.getIndex)} to $self cache")
+            cachedAccounts(coreA.getIndex).startRealTimeObserver()
           }
+          accountLen.updateAndGet(n => Math.max(n, count))
         }
       }
   }
 
-  private def getBalance(): Future[Long] = {
+  private def getBalance: Future[Long] = {
     accounts().flatMap { as =>
       Future.sequence( for (a <- as) yield a.balance ).map { b => b.sum }
     }

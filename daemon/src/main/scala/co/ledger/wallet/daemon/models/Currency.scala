@@ -9,17 +9,17 @@ import scala.collection.JavaConverters._
 
 class Currency(coreC: core.Currency) {
 
-  val currencyName: String = coreC.getName
+  val name: String = coreC.getName
 
-  val currencyFamily: CurrencyFamily = CurrencyFamily.valueOf(coreC.getWalletType.name())
+  val family: CurrencyFamily = CurrencyFamily.valueOf(coreC.getWalletType.name())
 
   lazy val currencyView: CurrencyView = CurrencyView(
     coreC.getName,
-    currencyFamily,
+    family,
     coreC.getBip44CoinType,
     coreC.getPaymentUriScheme,
-    coreC.getUnits.asScala.toSeq.map(newUnitView(_)),
-    newNetworkParamsView(coreC, currencyFamily)
+    coreC.getUnits.asScala.map(newUnitView(_)),
+    newNetworkParamsView(coreC, family)
   )
 
   private def newUnitView(coreUnit: core.CurrencyUnit): UnitView =
@@ -38,10 +38,10 @@ class Currency(coreC: core.Currency) {
   }
 
   override def hashCode: Int = {
-    this.currencyName.hashCode + this.currencyFamily.hashCode()
+    this.name.hashCode + this.family.hashCode()
   }
 
-  override def toString: String = s"Currency(name: $currencyName, family: $currencyFamily)"
+  override def toString: String = s"Currency(name: $name, family: $family)"
 }
 
 object Currency {

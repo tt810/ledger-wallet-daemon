@@ -2,28 +2,31 @@ package co.ledger.wallet.daemon.models
 
 import co.ledger.core
 import co.ledger.core.implicits._
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.libledger_core.async.LedgerCoreExecutionContext
 import co.ledger.wallet.daemon.schedulers.observers.{SynchronizationEventReceiver, SynchronizationResult}
 import co.ledger.wallet.daemon.services.LogMsgMaker
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.twitter.inject.Logging
 
 import scala.collection.JavaConverters._
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 
 object Account {
 
-  class Account(private val coreA: core.Account, private val coreW: core.Wallet) extends Wallet(coreW) {
-    private val self = this
+  class Account(private val coreA: core.Account, private val wallet: Wallet) extends Logging {
+    private[this] val self = this
     private val _coreExecutionContext = LedgerCoreExecutionContext.observerExecutionContext
+    implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
 
-    val accountIndex: Int = coreA.getIndex
+    val index: Int = coreA.getIndex
 
     def balance: Future[Long] = coreA.getBalance().map { balance => balance.toLong }
 
     def accountView: Future[AccountView] = balance.map { b =>
-      AccountView(walletName, accountIndex, b, "account key chain", currency.currencyView)
+      AccountView(wallet.name, index, b, "account key chain", wallet.currency.currencyView)
     }
 
     def operation(uid: String, fullOp: Int): Future[Option[Operation]] = {
@@ -32,7 +35,7 @@ object Account {
       (if (fullOp > 0)
         queryOperations.complete().execute()
       else queryOperations.partial().execute()).map { operations =>
-        operations.asScala.toSeq.headOption.map { o => Operation.newInstance(o, coreA, coreW)}
+        operations.asScala.toSeq.headOption.map { o => Operation.newInstance(o, self, wallet)}
       }
     }
 
@@ -43,13 +46,13 @@ object Account {
         coreA.queryOperations().offset(offset).limit(batch).partial().execute()
       ).map { operations =>
         if (operations.size() <= 0) List[Operation]()
-        else operations.asScala.toSeq.map { o => Operation.newInstance(o, coreA, coreW)}
+        else operations.asScala.toSeq.map { o => Operation.newInstance(o, self, wallet)}
       }
     }
 
     def sync(poolName: String): Future[SynchronizationResult] = {
       val promise: Promise[SynchronizationResult] = Promise[SynchronizationResult]()
-      val receiver: core.EventReceiver = new SynchronizationEventReceiver(coreA.getIndex, walletName, poolName, promise)
+      val receiver: core.EventReceiver = new SynchronizationEventReceiver(coreA.getIndex, wallet.name, poolName, promise)
       coreA.synchronize().subscribe(_coreExecutionContext, receiver)
       debug(s"Synchronize $self")
       promise.future
@@ -60,12 +63,12 @@ object Account {
       debug(LogMsgMaker.newInstance(s"Set real time observer on ${coreA.isObservingBlockchain}").append("account", self).toString())
     }
 
-    override def stopRealTimeObserver(): Unit = {
+    def stopRealTimeObserver(): Unit = {
       debug(LogMsgMaker.newInstance("Stop real time observer").append("account", self).toString())
       if (coreA.isObservingBlockchain) coreA.stopBlockchainObservation()
     }
 
-    override def toString: String = s"Account(index: $accountIndex)"
+    override def toString: String = s"Account(index: $index)"
   }
 
   class Derivation(private val accountCreationInfo: core.AccountCreationInfo) {
@@ -77,14 +80,14 @@ object Account {
       val pubKeys = {
         val pks = accountCreationInfo.getPublicKeys
         if (pks.isEmpty) paths.map { _ => null }
-        else pks.asScala.toSeq.map(HexUtils.valueOf(_))
+        else pks.asScala.toSeq.map(HexUtils.valueOf)
       }
       val chainCodes = {
         val ccs = accountCreationInfo.getChainCodes
         if (ccs.isEmpty) paths.map { _ => null }
-        else ccs.asScala.toSeq.map(HexUtils.valueOf(_))
+        else ccs.asScala.toSeq.map(HexUtils.valueOf)
       }
-      val derivations = (0 until paths.size).map { i =>
+      val derivations = paths.indices.map { i =>
         DerivationView(paths(i), owners(i), Option(pubKeys(i)), Option(chainCodes(i)))
       }
       AccountDerivationView(index, derivations)
@@ -92,8 +95,8 @@ object Account {
   }
 
 
-  def newInstance(coreA: core.Account, coreW: core.Wallet): Account = {
-    new Account(coreA, coreW)
+  def newInstance(coreA: core.Account, wallet: Wallet): Account = {
+    new Account(coreA, wallet)
   }
 
   def newDerivation(coreD: core.AccountCreationInfo): Derivation = {

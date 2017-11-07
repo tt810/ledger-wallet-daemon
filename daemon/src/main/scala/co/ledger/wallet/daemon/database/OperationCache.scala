@@ -1,20 +1,19 @@
 package co.ledger.wallet.daemon.database
 
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Singleton
 
 import co.ledger.wallet.daemon.exceptions.OperationNotFoundException
+import co.ledger.wallet.daemon.models.GenCache
 import co.ledger.wallet.daemon.services.LogMsgMaker
 import co.ledger.wallet.daemon.utils
 import com.twitter.inject.Logging
 
-import scala.collection.JavaConverters._
-import scala.collection.{concurrent, mutable}
+import scala.collection.mutable
 
 @Singleton
-class OperationCache extends Logging {
+class OperationCache extends Logging with GenCache {
 
   /**
     * Create and insert an operation query record.
@@ -131,16 +130,15 @@ class OperationCache extends Logging {
   }
 
   private def newPoolTreeInstance(pool: Long, wallet: String, account: Int, operation: UUID): PoolTree = {
-    val wallets = new ConcurrentHashMap[String, WalletTree]().asScala
+    val wallets: Cache[String, WalletTree] = newCache(initialCapacity = 100)
     wallets.put(wallet, newWalletTreeInstance(wallet, account, operation))
     new PoolTree(pool, wallets)
   }
+  private[this] val cache: Cache[UUID, AtomicRecord] = newCache(initialCapacity = 100)
+  private[this] val nexts: Cache[UUID, UUID] = newCache(initialCapacity = 1000)
+  private[this] val poolTrees: Cache[Long, PoolTree] = newCache(initialCapacity = 50)
 
-  private val cache: concurrent.Map[UUID, AtomicRecord] = new ConcurrentHashMap[UUID, AtomicRecord]().asScala
-  private val nexts: concurrent.Map[UUID, UUID] = new ConcurrentHashMap[UUID, UUID]().asScala
-  private val poolTrees: concurrent.Map[Long, PoolTree] = new ConcurrentHashMap[Long, PoolTree]().asScala
-
-  class PoolTree(val poolId: Long, val wallets: concurrent.Map[String, WalletTree]) {
+  class PoolTree(val poolId: Long, val wallets: Cache[String, WalletTree]) {
 
     def insertOperation(wallet: String, account: Int, operation: UUID): Unit = wallets.get(wallet) match {
       case Some(tree) => tree.insertOperation(account, operation)
@@ -153,12 +151,12 @@ class OperationCache extends Logging {
   }
 
   def newWalletTreeInstance(walletName: String, accountIndex: Int, operation: UUID): WalletTree = {
-    val accounts = new ConcurrentHashMap[Int, AccountTree]().asScala
+    val accounts: Cache[Int, AccountTree] = newCache(initialCapacity = 100)
     accounts.put(accountIndex, newAccountTreeInstance(accountIndex, operation))
     new WalletTree(walletName, accounts)
   }
 
-  class WalletTree(val walletName: String, val accounts: concurrent.Map[Int, AccountTree]) {
+  class WalletTree(val walletName: String, val accounts: Cache[Int, AccountTree]) {
 
     def insertOperation(account: Int, operation: UUID): Unit = accounts.get(account) match {
       case Some(tree) => tree.insertOperation(operation)
