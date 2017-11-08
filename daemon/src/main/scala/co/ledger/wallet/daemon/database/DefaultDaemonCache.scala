@@ -45,12 +45,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
   }
 
   def createAccount(accountDerivations: AccountDerivationView, user: User, poolName: String, walletName: String): Future[Account] = {
-    getHardWallet(user.pubKey, poolName, walletName).flatMap { w =>
-      w.addAccountIfNotExit(accountDerivations).andThen {
-        case Success(a) => a.sync(poolName)
-        case Failure(t: Throwable) => t
-      }
-    }
+    getHardWallet(user.pubKey, poolName, walletName).flatMap { w => w.addAccountIfNotExit(accountDerivations) }
   }
 
   def getCurrency(currencyName: String, poolName: String, pubKey: String): Future[Option[Currency]] = {
