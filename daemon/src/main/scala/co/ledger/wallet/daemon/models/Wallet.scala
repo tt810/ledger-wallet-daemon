@@ -19,7 +19,7 @@ import scala.collection._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
 
-class Wallet(private val coreW: core.Wallet) extends Logging with GenCache {
+class Wallet(private val coreW: core.Wallet, private val pool: Pool) extends Logging with GenCache {
   private[this] val self = this
 
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
@@ -80,7 +80,11 @@ class Wallet(private val coreW: core.Wallet) extends Logging with GenCache {
     )
     coreW.newAccountWithInfo(accountCreationInfo).map { coreA =>
       info(LogMsgMaker.newInstance("Account created").append("index", coreA.getIndex).append("wallet_name", name).toString())
-      toCacheAndStartListen(accountLen.get()).map { _ => cachedAccounts(coreA.getIndex) }
+      toCacheAndStartListen(accountLen.get()).map { _ =>
+        val account = cachedAccounts(coreA.getIndex)
+        account.sync(pool.name)
+        account
+      }
     }.recover {
       case e: implicits.InvalidArgumentException => Future.failed(InvalidArgumentException(e.getMessage, e))
       case alreadyExist: implicits.AccountAlreadyExistsException =>
@@ -144,8 +148,8 @@ class Wallet(private val coreW: core.Wallet) extends Logging with GenCache {
 }
 
 object Wallet {
-  def newInstance(coreW: core.Wallet): Wallet = {
-    new Wallet(coreW)
+  def newInstance(coreW: core.Wallet, pool: Pool): Wallet = {
+    new Wallet(coreW, pool)
   }
 }
 

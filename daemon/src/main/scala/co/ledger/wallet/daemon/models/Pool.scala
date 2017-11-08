@@ -224,7 +224,7 @@ class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging wit
         else if (count < offset) Future { warn(s"Offset should be less than count, possible race condition") }
         else {
           coreP.getWallets(offset, count).flatMap { coreWs =>
-            Future.sequence(coreWs.asScala.toSeq.map(Wallet.newInstance).map { wallet =>
+            Future.sequence(coreWs.asScala.toSeq.map(Wallet.newInstance(_, self)).map { wallet =>
               orderedNames += wallet.name
               cachedWallets.put(wallet.name, wallet)
               debug(s"Add ${cachedWallets(wallet.name)} to $self cache")
