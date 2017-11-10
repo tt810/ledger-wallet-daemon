@@ -45,12 +45,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
   }
 
   def createAccount(accountDerivations: AccountDerivationView, user: User, poolName: String, walletName: String): Future[Account] = {
-    getHardWallet(user.pubKey, poolName, walletName).flatMap { w =>
-      w.addAccountIfNotExit(accountDerivations).andThen {
-        case Success(a) => a.sync(poolName)
-        case Failure(t: Throwable) => t
-      }
-    }
+    getHardWallet(user.pubKey, poolName, walletName).flatMap { w => w.addAccountIfNotExit(accountDerivations) }
   }
 
   def getCurrency(currencyName: String, poolName: String, pubKey: String): Future[Option[Currency]] = {
@@ -191,6 +186,10 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     }
   }
 
+  def getAccountOperation(user: User, uid: String, accountIndex: Int, poolName: String, walletName: String, fullOp: Int): Future[Option[Operation]] = {
+    getHardAccount(user.pubKey, poolName, walletName, accountIndex).flatMap { pair => pair._2.operation(uid, fullOp) }
+  }
+
   private def getHardAccount(pubKey: String, poolName: String, walletName: String, accountIndex: Int): Future[(Wallet, Account)] = {
     getHardWallet(pubKey, poolName, walletName).flatMap { wallet =>
       wallet.account(accountIndex).map {
@@ -220,9 +219,10 @@ object DefaultDaemonCache extends Logging {
   private[database] val opsCache: OperationCache = new OperationCache()
   private val users: concurrent.Map[String, User] = new ConcurrentHashMap[String, User]().asScala
 
-  class User(val id: Long, val pubKey: String) extends Logging {
+  class User(val id: Long, val pubKey: String) extends Logging with GenCache {
     implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
-    private val cachedPools: concurrent.Map[String, Pool] = new ConcurrentHashMap[String, Pool]().asScala
+    private[this] val cachedPools: Cache[String, Pool] = newCache(initialCapacity = 50)
+    private[this] val self = this
 
     def sync(): Future[Seq[SynchronizationResult]] = {
       pools().flatMap { pls =>
@@ -289,7 +289,7 @@ object DefaultDaemonCache extends Logging {
         case Some(pool) => Future.successful(pool)
         case None => Pool.newCoreInstance(p).flatMap { coreP =>
           cachedPools.put(p.name, Pool.newInstance(coreP, id))
-          debug(s"Add to User(id: $id) cache, ${cachedPools(p.name)}")
+          debug(s"Add ${cachedPools(p.name)} to $self cache")
           cachedPools(p.name).registerEventReceiver(new NewOperationEventReceiver(id, opsCache))
           cachedPools(p.name).startCacheAndRealTimeObserver().map { _ => cachedPools(p.name)}
         }

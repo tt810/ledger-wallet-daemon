@@ -30,7 +30,7 @@ class AuthenticationService @Inject()(daemonCache: DaemonCache, ecdsa: ECDSAServ
           val currentTime = new Date()
           if ( Math.abs(currentTime.getTime - loginAt.getTime) > DaemonConfiguration.authTokenDuration)
             throw AuthenticationFailedException("Authentication token expired")
-          val msg = Sha256Hash.hash(s"LWD: $loginAtAsLong\n".getBytes(StandardCharsets.US_ASCII))
+          val msg = Sha256Hash.hash(s"LWD: $loginAtAsLong\n".getBytes(StandardCharsets.UTF_8))
           val signed = request.authContext.signedMessage
           if(!ecdsa.verify(msg, signed, pubKey))
             throw AuthenticationFailedException("User not authorized")

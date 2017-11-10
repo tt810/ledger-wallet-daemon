@@ -6,7 +6,7 @@ import javax.inject.{Inject, Singleton}
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.database.DaemonCache
 import co.ledger.wallet.daemon.database.DefaultDaemonCache.User
-import co.ledger.wallet.daemon.models.{AccountDerivationView, AccountView, PackedOperationsView}
+import co.ledger.wallet.daemon.models._
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -15,8 +15,8 @@ class AccountsService @Inject()(defaultDaemonCache: DaemonCache) extends DaemonS
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
 
   def accounts(user: User, poolName: String, walletName: String): Future[Seq[AccountView]] = {
-    defaultDaemonCache.getAccounts(user.pubKey, poolName, walletName).flatMap { wallets =>
-      Future.sequence(wallets.map { wallet => wallet.accountView })
+    defaultDaemonCache.getAccounts(user.pubKey, poolName, walletName).flatMap { accounts =>
+      Future.sequence(accounts.map { account => account.accountView })
     }
   }
 
@@ -31,7 +31,7 @@ class AccountsService @Inject()(defaultDaemonCache: DaemonCache) extends DaemonS
     defaultDaemonCache.getNextAccountCreationInfo(user.pubKey, poolName, walletName, accountIndex).map(_.view)
   }
 
-  def accountOperation(user: User, accountIndex: Int, poolName: String, walletName: String, queryParams: OperationQueryParams): Future[PackedOperationsView] = {
+  def accountOperations(user: User, accountIndex: Int, poolName: String, walletName: String, queryParams: OperationQueryParams): Future[PackedOperationsView] = {
     if(queryParams.next.isEmpty && queryParams.previous.isEmpty) {
       // new request
       info(LogMsgMaker.newInstance("Retrieve latest operations").toString())
@@ -43,6 +43,13 @@ class AccountsService @Inject()(defaultDaemonCache: DaemonCache) extends DaemonS
     } else {
       info(LogMsgMaker.newInstance("Retrieve previous operations").toString())
       defaultDaemonCache.getPreviousBatchAccountOperations(user, accountIndex, poolName, walletName, queryParams.previous.get, queryParams.fullOp)
+    }
+  }
+
+  def accountOperation(user: User, uid: String, accountIndex: Int, poolName: String, walletName: String, fullOp: Int): Future[Option[OperationView]] = {
+    defaultDaemonCache.getAccountOperation(user, uid, accountIndex, poolName, walletName, fullOp).flatMap {
+      case Some(op) => op.operationView.map(Option(_))
+      case None => Future.successful(None)
     }
   }
 

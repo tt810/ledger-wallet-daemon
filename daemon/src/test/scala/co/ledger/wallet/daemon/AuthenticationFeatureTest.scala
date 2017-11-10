@@ -1,10 +1,10 @@
 package co.ledger.wallet.daemon
 
-import java.util.Date
+import java.nio.charset.StandardCharsets
+import java.util.{Base64, Date}
 
 import co.ledger.wallet.daemon.services.ECDSAService
 import co.ledger.wallet.daemon.utils.{FixturesUtils, HexUtils}
-import com.lambdaworks.codec.Base64
 import com.twitter.finagle.http.Status
 import com.twitter.finatra.http.EmbeddedHttpServer
 import com.twitter.inject.server.FeatureTest
@@ -50,7 +50,7 @@ class AuthenticationFeatureTest extends FeatureTest {
   }
 
   private def basicAuthorisationHeader(username: String, password: String) = Map(
-    "authorization" -> s"Basic ${Base64.encode(s"$username:$password".getBytes).mkString}"
+    "authorization" -> s"Basic ${Base64.getEncoder.encodeToString(s"$username:$password".getBytes(StandardCharsets.UTF_8))}"
   )
 
   private def invalidLWDAuthorisationHeader(seedName: String) = {
@@ -61,7 +61,7 @@ class AuthenticationFeatureTest extends FeatureTest {
     val message = Sha256Hash.hash(s"LWD: $timestamp\n".getBytes)
     val signed = ecdsa.sign(message, privKey)
     Map(
-      "authorization" -> s"LW ${Base64.encode(s"${HexUtils.valueOf(pubKey)}:$timestamp:${HexUtils.valueOf(signed)}".getBytes).mkString}"
+      "authorization" -> s"LW ${Base64.getEncoder.encodeToString(s"${HexUtils.valueOf(pubKey)}:$timestamp:${HexUtils.valueOf(signed)}".getBytes(StandardCharsets.UTF_8))}"
     )
   }
 
@@ -73,7 +73,7 @@ class AuthenticationFeatureTest extends FeatureTest {
     val message = Sha256Hash.hash(s"LWD: $timestamp\n".getBytes)
     val signed = ecdsa.sign(message, privKey)
     Map(
-      "authorization" -> s"LWD ${Base64.encode(s"${HexUtils.valueOf(pubKey)}:$timestamp:${HexUtils.valueOf(signed)}".getBytes).mkString}"
+      "authorization" -> s"LWD ${Base64.getEncoder.encodeToString(s"${HexUtils.valueOf(pubKey)}:$timestamp:${HexUtils.valueOf(signed)}".getBytes(StandardCharsets.UTF_8))}"
     )
   }
 }

@@ -3,36 +3,56 @@ package co.ledger.wallet.daemon.models
 import java.util.{Date, UUID}
 
 import co.ledger.core
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.models.Account.Account
 import co.ledger.wallet.daemon.models.coins.Bitcoin
 import co.ledger.wallet.daemon.models.coins.Coin.TransactionView
 import com.fasterxml.jackson.annotation.JsonInclude.Include
 import com.fasterxml.jackson.annotation.{JsonInclude, JsonProperty}
+import com.twitter.inject.Logging
 
 import scala.collection.JavaConverters._
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-class Operation(private val coreO: core.Operation, private val coreA: core.Account, private val coreW: core.Wallet) extends Account(coreA, coreW) {
+class Operation(private val coreO: core.Operation, private val account: Account, private val wallet: Wallet) extends Logging {
+  private[this] val self = this
+  implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
+  val currencyFamily: CurrencyFamily = CurrencyFamily.valueOf(coreO.getWalletType.name())
+  val uid: String = coreO.getUid
+  val time: Date = coreO.getDate
+  val opType: OperationType = OperationType.valueOf(coreO.getOperationType.name())
+  val amount: Long = coreO.getAmount.toLong
+  val senders: Seq[String] = coreO.getSenders.asScala
+  val recipients: Seq[String] = coreO.getRecipients.asScala
+  val fees: Long = coreO.getFees.toLong
+  val blockHeight: Option[Long] = Option(coreO.getBlockHeight)
+  lazy val trustView: Option[TrustIndicatorView] = newTrustIndicatorView(coreO.getTrust)
+  lazy val transactionView: TransactionView = newTransactionView(coreO, currencyFamily)
 
-  def operationView: Future[OperationView] = {
+  def operationView: Future[OperationView] =
+    confirmations(wallet).map(OperationView(
+      uid,
+      wallet.currency.name,
+      currencyFamily,
+      trustView,
+      _,
+      time,
+      blockHeight,
+      opType,
+      amount,
+      fees,
+      wallet.name,
+      account.index,
+      senders,
+      recipients,
+      transactionView))
 
-    val currencyFamily = CurrencyFamily.valueOf(coreO.getWalletType.name())
-    val uid = coreO.getUid
-    val trust = newTrustIndicatorView(coreO.getTrust)
-    val time = coreO.getDate
-    val opType = OperationType.valueOf(coreO.getOperationType.name())
-    val amount = coreO.getAmount.toLong
-    val fees = coreO.getFees.toLong
-    val senders = coreO.getSenders.asScala.toSeq
-    val recipients = coreO.getRecipients.asScala.toSeq
-    val transaction = newTransactionView(coreO, currencyFamily)
-    confirmations.map(OperationView(uid, currency.currencyName, currencyFamily, trust, _, time, blockHeight, opType, amount, fees, walletName, accountIndex, senders, recipients, transaction))
-  }
-
-  private def confirmations: Future[Long] = {
-    if (blockHeight < 0) initialBlockHeight.map { _ => blockHeight - coreO.getBlockHeight }
-    else Future.successful(blockHeight - coreO.getBlockHeight)
-  }
+  private def confirmations(wallet: Wallet): Future[Long] =
+    wallet.lastBlockHeight.map { lastBlockHeight => blockHeight match {
+        case Some(height) => lastBlockHeight - height
+        case None => 0L
+      }
+    }
 
   private def newTransactionView(operation: core.Operation, currencyFamily: CurrencyFamily) = {
     if(operation.isComplete) currencyFamily match {
@@ -47,12 +67,25 @@ class Operation(private val coreO: core.Operation, private val coreA: core.Accou
     else
       Option(TrustIndicatorView(trust.getTrustWeight, TrustLevel.valueOf(trust.getTrustLevel.name()), trust.getConflictingOperationUids.asScala.toSeq, trust.getOrigin))
   }
+
+  override def equals(that: Any): Boolean = {
+    that match {
+      case that: Operation => that.isInstanceOf[Operation] && self.hashCode == that.hashCode
+      case _ => false
+    }
+  }
+
+  override def hashCode: Int = {
+    self.uid.hashCode
+  }
+
+  override def toString: String = s"Operation(uid: $uid)"
 }
 
 object Operation {
 
-  def newInstance(coreO: core.Operation, coreA: core.Account, coreW: core.Wallet): Operation = {
-    new Operation(coreO, coreA, coreW)
+  def newInstance(coreO: core.Operation, account: Account, wallet: Wallet): Operation = {
+    new Operation(coreO, account, wallet)
   }
 
 }
@@ -64,7 +97,7 @@ case class OperationView(
                           @JsonProperty("trust") trust: Option[TrustIndicatorView],
                           @JsonProperty("confirmations") confirmations: Long,
                           @JsonProperty("time") time: Date,
-                          @JsonProperty("block_height") blockHeight: Long,
+                          @JsonProperty("block_height") blockHeight: Option[Long],
                           @JsonProperty("type") opType: OperationType,
                           @JsonProperty("amount") amount: Long,
                           @JsonProperty("fees") fees: Long,

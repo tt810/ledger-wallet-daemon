@@ -6,8 +6,8 @@ import djinni.NativeLibLoader
 import org.junit.Test
 import org.scalatest.junit.AssertionsForJUnit
 
-import scala.concurrent.{Await, ExecutionContext}
 import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, ExecutionContext}
 
 class PoolTest extends AssertionsForJUnit {
 
@@ -34,9 +34,6 @@ class PoolTest extends AssertionsForJUnit {
     assert(testPool.name === "test_pool")
     assert(WalletPoolView("test_pool", 1) === Await.result(samePool.view, Duration.Inf))
     assert(notExistingWallet.isEmpty)
-  }
-
-  @Test def verifyOverridedFunctions(): Unit = {
     assert(wallet != "wallet")
     assert(testPool != wallet)
   }

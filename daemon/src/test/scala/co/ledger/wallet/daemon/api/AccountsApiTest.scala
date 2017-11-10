@@ -104,6 +104,9 @@ class AccountsApiTest extends APIFeatureTest {
     assertWalletCreation("op_pool", "op_wallet", "bitcoin", Status.Ok)
     assertCreateAccount(CORRECT_BODY, "op_pool", "op_wallet", Status.Ok)
     assertSyncPool(Status.Ok)
+    assertGetAccountOp("op_pool", "op_wallet", 0, "noexistop", 0, Status.NotFound)
+    assertGetAccountOp("op_pool", "op_wallet", 0, "ed977add08cfc6cd158e65150bcd646d7a52b60f84e15e424b617d5511aaed21", 0, Status.Ok)
+
     val firstBtch = parse[Map[String, Any]](assertGetAccountOps("op_pool", "op_wallet", 0, OperationQueryParams(None, None, 2, 0), Status.Ok))
 
     val secondBtch = parse[Map[String, Any]](assertGetAccountOps("op_pool", "op_wallet", 0, OperationQueryParams(None, getUUID("next", firstBtch), 10, 0), Status.Ok))
@@ -131,6 +134,11 @@ class AccountsApiTest extends APIFeatureTest {
     assertGetAccountOps("op_pool_mal", "op_wallet", 0, OperationQueryParams(None, Option(UUID.randomUUID), 2, 0), Status.BadRequest)
     assertGetAccountOps("op_pool_mal", "op_wallet", 0, OperationQueryParams(Option(UUID.randomUUID), None, 2, 0), Status.BadRequest)
     deletePool("op_pool_mal")
+  }
+
+  private def assertGetAccountOp(poolName: String, walletName: String, accountIndex: Int, uid: String, fullOp: Int, expected: Status): Response = {
+    val sb = new StringBuilder(s"/pools/$poolName/wallets/$walletName/accounts/$accountIndex/operations/$uid?full_op=$fullOp")
+    server.httpGet(sb.toString(), headers = defaultHeaders, andExpect = expected)
   }
 
   private def assertGetAccountOps(poolName: String, walletName: String, accountIndex: Int, params: OperationQueryParams, expected: Status): Response = {

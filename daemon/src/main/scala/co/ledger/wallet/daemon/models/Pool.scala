@@ -1,7 +1,5 @@
 package co.ledger.wallet.daemon.models
 
-import java.util.concurrent.ConcurrentHashMap
-
 import co.ledger.core
 import co.ledger.core.implicits.{CurrencyNotFoundException => CoreCurrencyNotFoundException, _}
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
@@ -25,15 +23,15 @@ import scala.collection._
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.{ExecutionContext, Future}
 
-class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging {
-  private val self = this
+class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging with GenCache {
+  private[this] val self = this
 
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
   private val _coreExecutionContext = LedgerCoreExecutionContext.observerExecutionContext
-  private val eventReceivers: mutable.Set[core.EventReceiver] = utils.newConcurrentSet[core.EventReceiver]
-  private val cachedWallets: concurrent.Map[String, Wallet] = new ConcurrentHashMap[String, Wallet]().asScala
-  private val cachedCurrencies: concurrent.Map[String, Currency] = new ConcurrentHashMap[String, Currency]().asScala
-  private var orderedNames = new ListBuffer[String]()
+  private[this] val eventReceivers: mutable.Set[core.EventReceiver] = utils.newConcurrentSet[core.EventReceiver]
+  private[this] val cachedWallets: Cache[String, Wallet] = newCache(initialCapacity = 100)
+  private[this] val cachedCurrencies: Cache[String, Currency] = newCache(initialCapacity = 100)
+  private[this] var orderedNames = new ListBuffer[String]()
   
   val name: String = coreP.getName
 
@@ -118,7 +116,7 @@ class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging {
 
   private def toCache(coreC: core.Currency): Unit = {
     cachedCurrencies.put(coreC.getName, Currency.newInstance(coreC))
-    debug(s"Add to $self cache, ${cachedCurrencies(coreC.getName)}")
+    debug(s"Add ${cachedCurrencies(coreC.getName)} to $self cache")
   }
 
   /**
@@ -226,10 +224,10 @@ class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging {
         else if (count < offset) Future { warn(s"Offset should be less than count, possible race condition") }
         else {
           coreP.getWallets(offset, count).flatMap { coreWs =>
-            Future.sequence(coreWs.asScala.toSeq.map(Wallet.newInstance).map { wallet =>
-              orderedNames += wallet.walletName
-              cachedWallets.put(wallet.walletName, wallet)
-              debug(s"Add to Pool(name: $name) cache, Wallet(name: ${wallet.walletName})")
+            Future.sequence(coreWs.asScala.toSeq.map(Wallet.newInstance(_, self)).map { wallet =>
+              orderedNames += wallet.name
+              cachedWallets.put(wallet.name, wallet)
+              debug(s"Add ${cachedWallets(wallet.name)} to $self cache")
               self.registerEventReceiver(new NewBlockEventReceiver(wallet))
               wallet.startCacheAndRealTimeObserver()
             })
