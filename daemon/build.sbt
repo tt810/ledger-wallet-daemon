@@ -8,49 +8,55 @@ testForkedParallel in IntegrationTest := false
 testOptions in Test := Seq(Tests.Argument(TestFrameworks.JUnit, "-a"))
 
 lazy val versions = new {
-  val finatra = "2.12.0"
-  val guice = "4.0"
-  val logback = "1.1.7"
-  val slick = "3.2.1"
+  val andrebeat = "0.4.0"
+  val bitcoinj  = "0.14.4"
+  val finatra   = "2.12.0"
+  val guice     = "4.0"
+  val h2        = "1.4.192"
+  val logback   = "1.1.7"
+  val postgre   = "9.3-1100-jdbc4"
+  val slick     = "3.2.1"
+  val sqlite    = "3.7.15-M1"
 }
 
 libraryDependencies ++= Seq(
-  "com.typesafe.slick" %% "slick" % versions.slick,
-  "com.typesafe.slick" %% "slick-hikaricp" % versions.slick,
+  "com.typesafe.slick"  %% "slick"              % versions.slick,
+  "com.typesafe.slick"  %% "slick-hikaricp"     % versions.slick,
+  "org.postgresql"      %  "postgresql"         % versions.postgre,
+  "org.xerial"          %  "sqlite-jdbc"        % versions.sqlite,
+  "com.h2database"      %  "h2"                 % versions.h2,
 
-  "org.postgresql" % "postgresql" % "9.3-1100-jdbc4",
-  "org.xerial" % "sqlite-jdbc" % "3.7.15-M1",
-  "com.h2database" % "h2" % "1.4.192",
+  "ch.qos.logback"      %  "logback-classic"    % versions.logback,
+  "org.bitcoinj"        %  "bitcoinj-core"      % versions.bitcoinj,
+  "io.github.andrebeat" %% "scala-pool"         % versions.andrebeat,
 
-  "ch.qos.logback" % "logback-classic" % "1.0.9",
-
-  "org.bitcoinj" % "bitcoinj-core" % "0.14.4",
-  "io.github.andrebeat" %% "scala-pool" % "0.4.0",
-  "javax.websocket" % "javax.websocket-api" % "1.1" % "provided",
+  "javax.websocket"             % "javax.websocket-api"     % "1.1"   % "provided",
   "org.glassfish.tyrus.bundles" % "tyrus-standalone-client" % "1.13.1",
 
-  "com.twitter" %% "finatra-http" % versions.finatra,
-  "com.twitter" %% "finatra-jackson" % versions.finatra,
+  "com.twitter" %% "finatra-http"     % versions.finatra,
+  "com.twitter" %% "finatra-jackson"  % versions.finatra,
 
-  "com.twitter" %% "finatra-http" % versions.finatra % "test",
-  "com.twitter" %% "finatra-jackson" % versions.finatra % "test",
-  "com.twitter" %% "inject-server" % versions.finatra % "test",
-  "com.twitter" %% "inject-app" % versions.finatra % "test",
-  "com.twitter" %% "inject-core" % versions.finatra % "test",
-  "com.twitter" %% "inject-modules" % versions.finatra % "test",
+  "com.twitter" %% "finatra-http"     % versions.finatra            % "test",
+  "com.twitter" %% "finatra-jackson"  % versions.finatra            % "test",
+  "com.twitter" %% "inject-server"    % versions.finatra            % "test",
+  "com.twitter" %% "inject-app"       % versions.finatra            % "test",
+  "com.twitter" %% "inject-core"      % versions.finatra            % "test",
+  "com.twitter" %% "inject-modules"   % versions.finatra            % "test",
+
   "com.google.inject.extensions" % "guice-testlib" % versions.guice % "test",
 
-  "com.twitter" %% "finatra-http" % versions.finatra % "test" classifier "tests",
-  "com.twitter" %% "finatra-jackson" % versions.finatra % "test" classifier "tests",
-  "com.twitter" %% "inject-server" % versions.finatra % "test" classifier "tests",
-  "com.twitter" %% "inject-app" % versions.finatra % "test" classifier "tests",
-  "com.twitter" %% "inject-core" % versions.finatra % "test" classifier "tests",
-  "com.twitter" %% "inject-modules" % versions.finatra % "test" classifier "tests",
+  "com.twitter" %% "finatra-http"     % versions.finatra % "test" classifier "tests",
+  "com.twitter" %% "finatra-jackson"  % versions.finatra % "test" classifier "tests",
+  "com.twitter" %% "inject-server"    % versions.finatra % "test" classifier "tests",
+  "com.twitter" %% "inject-app"       % versions.finatra % "test" classifier "tests",
+  "com.twitter" %% "inject-core"      % versions.finatra % "test" classifier "tests",
+  "com.twitter" %% "inject-modules"   % versions.finatra % "test" classifier "tests",
 
-  "org.scalacheck" %% "scalacheck" % "1.13.4" % "test",
-  "org.scalatest" %% "scalatest" %  "3.0.0" % "test",
-  "junit" % "junit" % "4.12" % "test",
-  "com.novocode" % "junit-interface" % "0.11" % "test",
-  "org.mockito" % "mockito-core" % "1.9.5" % "test",
-  "org.specs2" %% "specs2-mock" % "2.4.17" % "test"
+
+  "org.scalacheck"  %% "scalacheck"       % "1.13.4"  % "test",
+  "org.scalatest"   %% "scalatest"        %  "3.0.0"  % "test",
+  "org.specs2"      %% "specs2-mock"      % "2.4.17"  % "test",
+  "junit"           %  "junit"            % "4.12"    % "test",
+  "com.novocode"    %  "junit-interface"  % "0.11"    % "test",
+  "org.mockito"     %  "mockito-core"     % "1.9.5"   % "test"
 )
