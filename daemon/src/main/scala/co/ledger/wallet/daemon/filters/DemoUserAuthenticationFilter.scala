@@ -15,10 +15,10 @@ class DemoUserAuthenticationFilter @Inject()(ecdsa: ECDSAService) extends Simple
 
   override def apply(request: Request, service: Service[Request, Response]): Future[Response] = {
     request.headerMap.get("authorization").filter(_ contains "Basic") foreach {(string) =>
-      val privKey = Sha256Hash.hash(string.getBytes)
+      val privKey = Sha256Hash.hash(string.getBytes(StandardCharsets.UTF_8))
       val pk = ecdsa.computePublicKey(privKey)
       val time = new Date().getTime / 1000
-      val message = Sha256Hash.hash(s"LWD: $time\n".getBytes(StandardCharsets.US_ASCII))
+      val message = Sha256Hash.hash(s"LWD: $time\n".getBytes(StandardCharsets.UTF_8))
       val signedMessage = ecdsa.sign(message, privKey)
       AuthContextContext.setContext(request, AuthContext(pk, time, signedMessage))
     }

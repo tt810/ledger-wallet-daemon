@@ -1,13 +1,14 @@
 package co.ledger.wallet.daemon.services
 
+import java.nio.charset.StandardCharsets
+import java.util.Base64
 import javax.inject.{Inject, Singleton}
 
 import co.ledger.wallet.daemon.database.DefaultDaemonCache.User
-import co.ledger.wallet.daemon.database.{DaemonCache, UserDto}
+import co.ledger.wallet.daemon.database.DaemonCache
 import co.ledger.wallet.daemon.exceptions.UserAlreadyExistException
 import co.ledger.wallet.daemon.utils.HexUtils
 import org.bitcoinj.core.Sha256Hash
-import org.spongycastle.util.encoders.Base64
 
 import scala.concurrent.Future
 
@@ -57,8 +58,8 @@ class UsersService @Inject()(daemonCache: DaemonCache, ecdsa: ECDSAService) exte
   }
 
   private def pubKey(username: String, password: String) = {
-    val user = s"Basic ${Base64.toBase64String(s"$username:$password".getBytes)}"
-    val privKey = Sha256Hash.hash(user.getBytes)
+    val user = s"Basic ${Base64.getEncoder.encodeToString(s"$username:$password".getBytes(StandardCharsets.UTF_8))}"
+    val privKey = Sha256Hash.hash(user.getBytes(StandardCharsets.UTF_8))
     HexUtils.valueOf(ecdsa.computePublicKey(privKey))
   }
 }
