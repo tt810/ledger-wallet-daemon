@@ -15,7 +15,7 @@ class WalletsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
 
   def wallets(user: User, poolName: String, offset: Int, bulkSize: Int): Future[WalletsViewWithCount] = {
-    daemonCache.getWallets(Bulk(offset, bulkSize), poolName, user.pubKey).flatMap { pair =>
+    daemonCache.getWallets(offset, bulkSize, poolName, user.pubKey).flatMap { pair =>
       Future.sequence(pair._2.map(_.walletView)).map(WalletsViewWithCount(pair._1, _))
     }
   }

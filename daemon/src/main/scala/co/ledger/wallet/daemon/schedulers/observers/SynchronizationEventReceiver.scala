@@ -5,12 +5,19 @@ import com.twitter.inject.Logging
 
 import scala.concurrent.Promise
 
-class SynchronizationEventReceiver(accountIndex: Int, walletName: String, poolName: String, promise: Promise[SynchronizationResult]) extends EventReceiver with Logging {
+class SynchronizationEventReceiver(
+                                    accountIndex: Int,
+                                    walletName: String,
+                                    poolName: String,
+                                    promise: Promise[SynchronizationResult]) extends EventReceiver with Logging {
 
   override def onEvent(event: Event): Unit = {
     if (EventCode.SYNCHRONIZATION_SUCCEED == event.getCode ||
-    EventCode.SYNCHRONIZATION_SUCCEED_ON_PREVIOUSLY_EMPTY_ACCOUNT == event.getCode) promise.success(SynchronizationResult(accountIndex, walletName, poolName, true))
-    else if (EventCode.SYNCHRONIZATION_FAILED == event.getCode) promise.success(SynchronizationResult(accountIndex, walletName, poolName, false))
+    EventCode.SYNCHRONIZATION_SUCCEED_ON_PREVIOUSLY_EMPTY_ACCOUNT == event.getCode) {
+      promise.success(SynchronizationResult(accountIndex, walletName, poolName, syncResult = true))
+    } else if (EventCode.SYNCHRONIZATION_FAILED == event.getCode) {
+      promise.success(SynchronizationResult(accountIndex, walletName, poolName, syncResult = false))
+    }
   }
 }
 

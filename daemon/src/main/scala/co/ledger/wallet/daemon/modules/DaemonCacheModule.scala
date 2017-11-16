@@ -35,8 +35,8 @@ object DaemonCacheModule extends TwitterModule {
       Try(Await.result(daemonCache.syncOperations(), 5.minutes)) match {
         case Success(result) =>
           result.foreach { r =>
-            if (r.syncResult) info(s"Synchronization complete for $r")
-            else warn(s"Failed synchronizing $r")
+            if (r.syncResult) { info(s"Synchronization complete for $r") }
+            else { warn(s"Failed synchronizing $r") }
           }
           val t1 = System.currentTimeMillis()
           info(s"Synchronization finished, elapsed time: ${t1 - t0} milliseconds")
@@ -61,6 +61,7 @@ object DaemonCacheModule extends TwitterModule {
     scheduler.schedule(
       Time.fromSeconds(DaemonConfiguration.synchronizationInterval._1),
       Duration(DaemonConfiguration.synchronizationInterval._2, TimeUnit.HOURS))(synchronizationTask())
-    info(s"Scheduled synchronization job: initial start in ${DaemonConfiguration.synchronizationInterval._1} seconds, interval ${DaemonConfiguration.synchronizationInterval._2} hours")
+    info(s"Scheduled synchronization job: initial start in ${DaemonConfiguration.synchronizationInterval._1} seconds, " +
+      s"interval ${DaemonConfiguration.synchronizationInterval._2} hours")
   }
 }

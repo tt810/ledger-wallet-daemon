@@ -16,23 +16,22 @@ trait MDCPropagatingExecutionContext extends ExecutionContext{
 
   override def prepare(): ExecutionContext = new ExecutionContext {
 
-    val context = MDC.getCopyOfContextMap
+    val context = Option(MDC.getCopyOfContextMap)
 
-    override def execute(runnable: Runnable): Unit = self.execute(new Runnable {
-      def run(): Unit = {
+    override def execute(runnable: Runnable): Unit = self.execute(() => {
 
-        val oldContext = MDC.getCopyOfContextMap
+      val oldContext = Option(MDC.getCopyOfContextMap)
 
-        try {
-          if(context != null)
-            MDC.setContextMap(context)
-          else
-            MDC.clear()
-          runnable.run()
-        } finally {
-          if(oldContext != null)
-            MDC.setContextMap(oldContext)
-          else MDC.clear()
+      try {
+        context match {
+          case Some(c) => MDC.setContextMap(c)
+          case None => MDC.clear()
+        }
+        runnable.run()
+      } finally {
+        oldContext match {
+          case Some(oc) => MDC.setContextMap(oc)
+          case None => MDC.clear()
         }
       }
     })
@@ -43,7 +42,7 @@ trait MDCPropagatingExecutionContext extends ExecutionContext{
 
 object MDCPropagatingExecutionContext {
   object Implicits {
-    implicit lazy val global = MDCPropagatingExecutionContextWrapper(ExecutionContext.Implicits.global)
+    implicit lazy val global: ExecutionContext = MDCPropagatingExecutionContextWrapper(ExecutionContext.Implicits.global)
   }
 
   def cachedNamedThreads(prefix: String): ExecutionContext = {

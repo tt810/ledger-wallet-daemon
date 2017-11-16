@@ -28,16 +28,18 @@ class AuthenticationService @Inject()(daemonCache: DaemonCache, ecdsa: ECDSAServ
           val loginAtAsLong = request.authContext.time
           val loginAt = new Date(loginAtAsLong * 1000)
           val currentTime = new Date()
-          if ( Math.abs(currentTime.getTime - loginAt.getTime) > DaemonConfiguration.authTokenDuration)
+          if ( Math.abs(currentTime.getTime - loginAt.getTime) > DaemonConfiguration.authTokenDuration) {
             throw AuthenticationFailedException("Authentication token expired")
+          }
           val msg = Sha256Hash.hash(s"LWD: $loginAtAsLong\n".getBytes(StandardCharsets.UTF_8))
           val signed = request.authContext.signedMessage
-          if(!ecdsa.verify(msg, signed, pubKey))
+          if(!ecdsa.verify(msg, signed, pubKey)) {
             throw AuthenticationFailedException("User not authorized")
+          }
           AuthentifiedUserContext.setUser(request, user)
       } asTwitter()
     } catch {
-      case e: IllegalStateException => throw new AuthenticationFailedException("Missing authorization header")
+      case _: IllegalStateException => throw AuthenticationFailedException("Missing authorization header")
     }
   }
 }

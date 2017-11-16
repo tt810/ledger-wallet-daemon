@@ -29,10 +29,10 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
     walletsService.wallets(
       request.user,
       request.pool_name,
-      request.offset.getOrElse(0),
-      request.count.getOrElse(20))
+      request.offset.getOrElse(DEFAULT_OFFSET),
+      request.count.getOrElse(DEFAULT_COUNT))
       .recover {
-        case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
+        case _: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
           Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
           response)
         case e: Throwable => responseSerializer.serializeInternalError(response, e)
@@ -50,7 +50,7 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
       case None => responseSerializer.serializeNotFound(
         Map("response" -> "Wallet doesn't exist", "wallet_name" -> request.wallet_name), response)
     }.recover {
-      case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
+      case _: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
         Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
         response)
       case e: Throwable => responseSerializer.serializeInternalError(response, e)
@@ -64,10 +64,10 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
   post("/pools/:pool_name/wallets") {(request: CreateWalletRequest) =>
     info(s"CREATE wallet $request")
     walletsService.createWallet(request.user, request.pool_name, request.wallet_name, request.currency_name).recover {
-      case cnfe: CurrencyNotFoundException => responseSerializer.serializeBadRequest(
+      case _: CurrencyNotFoundException => responseSerializer.serializeBadRequest(
         Map("response"-> "Currency not support", "currency_name" -> request.currency_name),
         response)
-      case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
+      case _: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
         Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
         response)
       case e: Throwable => responseSerializer.serializeInternalError(response, e)
@@ -78,7 +78,8 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
 }
 
 object WalletsController {
-
+  private val DEFAULT_OFFSET: Int = 0
+  private val DEFAULT_COUNT: Int = 20
   case class GetWalletRequest(
                                @RouteParam pool_name: String,
                                @RouteParam wallet_name: String,

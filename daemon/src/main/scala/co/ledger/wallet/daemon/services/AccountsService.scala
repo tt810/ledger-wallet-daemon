@@ -31,7 +31,12 @@ class AccountsService @Inject()(defaultDaemonCache: DaemonCache) extends DaemonS
     defaultDaemonCache.getNextAccountCreationInfo(user.pubKey, poolName, walletName, accountIndex).map(_.view)
   }
 
-  def accountOperations(user: User, accountIndex: Int, poolName: String, walletName: String, queryParams: OperationQueryParams): Future[PackedOperationsView] = {
+  def accountOperations(
+                         user: User,
+                         accountIndex: Int,
+                         poolName: String,
+                         walletName: String,
+                         queryParams: OperationQueryParams): Future[PackedOperationsView] = {
     if(queryParams.next.isEmpty && queryParams.previous.isEmpty) {
       // new request
       info(LogMsgMaker.newInstance("Retrieve latest operations").toString())
@@ -58,4 +63,4 @@ class AccountsService @Inject()(defaultDaemonCache: DaemonCache) extends DaemonS
   }
 }
 
-case class OperationQueryParams(previous: Option[UUID], next: Option[UUID], batch: Int = 20, fullOp: Int = 0)
+case class OperationQueryParams(previous: Option[UUID], next: Option[UUID], batch: Int, fullOp: Int)

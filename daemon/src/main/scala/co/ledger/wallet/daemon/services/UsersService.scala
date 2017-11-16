@@ -4,8 +4,8 @@ import java.nio.charset.StandardCharsets
 import java.util.Base64
 import javax.inject.{Inject, Singleton}
 
-import co.ledger.wallet.daemon.database.DefaultDaemonCache.User
 import co.ledger.wallet.daemon.database.DaemonCache
+import co.ledger.wallet.daemon.database.DefaultDaemonCache.User
 import co.ledger.wallet.daemon.exceptions.UserAlreadyExistException
 import co.ledger.wallet.daemon.utils.HexUtils
 import org.bitcoinj.core.Sha256Hash
@@ -48,8 +48,6 @@ class UsersService @Inject()(daemonCache: DaemonCache, ecdsa: ECDSAService) exte
     * @throws UserAlreadyExistException if user already exist.
     */
   def createUser(username: String, password: String): Future[Long] = {
-    assert(username != null && !username.isEmpty, "username must be provided")
-    assert(password != null && !password.isEmpty, "password must be provided")
     info(LogMsgMaker.newInstance("Create user")
       .append("username", username)
       .toString())

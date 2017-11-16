@@ -4,10 +4,11 @@ import scala.collection.mutable
 
 package object utils {
 
-  import com.twitter.util.{Future => TwitterFuture, Promise => TwitterPromise, Return, Throw}
-  import scala.concurrent.{Future => ScalaFuture, Promise => ScalaPromise, ExecutionContext}
-  import scala.util.{Success, Failure}
+  import com.twitter.util.{Return, Throw, Future => TwitterFuture, Promise => TwitterPromise}
+
   import scala.collection.JavaConverters._
+  import scala.concurrent.{ExecutionContext, Future => ScalaFuture, Promise => ScalaPromise}
+  import scala.util.{Failure, Success}
 
   /** Convert from a Twitter Future to a Scala Future */
   implicit class RichTwitterFuture[A](val tf: TwitterFuture[A]) extends AnyVal {

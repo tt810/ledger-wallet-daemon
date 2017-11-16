@@ -32,21 +32,21 @@ object Account {
     def operation(uid: String, fullOp: Int): Future[Option[Operation]] = {
       val queryOperations = coreA.queryOperations()
       queryOperations.filter().opAnd(core.QueryFilter.operationUidEq(uid))
-      (if (fullOp > 0)
+      (if (fullOp > 0) {
         queryOperations.complete().execute()
-      else queryOperations.partial().execute()).map { operations =>
-        operations.asScala.toSeq.headOption.map { o => Operation.newInstance(o, self, wallet)}
+      } else { queryOperations.partial().execute() }).map { operations =>
+        operations.asScala.headOption.map { o => Operation.newInstance(o, self, wallet)}
       }
     }
 
     def operations(offset: Long, batch: Int, fullOp: Int): Future[Seq[Operation]] = {
-      (if (fullOp > 0)
+      (if (fullOp > 0) {
         coreA.queryOperations().offset(offset).limit(batch).complete().execute()
-      else
+      } else {
         coreA.queryOperations().offset(offset).limit(batch).partial().execute()
-      ).map { operations =>
-        if (operations.size() <= 0) List[Operation]()
-        else operations.asScala.toSeq.map { o => Operation.newInstance(o, self, wallet)}
+      }).map { operations =>
+        if (operations.size() <= 0) { List[Operation]() }
+        else { operations.asScala.map { o => Operation.newInstance(o, self, wallet)} }
       }
     }
 
@@ -59,7 +59,7 @@ object Account {
     }
 
     def startRealTimeObserver(): Unit = {
-      if (DaemonConfiguration.realtimeObserverOn && !coreA.isObservingBlockchain) coreA.startBlockchainObservation()
+      if (DaemonConfiguration.realTimeObserverOn && !coreA.isObservingBlockchain) coreA.startBlockchainObservation()
       debug(LogMsgMaker.newInstance(s"Set real time observer on ${coreA.isObservingBlockchain}").append("account", self).toString())
     }
 
@@ -72,23 +72,33 @@ object Account {
   }
 
   class Derivation(private val accountCreationInfo: core.AccountCreationInfo) {
-    val index = accountCreationInfo.getIndex
+    val index: Int = accountCreationInfo.getIndex
 
     lazy val view: AccountDerivationView = {
-      val paths = accountCreationInfo.getDerivations.asScala.toSeq
-      val owners = accountCreationInfo.getOwners.asScala.toSeq
+      val paths = accountCreationInfo.getDerivations.asScala
+      val owners = accountCreationInfo.getOwners.asScala
       val pubKeys = {
         val pks = accountCreationInfo.getPublicKeys
-        if (pks.isEmpty) paths.map { _ => null }
-        else pks.asScala.toSeq.map(HexUtils.valueOf)
+        if (pks.isEmpty) { paths.map { _ => "" } }
+        else { pks.asScala.map(HexUtils.valueOf) }
       }
       val chainCodes = {
         val ccs = accountCreationInfo.getChainCodes
-        if (ccs.isEmpty) paths.map { _ => null }
-        else ccs.asScala.toSeq.map(HexUtils.valueOf)
+        if (ccs.isEmpty) { paths.map { _ => "" } }
+        else { ccs.asScala.map(HexUtils.valueOf) }
       }
       val derivations = paths.indices.map { i =>
-        DerivationView(paths(i), owners(i), Option(pubKeys(i)), Option(chainCodes(i)))
+        DerivationView(
+          paths(i),
+          owners(i),
+          pubKeys(i) match {
+            case "" => None
+            case pubKey => Option(pubKey)
+          },
+          chainCodes(i) match {
+            case "" => None
+            case chainCode => Option(chainCode)
+          })
       }
       AccountDerivationView(index, derivations)
     }

@@ -3,18 +3,20 @@ package co.ledger.wallet.daemon.filters
 import javax.inject.Inject
 
 import co.ledger.wallet.daemon.models.AccountDerivationView
-import com.twitter.finagle.{Service, SimpleFilter}
 import com.twitter.finagle.http.{Request, Response}
+import com.twitter.finagle.{Service, SimpleFilter}
 import com.twitter.finatra.http.exceptions.BadRequestException
 import com.twitter.finatra.http.internal.marshalling.MessageBodyManager
+import com.twitter.util.Future
 
 class AccountCreationFilter @Inject()(messageBodyManager: MessageBodyManager) extends SimpleFilter[Request, Response] {
 
-  override def apply(request: Request, service: Service[Request, Response]) = {
+  override def apply(request: Request, service: Service[Request, Response]): Future[Response] = {
     val accountCreationBody = messageBodyManager.read[AccountDerivationView](request)
     accountCreationBody.derivations.foreach { derivation =>
-      if(derivation.pubKey == None) throw new BadRequestException("derivations.pub_key: field is required")
-      else if (derivation.chainCode == None) throw new BadRequestException("derivations.chain_code: field is required")
+      if(derivation.pubKey.isEmpty) {
+        throw new BadRequestException("derivations.pub_key: field is required")
+      } else if (derivation.chainCode.isEmpty) { throw new BadRequestException("derivations.chain_code: field is required") }
     }
     AccountCreationContext.setAccountCreationBody(request, accountCreationBody)
     service(request)

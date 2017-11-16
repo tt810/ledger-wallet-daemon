@@ -26,7 +26,10 @@ class Operation(private val coreO: core.Operation, private val account: Account,
   val recipients: Seq[String] = coreO.getRecipients.asScala
   val fees: Long = coreO.getFees.toLong
   val blockHeight: Option[Long] = Option(coreO.getBlockHeight)
-  lazy val trustView: Option[TrustIndicatorView] = newTrustIndicatorView(coreO.getTrust)
+  lazy val trustView: Option[TrustIndicatorView] = Option(coreO.getTrust) match {
+    case None => None
+    case Some(trust) => Option(newTrustIndicatorView(trust))
+  }
   lazy val transactionView: TransactionView = newTransactionView(coreO, currencyFamily)
 
   def operationView: Future[OperationView] =
@@ -54,18 +57,17 @@ class Operation(private val coreO: core.Operation, private val account: Account,
       }
     }
 
-  private def newTransactionView(operation: core.Operation, currencyFamily: CurrencyFamily) = {
-    if(operation.isComplete) currencyFamily match {
-      case CurrencyFamily.BITCOIN => Bitcoin.newTransactionView(operation.asBitcoinLikeOperation().getTransaction)
-      case _ => ???
-    }
-    else null
+  private def newTransactionView(operation: core.Operation, currencyFamily: CurrencyFamily): TransactionView = {
+    if(operation.isComplete) {
+      currencyFamily match {
+        case CurrencyFamily.BITCOIN => Bitcoin.newTransactionView(operation.asBitcoinLikeOperation().getTransaction)
+        case _ => throw new UnsupportedOperationException
+      }
+    } else { null }
   }
 
-  private def newTrustIndicatorView(trust: core.TrustIndicator): Option[TrustIndicatorView] = {
-    if (trust == null) None
-    else
-      Option(TrustIndicatorView(trust.getTrustWeight, TrustLevel.valueOf(trust.getTrustLevel.name()), trust.getConflictingOperationUids.asScala.toSeq, trust.getOrigin))
+  private def newTrustIndicatorView(trust: core.TrustIndicator): TrustIndicatorView = {
+    TrustIndicatorView(trust.getTrustWeight, TrustLevel.valueOf(trust.getTrustLevel.name()), trust.getConflictingOperationUids.asScala, trust.getOrigin)
   }
 
   override def equals(that: Any): Boolean = {

@@ -11,12 +11,13 @@ import com.twitter.util.Future
 
 class LWDAutenticationFilter extends SimpleFilter[Request, Response] {
 
-  private val authStringPattern = "([0-9a-fA-F]+):([0-9]+):([0-9a-fA-F]+)".r
+  private val AUTH_STRING_PATTERN = "([0-9a-fA-F]+):([0-9]+):([0-9a-fA-F]+)".r
+  private val AUTHORIZATION_PREFIX: Int = 4
 
   override def apply(request: Request, service: Service[Request, Response]): Future[Response] = {
     request.headerMap.get("authorization").filter(_ contains "LWD") foreach {(string) =>
-      val auth = new String(Base64.getDecoder.decode(string.substring(4).getBytes(StandardCharsets.UTF_8)))
-      val authStringPattern(pubKey, timestamp, signature) = auth
+      val auth = new String(Base64.getDecoder.decode(string.substring(AUTHORIZATION_PREFIX).getBytes(StandardCharsets.UTF_8)))
+      val AUTH_STRING_PATTERN(pubKey, timestamp, signature) = auth
       AuthContextContext.setContext(request, AuthContext(HexUtils.valueOf(pubKey), timestamp.toLong, HexUtils.valueOf(signature)))
     }
     service(request)

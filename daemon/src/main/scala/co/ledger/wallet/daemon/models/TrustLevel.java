@@ -4,5 +4,5 @@ public enum TrustLevel {
     TRUSTED,
     PENDING,
     UNTRUSTED,
-    DROPPED;
+    DROPPED
 }

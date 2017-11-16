@@ -5,10 +5,10 @@ import javax.inject.Inject
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.controllers.requests.{CommonMethodValidations, RichRequest}
 import co.ledger.wallet.daemon.controllers.responses.ResponseSerializer
+import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
 import co.ledger.wallet.daemon.services.PoolsService
 import co.ledger.wallet.daemon.services.PoolsService.PoolConfiguration
 import com.fasterxml.jackson.annotation.JsonProperty
-import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
 import com.twitter.finagle.http.Request
 import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.RouteParam
@@ -56,7 +56,7 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
     val t0 = System.currentTimeMillis()
     poolsService.syncOperations().map { result =>
       val t1 = System.currentTimeMillis()
-      info(s"Synchronization finished, elapsed time: ${(t1 - t0)} milliseconds")
+      info(s"Synchronization finished, elapsed time: ${t1 - t0} milliseconds")
       result
     }.recover {
       case e: Throwable => responseSerializer.serializeInternalError(response, e)
@@ -88,7 +88,7 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
     }
   }
 
-  private val responseSerializer: ResponseSerializer = ResponseSerializer.newInstance
+  private val responseSerializer: ResponseSerializer = ResponseSerializer.newInstance()
 }
 
 object WalletPoolsController {

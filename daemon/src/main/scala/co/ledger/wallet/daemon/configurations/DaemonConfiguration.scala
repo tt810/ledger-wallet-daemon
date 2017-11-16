@@ -12,14 +12,17 @@ import scala.util.Try
 object DaemonConfiguration {
   private val config = ConfigFactory.load()
   private val PERMISSION_CREATE_USER: Int = 0x01
+  private val DEFAULT_AUTH_TOKEN_DURATION: Int = 30000 // 30 seconds
+  private val DEFAULT_SYNC_INTERVAL: Int = 24 // 24 hours
+  private val DEFAULT_SYNC_INITIAL_DELAY: Int = 300 // 5 minutes
 
   val adminUsers: Seq[(String, String)] = if (config.hasPath("demo_users")) {
-    val usersConfig = config.getConfigList("demo_users").asScala.toSeq
+    val usersConfig = config.getConfigList("demo_users").asScala
     for {
       userConfig <- usersConfig
     } yield (userConfig.getString("username"), userConfig.getString("password"))
 
-  } else List[(String, String)]()
+  } else { List[(String, String)]() }
 
   val whiteListUsers: Seq[(String, Long)] = if (config.hasPath("whitelist")){
     val usersConfig = config.getConfigList("whitelist")
@@ -31,11 +34,11 @@ object DaemonConfiguration {
       users += ((pubKey, permissions))
     }
     users.toList
-  } else List[(String, Long)]()
+  } else { List[(String, Long)]() }
 
   val authTokenDuration: Int =
-    if (config.hasPath("authentication.token_duration")) config.getInt("authentication.token_duration") * 1000
-    else 30000
+    if (config.hasPath("authentication.token_duration")) { config.getInt("authentication.token_duration_in_seconds") * 1000 }
+    else { DEFAULT_AUTH_TOKEN_DURATION }
 
   val dbProfileName: String = Try(config.getString("database_engine")).toOption.getOrElse("sqlite3")
 
@@ -50,13 +53,13 @@ object DaemonConfiguration {
   }
 
   val synchronizationInterval: (Int, Int) = (
-    if (config.hasPath("synchronization.initial_delay_in_seconds")) config.getInt("synchronization.initial_delay_in_seconds")
-    else 5 * 60,
-    if(config.hasPath("synchronization.interval_in_hours")) config.getInt("synchronization.interval_in_hours")
-    else 24)
+    if (config.hasPath("synchronization.initial_delay_in_seconds")) { config.getInt("synchronization.initial_delay_in_seconds") }
+    else { DEFAULT_SYNC_INITIAL_DELAY },
+    if(config.hasPath("synchronization.interval_in_hours")) { config.getInt("synchronization.interval_in_hours") }
+    else { DEFAULT_SYNC_INTERVAL })
 
-  val realtimeObserverOn: Boolean =
-    if (config.hasPath("realtimeobservation")) config.getBoolean("realtimeobservation")
-    else false
+  val realTimeObserverOn: Boolean =
+    if (config.hasPath("realtimeobservation")) { config.getBoolean("realtimeobservation") }
+    else { false }
 
 }

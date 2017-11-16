@@ -33,10 +33,10 @@ class CurrenciesController @Inject()(currenciesService: CurrenciesService) exten
       case None => responseSerializer.serializeNotFound(
         Map("response" -> "Currency not support", "currency_name" -> currencyName), response)
     }.recover {
-      case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
+      case _: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
         Map("response" -> "Wallet pool doesn't exist", "pool_name" -> poolName),
         response)
-      case cnfe: CurrencyNotFoundException =>
+      case _: CurrencyNotFoundException =>
       case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
   }
@@ -49,7 +49,7 @@ class CurrenciesController @Inject()(currenciesService: CurrenciesService) exten
     val poolName = request.pool_name
     info(s"GET currencies $request")
     currenciesService.currencies(poolName, request.user.pubKey).recover {
-      case pnfe: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
+      case _: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
         Map("response" -> "Wallet pool doesn't exist", "pool_name" -> poolName),
         response)
       case e: Throwable => responseSerializer.serializeInternalError(response, e)

@@ -16,8 +16,8 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
 class DatabaseDao @Inject()(db: Database) extends Logging {
-  import database.Tables._
-  import database.Tables.profile.api._
+  import Tables._
+  import Tables.profile.api._
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.cachedNamedThreads("database-read-thread-pool")
   private val _writeContext = SerialExecutionContext.cachedNamedThreads("database-write-thread-pool")
 
@@ -135,5 +135,11 @@ case class UserDto(pubKey: String, permissions: Long, id: Option[Long] = None) {
   override def toString: String = s"UserDto(id: $id, pubKey: $pubKey, permissions: $permissions)"
 }
 case class PoolDto(name: String, userId: Long, configuration: String, id: Option[Long] = None, dbBackend: String = "", dbConnectString: String = "") {
-  override def toString: String = s"PoolDto(id: $id, name: $name, userId: $userId, configuration: $configuration, dbBackend: $dbBackend, dbConnectString: $dbConnectString)"
+  override def toString: String = s"PoolDto(" +
+    s"id: $id, " +
+    s"name: $name, " +
+    s"userId: $userId, " +
+    s"configuration: $configuration, " +
+    s"dbBackend: $dbBackend, " +
+    s"dbConnectString: $dbConnectString)"
 }

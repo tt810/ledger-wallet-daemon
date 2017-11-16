@@ -8,7 +8,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 object SerialExecutionContext {
   object Implicits{
-    implicit lazy val global = SerialExecutionContextWrapper(ExecutionContext.Implicits.global)
+    implicit lazy val global: ExecutionContext = SerialExecutionContextWrapper(ExecutionContext.Implicits.global)
   }
 
   def singleNamedThread(prefix: String): ExecutionContext = {
