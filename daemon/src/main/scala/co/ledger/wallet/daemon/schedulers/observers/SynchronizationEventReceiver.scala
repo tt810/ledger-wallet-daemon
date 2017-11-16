@@ -12,10 +12,10 @@ class SynchronizationEventReceiver(
                                     promise: Promise[SynchronizationResult]) extends EventReceiver with Logging {
 
   override def onEvent(event: Event): Unit = {
-    if (EventCode.SYNCHRONIZATION_SUCCEED == event.getCode ||
-    EventCode.SYNCHRONIZATION_SUCCEED_ON_PREVIOUSLY_EMPTY_ACCOUNT == event.getCode) {
+    if (event.getCode == EventCode.SYNCHRONIZATION_SUCCEED ||
+      event.getCode == EventCode.SYNCHRONIZATION_SUCCEED_ON_PREVIOUSLY_EMPTY_ACCOUNT) {
       promise.success(SynchronizationResult(accountIndex, walletName, poolName, syncResult = true))
-    } else if (EventCode.SYNCHRONIZATION_FAILED == event.getCode) {
+    } else if (event.getCode == EventCode.SYNCHRONIZATION_FAILED) {
       promise.success(SynchronizationResult(accountIndex, walletName, poolName, syncResult = false))
     }
   }

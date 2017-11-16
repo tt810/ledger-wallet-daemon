@@ -1,4 +1,6 @@
 name := "daemon"
+
+addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.17")
 concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
 parallelExecution in Test := false
 parallelExecution in IntegrationTest := false

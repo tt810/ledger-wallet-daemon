@@ -235,6 +235,6 @@ trait DaemonCache {
     * @param permissions the permissions level of this user.
     * @return a Future of unique id of created user.
     */
-  def createUser(pubKey: String, permissions: Long): Future[Long]
+  def createUser(pubKey: String, permissions: Int): Future[Long]
 
 }

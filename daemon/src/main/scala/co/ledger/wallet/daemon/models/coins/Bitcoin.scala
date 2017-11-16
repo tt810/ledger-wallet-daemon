@@ -31,10 +31,7 @@ object Bitcoin {
   def newTransactionView(from: core.BitcoinLikeTransaction): TransactionView = {
     BitcoinTransactionView(
       newBlockView(from.getBlock),
-      Option(from.getFees) match {
-        case Some(fees) => Option(fees.toLong)
-        case None => None
-      },
+      Option(from.getFees).map (fees => fees.toLong),
       from.getHash,
       from.getTime,
       from.getInputs.asScala.map(newInputView),

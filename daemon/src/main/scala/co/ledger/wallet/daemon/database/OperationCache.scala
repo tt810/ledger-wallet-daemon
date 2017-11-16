@@ -67,24 +67,21 @@ class OperationCache extends Logging with GenCache {
     * @throws OperationNotFoundException when there is no record found with the UUID.
     */
   def getOperationCandidate(id: UUID): AtomicRecord = {
-    cache.get(id) match {
-      case None => nexts.get(id) match {
-        case Some(current) => cache.get(current) match {
-          case Some(record) => new AtomicRecord(
-            id,
-            record.poolId,
-            record.walletName,
-            record.accountIndex,
-            record.batch,
-            new AtomicLong(record.batch + record.offset()),
-            Option(UUID.randomUUID()),
-            Option(current))
-          case None => throw OperationNotFoundException(current)
-        }
-        case None => throw OperationNotFoundException(id)
+    cache.getOrElse(id, nexts.get(id) match {
+      case Some(current) => cache.get(current) match {
+        case Some(record) => new AtomicRecord(
+          id,
+          record.poolId,
+          record.walletName,
+          record.accountIndex,
+          record.batch,
+          new AtomicLong(record.batch + record.offset()),
+          Option(UUID.randomUUID()),
+          Option(current))
+        case None => throw OperationNotFoundException(current)
       }
-      case Some(op) => op
-    }
+      case None => throw OperationNotFoundException(id)
+    })
   }
 
   /**
@@ -104,16 +101,10 @@ class OperationCache extends Logging with GenCache {
     * @throws OperationNotFoundException when there is no record found with the UUID.
     */
   def getPreviousOperationRecord(id: UUID): AtomicRecord = {
-    cache.get(id) match {
-      case None => nexts.get(id) match {
-        case Some(pre) => cache.get(pre) match {
-          case None => throw OperationNotFoundException(id)
-          case Some(record) => record
-        }
-        case None => throw OperationNotFoundException(id)
-      }
-      case Some(record) => record
-    }
+    cache.getOrElse(id, nexts.get(id) match {
+      case Some(pre) => cache.getOrElse(pre, throw OperationNotFoundException(id))
+      case None => throw OperationNotFoundException(id)
+    })
   }
 
   /**

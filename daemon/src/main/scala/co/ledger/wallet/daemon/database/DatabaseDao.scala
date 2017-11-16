@@ -119,7 +119,7 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
     UserDto(userRow.pubKey, userRow.permissions, Option(userRow.id))
 
   private def insertDatabaseVersion(version: Int): DBIO[Int] =
-    databaseVersions += (0, new Timestamp(new Date().getTime))
+    databaseVersions += (version, new Timestamp(new Date().getTime))
 
   private def filterPool(poolName: String, userId: Long) = {
     pools.filter(pool => pool.userId === userId.bind && pool.name === poolName.bind)
@@ -131,11 +131,11 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
 
 }
 
-case class UserDto(pubKey: String, permissions: Long, id: Option[Long] = None) {
+case class UserDto(pubKey: String, permissions: Int, id: Option[Long] = None) {
   override def toString: String = s"UserDto(id: $id, pubKey: $pubKey, permissions: $permissions)"
 }
 case class PoolDto(name: String, userId: Long, configuration: String, id: Option[Long] = None, dbBackend: String = "", dbConnectString: String = "") {
-  override def toString: String = s"PoolDto(" +
+  override def toString: String = "PoolDto(" +
     s"id: $id, " +
     s"name: $name, " +
     s"userId: $userId, " +

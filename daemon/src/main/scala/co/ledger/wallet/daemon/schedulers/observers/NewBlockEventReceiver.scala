@@ -10,10 +10,10 @@ class NewBlockEventReceiver(wallet: Wallet) extends EventReceiver with Logging {
   private val self = this
 
   override def onEvent(event: Event): Unit =
-    if (EventCode.NEW_BLOCK == event.getCode) {
+    if (event.getCode == EventCode.NEW_BLOCK) {
       Try(wallet.updateBlockHeight(event.getPayload.getLong(Account.EV_NEW_BLOCK_HEIGHT))) match {
         case Success(_) => // do nothing
-        case Failure(e) => error(s"Failed to update block height with exception", e)
+        case Failure(e) => error("Failed to update block height with exception", e)
       }
     }
 

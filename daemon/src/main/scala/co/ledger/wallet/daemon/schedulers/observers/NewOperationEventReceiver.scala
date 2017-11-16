@@ -10,13 +10,13 @@ class NewOperationEventReceiver(private val poolId: Long, private val opsCache: 
   private val self = this
 
   override def onEvent(event: Event): Unit =
-    if (EventCode.NEW_OPERATION == event.getCode) {
+    if (event.getCode == EventCode.NEW_OPERATION) {
       Try(opsCache.updateOffset(
         poolId,
         event.getPayload.getString(Account.EV_NEW_OP_WALLET_NAME),
         event.getPayload.getInt(Account.EV_NEW_OP_ACCOUNT_INDEX))) match {
         case Success(_) => //do nothing
-        case Failure(e) => error(s"Failed to update offset with exception", e)
+        case Failure(e) => error("Failed to update offset with exception", e)
       }
     }
 

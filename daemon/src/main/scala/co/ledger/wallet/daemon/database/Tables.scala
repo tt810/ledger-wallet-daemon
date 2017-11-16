@@ -26,7 +26,7 @@ trait Tables {
 
   val databaseVersions = TableQuery[DatabaseVersion]
 
-  case class UserRow(id: Long, pubKey: String, permissions: Long, createdAt: Option[Timestamp] = Some(new Timestamp(new java.util.Date().getTime)))
+  case class UserRow(id: Long, pubKey: String, permissions: Int, createdAt: Option[Timestamp] = Some(new Timestamp(new java.util.Date().getTime)))
 
   class Users(tag: Tag) extends Table[UserRow](tag, "users") {
     def id          = column[Long]("id", O.PrimaryKey, O.AutoInc)
@@ -35,7 +35,7 @@ trait Tables {
 
     def createdAt   = column[Timestamp]("created_at", SqlType("timestamp default CURRENT_TIMESTAMP"))
 
-    def permissions = column[Long]("permissions")
+    def permissions = column[Int]("permissions")
 
     override def *  = (id, pubKey, permissions, createdAt.?) <> (UserRow.tupled, UserRow.unapply)
 

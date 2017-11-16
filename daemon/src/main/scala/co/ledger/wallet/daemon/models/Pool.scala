@@ -62,10 +62,7 @@ class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging wit
 
   private def fromCache(offset: Int, batch: Int): Seq[Wallet] = {
     (offset until (offset + batch)).map { index =>
-      cachedWallets.get(orderedNames(index)) match {
-        case Some(wallet) => wallet
-        case None => throw WalletNotFoundException(orderedNames(index))
-      }
+      cachedWallets.getOrElse(orderedNames(index), throw WalletNotFoundException(orderedNames(index)))
     }
   }
 
@@ -230,14 +227,15 @@ class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging wit
           Future(warn(s"Offset should be less than count, possible race condition"))
         } else {
           coreP.getWallets(offset, count).flatMap { coreWs =>
-            Future.sequence(coreWs.asScala.map(Wallet.newInstance(_, self)).map { wallet =>
+            Future.sequence(coreWs.asScala.map { coreW =>
+              val wallet = Wallet.newInstance(coreW, self)
               orderedNames += wallet.name
               cachedWallets.put(wallet.name, wallet)
               debug(s"Add ${cachedWallets(wallet.name)} to $self cache")
               self.registerEventReceiver(new NewBlockEventReceiver(wallet))
               wallet.startCacheAndRealTimeObserver()
-            })
-          }.map { _ => () }
+            }).map(_ => ())
+          }
         }
       }
     }
