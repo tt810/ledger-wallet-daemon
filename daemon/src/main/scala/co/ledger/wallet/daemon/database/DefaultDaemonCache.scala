@@ -93,17 +93,11 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
   }
 
   private def getHardWallet(pubKey: String, poolName: String, walletName: String): Future[Wallet] = {
-    getWallet(walletName, poolName, pubKey).map {
-      case None => throw exceptions.WalletNotFoundException(walletName)
-      case Some(w) => w
-    }
+    getWallet(walletName, poolName, pubKey).map { wO => wO.getOrElse(throw exceptions.WalletNotFoundException(walletName)) }
   }
 
   private def getHardPool(pubKey: String, poolName: String): Future[Pool] = {
-    getWalletPool(pubKey, poolName).map {
-      case Some(pool) => pool
-      case None => throw WalletPoolNotFoundException(poolName)
-    }
+    getWalletPool(pubKey, poolName).map { pO => pO.getOrElse(throw WalletPoolNotFoundException(poolName)) }
   }
 
   def getUser(pubKey: String): Future[Option[User]] = {
@@ -114,10 +108,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
   }
 
   private def getHardUser(pubKey: String): Future[User] = {
-    getUser(pubKey).map {
-      case Some(user) => user
-      case None => throw UserNotFoundException(pubKey)
-    }
+    getUser(pubKey).map { uO => uO.getOrElse(throw UserNotFoundException(pubKey)) }
   }
 
   def getUsers: Future[Seq[User]] = {
@@ -129,7 +120,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     }
   }
 
-  def createUser(pubKey: String, permissions: Long): Future[Long] = {
+  def createUser(pubKey: String, permissions: Int): Future[Long] = {
     val user = UserDto(pubKey, permissions)
     dbDao.insertUser(user).map { id =>
       users.put(user.pubKey, new User(id, user.pubKey))
@@ -211,10 +202,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
   }
 
   private def getHardPool(user: User, poolName: String): Future[Pool] = {
-    user.pool(poolName).map {
-      case None => throw WalletPoolNotFoundException(poolName)
-      case Some(p) => p
-    }
+    user.pool(poolName).map { pO => pO.getOrElse(throw WalletPoolNotFoundException(poolName)) }
   }
 
 }

@@ -209,7 +209,7 @@ object AccountsController {
     def validateWalletName: ValidationResult = CommonMethodValidations.validateName("wallet_name", wallet_name)
 
     @MethodValidation
-    def validateAccountIndex: ValidationResult = ValidationResult.validate(account_index >= 0, s"account_index: index can not be less than zero")
+    def validateAccountIndex: ValidationResult = ValidationResult.validate(account_index >= 0, "account_index: index can not be less than zero")
 
     @MethodValidation
     def validateBatch: ValidationResult = ValidationResult.validate(batch > 0, "batch: batch should be greater than zero")
@@ -240,7 +240,7 @@ object AccountsController {
     def validateWalletName: ValidationResult = CommonMethodValidations.validateName("wallet_name", wallet_name)
 
     @MethodValidation
-    def validateAccountIndex: ValidationResult = ValidationResult.validate(account_index >= 0, s"account_index: index can not be less than zero")
+    def validateAccountIndex: ValidationResult = ValidationResult.validate(account_index >= 0, "account_index: index can not be less than zero")
 
     override def toString: String = s"$request, Parameters(" +
       s"user: ${user.id}, pool_name: $pool_name, wallet_name: $wallet_name, account_index: $account_index, uid: $uid, full_op: $full_op)"

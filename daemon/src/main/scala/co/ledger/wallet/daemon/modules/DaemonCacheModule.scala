@@ -41,7 +41,7 @@ object DaemonCacheModule extends TwitterModule {
           val t1 = System.currentTimeMillis()
           info(s"Synchronization finished, elapsed time: ${t1 - t0} milliseconds")
         case Failure(e) =>
-          error(s"Synchronization failed with exception", e)
+          error("Synchronization failed with exception", e)
       }
     }
 
@@ -51,7 +51,7 @@ object DaemonCacheModule extends TwitterModule {
       if (existingUser.isEmpty) Await.result(usersService.createUser(user._1, user._2), 1.minutes)
     }
     DaemonConfiguration.whiteListUsers.map { user =>
-      val existingUser = Await.result(usersService.user(user._1, user._2), 1.minutes)
+      val existingUser = Await.result(usersService.user(user._1), 1.minutes)
       if (existingUser.isEmpty) Await.result(usersService.createUser(user._1, user._2), 1.minutes)
     }
     val scheduler = new ScheduledThreadPoolTimer(

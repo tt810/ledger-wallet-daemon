@@ -104,10 +104,10 @@ object WalletsController {
     def validatePoolName: ValidationResult = CommonMethodValidations.validateName("pool_name", pool_name)
 
     @MethodValidation
-    def validateOffset: ValidationResult = ValidationResult.validate(offset.isEmpty || offset.get >= 0, s"offset: offset can not be less than zero")
+    def validateOffset: ValidationResult = ValidationResult.validate(offset.isEmpty || offset.get >= 0, "offset: offset can not be less than zero")
 
     @MethodValidation
-    def validateCount: ValidationResult = ValidationResult.validate(count.isEmpty || count.get > 0, s"account_index: index can not be less than 1")
+    def validateCount: ValidationResult = ValidationResult.validate(count.isEmpty || count.get > 0, "account_index: index can not be less than 1")
 
     override def toString: String = s"$request, Parameters(user: ${user.id}, pool_name: $pool_name, offset: $offset, count: $count)"
   }

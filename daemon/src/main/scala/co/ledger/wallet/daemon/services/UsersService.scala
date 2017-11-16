@@ -19,7 +19,7 @@ class UsersService @Inject()(daemonCache: DaemonCache, ecdsa: ECDSAService) exte
     user(pubKey(username, password))
   }
 
-  def user(pubKey: String, permissions: Long = 0): Future[Option[User]] = {
+  def user(pubKey: String): Future[Option[User]] = {
     daemonCache.getUser(pubKey)
   }
 
@@ -31,7 +31,7 @@ class UsersService @Inject()(daemonCache: DaemonCache, ecdsa: ECDSAService) exte
     * @return Future of created user id.
     * @throws UserAlreadyExistException if user already exist.
     */
-  def createUser(publicKey: String, permissions: Long = 0): Future[Long] = {
+  def createUser(publicKey: String, permissions: Int = 0): Future[Long] = {
     info(LogMsgMaker.newInstance("Create user")
       .append("pub_key", publicKey)
       .append("permissions", permissions)

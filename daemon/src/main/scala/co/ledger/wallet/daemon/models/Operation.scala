@@ -26,10 +26,7 @@ class Operation(private val coreO: core.Operation, private val account: Account,
   val recipients: Seq[String] = coreO.getRecipients.asScala
   val fees: Long = coreO.getFees.toLong
   val blockHeight: Option[Long] = Option(coreO.getBlockHeight)
-  lazy val trustView: Option[TrustIndicatorView] = Option(coreO.getTrust) match {
-    case None => None
-    case Some(trust) => Option(newTrustIndicatorView(trust))
-  }
+  lazy val trustView: Option[TrustIndicatorView] = Option(coreO.getTrust).map (trust => newTrustIndicatorView(trust))
   lazy val transactionView: TransactionView = newTransactionView(coreO, currencyFamily)
 
   def operationView: Future[OperationView] =
