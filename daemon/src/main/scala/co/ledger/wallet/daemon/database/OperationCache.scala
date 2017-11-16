@@ -28,8 +28,16 @@ class OperationCache extends Logging with GenCache {
     * @param previous the UUID of operation query record to find previous query.
     * @return a operation query record.
     */
-  def insertOperation(id: UUID, poolId: Long, walletName: String, accountIndex: Int, offset: Long, batch: Int, next: Option[UUID], previous: Option[UUID]): AtomicRecord = {
-    if (cache.contains(id)) cache(id)
+  def insertOperation(
+                       id: UUID,
+                       poolId: Long,
+                       walletName: String,
+                       accountIndex: Int,
+                       offset: Long,
+                       batch: Int,
+                       next: Option[UUID],
+                       previous: Option[UUID]): AtomicRecord = {
+    if (cache.contains(id)) { cache(id) }
     else {
       val newRecord = new AtomicRecord(id, poolId, Option(walletName), Option(accountIndex), batch, new AtomicLong(offset), next, previous)
       cache.put(id, newRecord)
@@ -62,7 +70,15 @@ class OperationCache extends Logging with GenCache {
     cache.get(id) match {
       case None => nexts.get(id) match {
         case Some(current) => cache.get(current) match {
-          case Some(record) => new AtomicRecord(id, record.poolId, record.walletName, record.accountIndex, record.batch, new AtomicLong(record.batch + record.offset()), Option(UUID.randomUUID()), Option(current))
+          case Some(record) => new AtomicRecord(
+            id,
+            record.poolId,
+            record.walletName,
+            record.accountIndex,
+            record.batch,
+            new AtomicLong(record.batch + record.offset()),
+            Option(UUID.randomUUID()),
+            Option(current))
           case None => throw OperationNotFoundException(current)
         }
         case None => throw OperationNotFoundException(id)
@@ -90,7 +106,7 @@ class OperationCache extends Logging with GenCache {
   def getPreviousOperationRecord(id: UUID): AtomicRecord = {
     cache.get(id) match {
       case None => nexts.get(id) match {
-        case Some(id) => cache.get(id) match {
+        case Some(pre) => cache.get(pre) match {
           case None => throw OperationNotFoundException(id)
           case Some(record) => record
         }
@@ -108,11 +124,17 @@ class OperationCache extends Logging with GenCache {
     * @param accountIndex the unique index of account.
     */
   def updateOffset(poolId: Long, walletName: String, accountIndex: Int): Unit = {
-    if (poolTrees.contains(poolId))
-      poolTrees(poolId).operations(walletName, accountIndex).map { op =>
+    if (poolTrees.contains(poolId)) {
+      poolTrees(poolId).operations(walletName, accountIndex).foreach { op =>
         val lastOffset = cache(op).incrementOffset()
-        debug(LogMsgMaker.newInstance("Update offset").append("to", lastOffset).append("pool", poolId).append("wallet", walletName).append("account", accountIndex).toString())
+        debug(LogMsgMaker.newInstance("Update offset")
+          .append("to", lastOffset)
+          .append("pool", poolId)
+          .append("wallet", walletName)
+          .append("account", accountIndex)
+          .toString())
       }
+    }
   }
 
   /**
@@ -130,13 +152,13 @@ class OperationCache extends Logging with GenCache {
   }
 
   private def newPoolTreeInstance(pool: Long, wallet: String, account: Int, operation: UUID): PoolTree = {
-    val wallets: Cache[String, WalletTree] = newCache(initialCapacity = 100)
+    val wallets: Cache[String, WalletTree] = newCache(initialCapacity = INITIAL_WALLET_CAP_PER_POOL)
     wallets.put(wallet, newWalletTreeInstance(wallet, account, operation))
     new PoolTree(pool, wallets)
   }
-  private[this] val cache: Cache[UUID, AtomicRecord] = newCache(initialCapacity = 100)
-  private[this] val nexts: Cache[UUID, UUID] = newCache(initialCapacity = 1000)
-  private[this] val poolTrees: Cache[Long, PoolTree] = newCache(initialCapacity = 50)
+  private[this] val cache: Cache[UUID, AtomicRecord] = newCache(initialCapacity = INITIAL_OPERATION_CAP)
+  private[this] val nexts: Cache[UUID, UUID] = newCache(initialCapacity = INITIAL_OPERATION_CAP)
+  private[this] val poolTrees: Cache[Long, PoolTree] = newCache(initialCapacity = INITIAL_POOL_CAP_PER_USER)
 
   class PoolTree(val poolId: Long, val wallets: Cache[String, WalletTree]) {
 
@@ -151,7 +173,7 @@ class OperationCache extends Logging with GenCache {
   }
 
   def newWalletTreeInstance(walletName: String, accountIndex: Int, operation: UUID): WalletTree = {
-    val accounts: Cache[Int, AccountTree] = newCache(initialCapacity = 100)
+    val accounts: Cache[Int, AccountTree] = newCache(initialCapacity = INITIAL_ACCOUNT_CAP_PER_WALLET / 100)
     accounts.put(accountIndex, newAccountTreeInstance(accountIndex, operation))
     new WalletTree(walletName, accounts)
   }

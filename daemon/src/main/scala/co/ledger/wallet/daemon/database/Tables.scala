@@ -6,12 +6,11 @@ import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import slick.lifted.ProvenShape
 import slick.sql.SqlProfile.ColumnOption.SqlType
 
-package database {
-
-  object Tables extends Tables {
-    override val profile = DaemonConfiguration.dbProfile
-  }
+object Tables extends Tables {
+  override val profile = DaemonConfiguration.dbProfile
 }
+
+//noinspection ScalaStyle
 trait Tables {
   val profile: slick.jdbc.JdbcProfile
   import profile.api._

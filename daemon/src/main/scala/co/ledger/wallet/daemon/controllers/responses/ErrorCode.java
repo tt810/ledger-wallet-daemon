@@ -6,5 +6,5 @@ public enum ErrorCode {
 
     Bad_Request,
 
-    Not_Found;
+    Not_Found
 }

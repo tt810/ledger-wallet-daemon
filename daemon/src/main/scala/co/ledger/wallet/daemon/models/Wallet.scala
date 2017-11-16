@@ -24,8 +24,7 @@ class Wallet(private val coreW: core.Wallet, private val pool: Pool) extends Log
 
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
   implicit def asArrayList[T](input: Seq[T]): AsArrayList[T] = new AsArrayList[T](input)
-
-  private[this] val cachedAccounts: Cache[Int, Account] = newCache(initialCapacity = 1000)
+  private[this] val cachedAccounts: Cache[Int, Account] = newCache(initialCapacity = INITIAL_ACCOUNT_CAP_PER_WALLET)
   private[this] val accountLen: AtomicInteger = new AtomicInteger(0)
   private val configuration: Map[String, Any] = Map[String, Any]()
   private[this] val currentBlockHeight: AtomicLong = new AtomicLong(-1)
@@ -34,10 +33,11 @@ class Wallet(private val coreW: core.Wallet, private val pool: Pool) extends Log
   val currency: Currency = Currency.newInstance(coreW.getCurrency)
 
   def lastBlockHeight: Future[Long] =
-    if (currentBlockHeight.get() < 0)
+    if (currentBlockHeight.get() < 0) {
       coreW.getLastBlock().map { lastBlock => updateBlockHeight(lastBlock.getHeight); currentBlockHeight.get() }
-    else
+    } else {
       Future.successful(currentBlockHeight.get())
+    }
 
   def updateBlockHeight(newHeight: Long): Unit = {
     val updated = currentBlockHeight.updateAndGet(n => Math.max(n, newHeight))
@@ -65,8 +65,8 @@ class Wallet(private val coreW: core.Wallet, private val pool: Pool) extends Log
 
   def accounts(): Future[Seq[Account]] = {
     coreW.getAccountCount().flatMap { count =>
-      if(count == accountLen.get()) Future.successful(cachedAccounts.values.toSeq)
-      else toCacheAndStartListen(accountLen.get()).map { _ => cachedAccounts.values.toSeq }
+      if(count == accountLen.get()) { Future.successful(cachedAccounts.values.toSeq) }
+      else { toCacheAndStartListen(accountLen.get()).map { _ => cachedAccounts.values.toSeq }}
     }
   }
 
@@ -86,11 +86,11 @@ class Wallet(private val coreW: core.Wallet, private val pool: Pool) extends Log
         account
       }
     }.recover {
-      case e: implicits.InvalidArgumentException => Future.failed(InvalidArgumentException(e.getMessage, e))
-      case alreadyExist: implicits.AccountAlreadyExistsException =>
+      case e: implicits.InvalidArgumentException => Future.failed(InvalidArgumentException(e.getMessage))
+      case _: implicits.AccountAlreadyExistsException =>
         warn(LogMsgMaker.newInstance("Account already exist").append("index", accountDerivations.accountIndex).append("wallet_name", name).toString())
-        if(cachedAccounts.contains(accountDerivations.accountIndex)) Future.successful(cachedAccounts(accountDerivations.accountIndex))
-        else toCacheAndStartListen(accountLen.get()).map { _ => cachedAccounts(accountDerivations.accountIndex) }
+        if(cachedAccounts.contains(accountDerivations.accountIndex)) { Future.successful(cachedAccounts(accountDerivations.accountIndex)) }
+        else { toCacheAndStartListen(accountLen.get()).map { _ => cachedAccounts(accountDerivations.accountIndex) }}
     }.flatten
   }
 
@@ -123,20 +123,25 @@ class Wallet(private val coreW: core.Wallet, private val pool: Pool) extends Log
   override def toString: String = s"Wallet(name: $name, currency: ${currency.name})"
 
   private def toCacheAndStartListen(offset: Int): Future[Unit] = {
-    if (offset < accountLen.get()) Future { info(s"Wallet $name cache was already updated")}
-    else
+    if (offset < accountLen.get()) { Future { info(s"Wallet $name cache was already updated")}}
+    else {
       coreW.getAccountCount().flatMap { count =>
-        if (count == offset) Future { info(s"Wallet $name cache is up to date") }
-        else if (count < offset) Future { warn(s"Offset should be less than count, possible race condition")}
-        else coreW.getAccounts(offset, count).map { coreAs =>
-          coreAs.asScala.foreach { coreA =>
-            cachedAccounts.put(coreA.getIndex, Account.newInstance(coreA, self))
-            debug(s"Add ${cachedAccounts(coreA.getIndex)} to $self cache")
-            cachedAccounts(coreA.getIndex).startRealTimeObserver()
+        if (count == offset) {
+          Future(info(s"Wallet $name cache is up to date"))
+        } else if (count < offset) {
+          Future(warn(s"Offset should be less than count, possible race condition"))
+        } else {
+          coreW.getAccounts(offset, count).map { coreAs =>
+            coreAs.asScala.foreach { coreA =>
+              cachedAccounts.put(coreA.getIndex, Account.newInstance(coreA, self))
+              debug(s"Add ${cachedAccounts(coreA.getIndex)} to $self cache")
+              cachedAccounts(coreA.getIndex).startRealTimeObserver()
+            }
+            accountLen.updateAndGet(n => Math.max(n, count))
           }
-          accountLen.updateAndGet(n => Math.max(n, count))
         }
       }
+    }
   }
 
   private def getBalance: Future[Long] = {

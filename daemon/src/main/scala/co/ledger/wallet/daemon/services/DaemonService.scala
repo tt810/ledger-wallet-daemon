@@ -17,7 +17,7 @@ class LogMsgMaker(private val inner: StringBuilder = new StringBuilder()) {
     self
   }
 
-  override def toString(): String = {
+  override def toString: String = {
     self.inner.toString()
   }
 }

@@ -1,9 +1,9 @@
 package co.ledger.wallet.daemon.modules
 
 import co.ledger.wallet.daemon.models.coins.BitcoinNetworkParamsView
-import com.fasterxml.jackson.databind.module.SimpleModule
 import co.ledger.wallet.daemon.models.{CurrencyFamily, CurrencyView, WalletView, UnitView => ModelUnit}
 import com.fasterxml.jackson.core.JsonParser
+import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.databind.{DeserializationContext, JsonDeserializer, JsonNode, ObjectMapper}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
@@ -45,9 +45,9 @@ object Deserializers {
       val bip44CoinType = node.get("bip_44_coin_type").asInt()
       val paymentUriScheme = node.get("payment_uri_scheme").asText()
       val unitsIter = node.path("units").iterator().asScala
-      val units = for (unit <- unitsIter) yield mapper.readValue[ModelUnit](unit.toString(), classOf[ModelUnit])
+      val units = for (unit <- unitsIter) yield mapper.readValue[ModelUnit](unit.toString, classOf[ModelUnit])
       val networkParams = family match {
-        case CurrencyFamily.BITCOIN => mapper.readValue[BitcoinNetworkParamsView](node.get("network_params").toString(), classOf[BitcoinNetworkParamsView])
+        case CurrencyFamily.BITCOIN => mapper.readValue[BitcoinNetworkParamsView](node.get("network_params").toString, classOf[BitcoinNetworkParamsView])
         case _ => throw new NotImplementedError()
       }
       CurrencyView(name, family, bip44CoinType, paymentUriScheme, units.toList, networkParams)

@@ -75,6 +75,7 @@ class ScalaWebSocketClient extends co.ledger.core.WebSocketClient with Logging{
     } else {
       try {
         @Nullable val session = sessions.remove(connection.getConnectionId)
+        //noinspection ScalaStyle
         if(session != null) session.close()
         info(LogMsgMaker.newInstance("Disconnecting, session closed")
           .append("session", session.getId)

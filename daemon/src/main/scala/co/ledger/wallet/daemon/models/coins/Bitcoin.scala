@@ -8,6 +8,7 @@ import co.ledger.wallet.daemon.models.coins.Coin._
 import co.ledger.wallet.daemon.utils
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.fasterxml.jackson.annotation.JsonProperty
+
 import scala.collection.JavaConverters._
 
 object Bitcoin {
@@ -30,12 +31,15 @@ object Bitcoin {
   def newTransactionView(from: core.BitcoinLikeTransaction): TransactionView = {
     BitcoinTransactionView(
       newBlockView(from.getBlock),
-      if(from.getFees == null) None else Option(from.getFees.toLong),
+      Option(from.getFees) match {
+        case Some(fees) => Option(fees.toLong)
+        case None => None
+      },
       from.getHash,
-      from.getTime(),
-      from.getInputs.asScala.toSeq.map(newInputView(_)),
+      from.getTime,
+      from.getInputs.asScala.map(newInputView),
       from.getLockTime,
-      from.getOutputs.asScala.toSeq.map(newOutputView(_))
+      from.getOutputs.asScala.map(newOutputView)
     )
   }
 

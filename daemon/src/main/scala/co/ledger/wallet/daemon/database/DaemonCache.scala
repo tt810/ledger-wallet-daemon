@@ -99,7 +99,13 @@ trait DaemonCache {
     *               including transaction information, will be returned.
     * @return a Future of `co.ledger.wallet.daemon.models.PackedOperationView` instance.
     */
-  def getPreviousBatchAccountOperations(user: User, accountIndex: Int, poolName: String, walletName: String, previous: UUID, fullOp: Int): Future[PackedOperationsView]
+  def getPreviousBatchAccountOperations(
+                                         user: User,
+                                         accountIndex: Int,
+                                         poolName: String,
+                                         walletName: String,
+                                         previous: UUID,
+                                         fullOp: Int): Future[PackedOperationsView]
 
   /**
     * Getter of information for next account creation.
@@ -149,12 +155,13 @@ trait DaemonCache {
   /**
     * Getter of sequence of `co.ledger.wallet.daemon.models.Wallet` instances.
     *
-    * @param walletBulk the object indicating the offset and batch size of the returned wallet sequence.
+    * @param offset the offset of the returned wallet sequence.
+    * @param batch the batch size of the returned wallet sequence.
     * @param poolName the name of wallet pool the wallets belong to.
     * @param pubKey the public key of the user.
     * @return a Future of a tuple containing the total wallets count and required sequence of wallets.
     */
-  def getWallets(walletBulk: Bulk, poolName: String, pubKey: String): Future[(Int, Seq[Wallet])]
+  def getWallets(offset: Int, batch: Int, poolName: String, pubKey: String): Future[(Int, Seq[Wallet])]
 
   /**
     * Getter of instance of `co.ledger.wallet.daemon.models.Wallet`.

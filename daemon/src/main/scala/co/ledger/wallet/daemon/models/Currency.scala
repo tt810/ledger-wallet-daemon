@@ -1,8 +1,8 @@
 package co.ledger.wallet.daemon.models
 
 import co.ledger.core
-import co.ledger.wallet.daemon.models.coins.Coin.NetworkParamsView
 import co.ledger.wallet.daemon.models.coins.Bitcoin
+import co.ledger.wallet.daemon.models.coins.Coin.NetworkParamsView
 import com.fasterxml.jackson.annotation.JsonProperty
 
 import scala.collection.JavaConverters._
@@ -18,7 +18,7 @@ class Currency(coreC: core.Currency) {
     family,
     coreC.getBip44CoinType,
     coreC.getPaymentUriScheme,
-    coreC.getUnits.asScala.map(newUnitView(_)),
+    coreC.getUnits.asScala.map(newUnitView),
     newNetworkParamsView(coreC, family)
   )
 
@@ -27,7 +27,7 @@ class Currency(coreC: core.Currency) {
 
   private def newNetworkParamsView(coreCurrency: core.Currency, currencyFamily: CurrencyFamily): NetworkParamsView = currencyFamily match {
     case CurrencyFamily.BITCOIN => Bitcoin.newNetworkParamsView(coreCurrency.getBitcoinLikeNetworkParameters)
-    case _ => ???
+    case _ => throw new UnsupportedOperationException
   }
 
   override def equals(that: Any): Boolean = {
