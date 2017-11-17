@@ -24,7 +24,7 @@ object Deserializers {
       val name = node.get("name").asText()
       val accountCount = node.get("account_count").asInt()
       val balance = node.get("balance").asLong()
-      val configuration = mapper.readValue[Map[String, Any]](node.get("configuration").toString, classOf[Map[String, Any]])
+      val configuration = mapper.readValue[Map[String, Any]](node.get("configuration").toString, classOf[Map[String, Any]]) // linter:ignore
       val currency = mapper.readValue[CurrencyView](node.get("currency").toString, classOf[CurrencyView])
       WalletView(name, accountCount, balance, currency, configuration)
     }

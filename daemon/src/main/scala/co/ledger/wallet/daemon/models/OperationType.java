@@ -1,6 +1,6 @@
 package co.ledger.wallet.daemon.models;
 
 public enum OperationType {
-    SEND,
-    RECEIVE
+    SEND, // linter:ignore
+    RECEIVE // linter:ignore
 }
