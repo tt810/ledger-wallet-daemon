@@ -46,7 +46,7 @@ class ScalaWebSocketClient extends co.ledger.core.WebSocketClient with Logging{
   }
 
   @OnMessage
-  def processMessage(message: String, session: Session): Unit = {
+  def processMessage(message: String, session: Session): Unit = { // linter:ignore
 
   }
 
