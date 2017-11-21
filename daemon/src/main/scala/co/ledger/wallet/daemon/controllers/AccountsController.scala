@@ -27,7 +27,7 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
     * End point queries for account views with specified pool name and wallet name.
     *
     */
-  get("/pools/:pool_name/wallets/:wallet_name/accounts") { request: AccountRequest =>
+  get("/pools/:pool_name/wallets/:wallet_name/accounts") { request: AccountsRequest =>
     info(s"GET accounts $request")
     accountsService.accounts(request.user, request.pool_name, request.wallet_name).recover {
       case _: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
@@ -63,7 +63,7 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
     */
   get("/pools/:pool_name/wallets/:wallet_name/accounts/:account_index") { request: AccountRequest =>
     info(s"GET account $request")
-    accountsService.account(request.account_index.get, request.user, request.pool_name, request.wallet_name).map {
+    accountsService.account(request.account_index, request.user, request.pool_name, request.wallet_name).map {
       case Some(view) => responseSerializer.serializeOk(view, response)
       case None => responseSerializer.serializeNotFound(Map("response" -> "Account doesn't exist", "account_index" -> request.account_index), response)
     }.recover {
@@ -72,6 +72,26 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
         response)
       case _: WalletNotFoundException => responseSerializer.serializeBadRequest(
         Map("response"->"Wallet doesn't exist", "wallet_name" -> request.wallet_name),
+        response)
+      case e: Throwable => responseSerializer.serializeInternalError(response, e)
+    }
+  }
+
+  /**
+    * End point queries for fresh addresses with specified pool, wallet name and unique account index.
+    *
+    */
+  get("/pools/:pool_name/wallets/:wallet_name/accounts/:account_index/addresses/fresh") { request: AccountRequest =>
+    info(s"GET fresh addresses $request")
+    accountsService.accountFreshAddresses(request.account_index, request.user, request.pool_name, request.wallet_name).recover {
+      case _: WalletPoolNotFoundException => responseSerializer.serializeBadRequest(
+        Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
+        response)
+      case _: WalletNotFoundException => responseSerializer.serializeBadRequest(
+        Map("response"->"Wallet doesn't exist", "wallet_name" -> request.wallet_name),
+        response)
+      case _: AccountNotFoundException => responseSerializer.serializeBadRequest(
+        Map("response"->"Account doesn't exist", "account_index" -> request.account_index),
         response)
       case e: Throwable => responseSerializer.serializeInternalError(response, e)
     }
@@ -162,7 +182,7 @@ object AccountsController {
   case class AccountRequest(
                            @RouteParam pool_name: String,
                            @RouteParam wallet_name: String,
-                           @RouteParam account_index: Option[Int],
+                           @RouteParam account_index: Int,
                            request: Request
                            ) extends RichRequest(request) {
     @MethodValidation
@@ -171,7 +191,24 @@ object AccountsController {
     @MethodValidation
     def validateWalletName: ValidationResult = CommonMethodValidations.validateName("wallet_name", wallet_name)
 
+    @MethodValidation
+    def validateAccountIndex: ValidationResult = ValidationResult.validate(account_index >= 0, "account_index: index can not be less than zero")
+
     override def toString: String = s"$request, Parameters(user: ${user.id}, pool_name: $pool_name, wallet_name: $wallet_name, account_index: $account_index)"
+  }
+
+  case class AccountsRequest(
+                            @RouteParam pool_name: String,
+                            @RouteParam wallet_name: String,
+                            request: Request
+                            ) extends RichRequest(request) {
+    @MethodValidation
+    def validatePoolName: ValidationResult = CommonMethodValidations.validateName("pool_name", pool_name)
+
+    @MethodValidation
+    def validateWalletName: ValidationResult = CommonMethodValidations.validateName("wallet_name", wallet_name)
+
+    override def toString: String = s"$request, Parameters(user: ${user.id}, pool_name: $pool_name, wallet_name: $wallet_name)"
   }
 
   case class AccountCreationInfoRequest(

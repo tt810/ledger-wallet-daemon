@@ -36,6 +36,14 @@ class AccountsApiTest extends APIFeatureTest {
     deletePool("list_pool")
   }
 
+  test("AccountsApi#Get fresh addresses from account") {
+    createPool("list_pool")
+    assertWalletCreation("list_pool", "account_wallet", "bitcoin", Status.Ok)
+    assertCreateAccount(CORRECT_BODY, "list_pool", "account_wallet", Status.Ok)
+    val addresses = parse[Seq[String]](assertGetFreshAddresses("list_pool", "account_wallet", index = 0, Status.Ok))
+    assert(!addresses.isEmpty)
+  }
+
   test("AccountsApi#Get account(s) from non exist pool return bad request") {
     assertCreateAccount(CORRECT_BODY, "not_exist_pool", "account_wallet", Status.BadRequest)
     assertGetAccounts(None, "not_exist_pool", "account_wallet", Status.BadRequest)
@@ -174,6 +182,10 @@ class AccountsApiTest extends APIFeatureTest {
 
   private def assertCreateAccount(accountCreationBody: String, poolName: String, walletName: String, expected: Status): Response = {
     server.httpPost(s"/pools/$poolName/wallets/$walletName/accounts", accountCreationBody, headers = defaultHeaders, andExpect = expected)
+  }
+
+  private def assertGetFreshAddresses(poolName: String, walletName: String, index: Int, expected: Status): Response = {
+    server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/$index/addresses/fresh", headers = defaultHeaders, andExpect = expected)
   }
 
   private val CORRECT_BODY =

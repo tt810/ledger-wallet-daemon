@@ -50,6 +50,10 @@ object Account {
       }
     }
 
+    def freshAddresses(): Future[Seq[String]] = {
+      coreA.getFreshPublicAddresses().map(_.asScala)
+    }
+
     def sync(poolName: String): Future[SynchronizationResult] = {
       val promise: Promise[SynchronizationResult] = Promise[SynchronizationResult]()
       val receiver: core.EventReceiver = new SynchronizationEventReceiver(coreA.getIndex, wallet.name, poolName, promise)

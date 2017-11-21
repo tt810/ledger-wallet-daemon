@@ -66,6 +66,17 @@ class DaemonCacheTest extends AssertionsForJUnit {
     assertEquals(currency.get.name, currencies(0).name)
   }
 
+  @Test def verifyGetFreshAddressesFromNonExistingAccount(): Unit = {
+    val addresses: Seq[String] = Await.result(cache.getFreshAddresses(accountIndex = 0, PUB_KEY_3, POOL_NAME, WALLET_NAME), Duration.Inf)
+    assert(!addresses.isEmpty)
+    try {
+      Await.result(cache.getFreshAddresses(accountIndex = 1, PUB_KEY_3, POOL_NAME, WALLET_NAME), Duration.Inf)
+      fail()
+    } catch {
+      case _: AccountNotFoundException => // expected
+    }
+  }
+
   @Test def verifyGetAccountOperations(): Unit = {
     val user1 = Await.result(cache.getUser(PUB_KEY_3), Duration.Inf)
     val pool1 = Await.result(DefaultDaemonCache.dbDao.getPool(user1.get.id, POOL_NAME), Duration.Inf)
