@@ -43,6 +43,10 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     getHardWallet(pubKey, poolName, walletName).flatMap { wallet => wallet.accounts() }
   }
 
+  def getFreshAddresses(accountIndex: Int, pubKey: String, poolName: String, walletName: String): Future[Seq[String]] = {
+    getHardAccount(pubKey, poolName, walletName, accountIndex).flatMap { account => account.freshAddresses() }
+  }
+
   def createAccount(accountDerivations: AccountDerivationView, user: User, poolName: String, walletName: String): Future[Account] = {
     getHardWallet(user.pubKey, poolName, walletName).flatMap { w => w.addAccountIfNotExit(accountDerivations) }
   }
@@ -140,9 +144,9 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
                                          walletName: String,
                                          previous: UUID,
                                          fullOp: Int): Future[PackedOperationsView] = {
-    getHardAccount(user.pubKey, poolName, walletName, accountIndex).flatMap { pair =>
+    getHardAccount(user.pubKey, poolName, walletName, accountIndex).flatMap { account =>
       val previousRecord = opsCache.getPreviousOperationRecord(previous)
-      pair._2.operations(previousRecord.offset(), previousRecord.batch, fullOp).flatMap { ops =>
+      account.operations(previousRecord.offset(), previousRecord.batch, fullOp).flatMap { ops =>
         Future.sequence(ops.map { op => op.operationView })
           .map { os => PackedOperationsView(previousRecord.previous, previousRecord.next, os)}
       }
@@ -158,9 +162,9 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
                                      next: UUID,
                                      fullOp: Int): Future[PackedOperationsView] = {
     getHardPool(user, poolName).flatMap { pool =>
-      getHardAccount(user.pubKey, poolName, walletName, accountIndex).flatMap { pair =>
+      getHardAccount(user.pubKey, poolName, walletName, accountIndex).flatMap { account =>
         val candidate = opsCache.getOperationCandidate(next)
-        pair._2.operations(candidate.offset(), candidate.batch, fullOp).flatMap { ops =>
+        account.operations(candidate.offset(), candidate.batch, fullOp).flatMap { ops =>
           val realBatch = if (ops.size < candidate.batch) ops.size else candidate.batch
           val next = if (realBatch < candidate.batch) None else candidate.next
           val previous = candidate.previous
@@ -174,9 +178,9 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
 
   def getAccountOperations(user: User, accountIndex: Int, poolName: String, walletName: String, batch: Int, fullOp: Int): Future[PackedOperationsView] = {
     getHardPool(user, poolName).flatMap { pool =>
-      getHardAccount(user.pubKey, poolName, walletName, accountIndex).flatMap { pair =>
+      getHardAccount(user.pubKey, poolName, walletName, accountIndex).flatMap { account =>
         val offset = 0
-        pair._2.operations(offset, batch, fullOp).flatMap { ops =>
+        account.operations(offset, batch, fullOp).flatMap { ops =>
           val realBatch = if (ops.size < batch) ops.size else batch
           val next = if (realBatch < batch) None else Option(UUID.randomUUID())
           val previous = None
@@ -189,13 +193,13 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
   }
 
   def getAccountOperation(user: User, uid: String, accountIndex: Int, poolName: String, walletName: String, fullOp: Int): Future[Option[Operation]] = {
-    getHardAccount(user.pubKey, poolName, walletName, accountIndex).flatMap { pair => pair._2.operation(uid, fullOp) }
+    getHardAccount(user.pubKey, poolName, walletName, accountIndex).flatMap { account => account.operation(uid, fullOp) }
   }
 
-  private def getHardAccount(pubKey: String, poolName: String, walletName: String, accountIndex: Int): Future[(Wallet, Account)] = {
+  private def getHardAccount(pubKey: String, poolName: String, walletName: String, accountIndex: Int): Future[Account] = {
     getHardWallet(pubKey, poolName, walletName).flatMap { wallet =>
       wallet.account(accountIndex).map {
-        case Some(a) => (wallet, a)
+        case Some(a) => a
         case None => throw AccountNotFoundException(accountIndex)
       }
     }

@@ -61,6 +61,8 @@ class AccountTest extends AssertionsForJUnit {
       )
     }.flatMap { info => testWallet.addAccountIfNotExit(info) } , Duration.Inf)
 
+  private val freshAddresses: Seq[String] = Await.result(account2.freshAddresses(), Duration.Inf)
+
   @Test def verifyAccountCreation(): Unit = {
     assert(0 === account0.index)
     assert(1 === account1.index)
@@ -71,5 +73,6 @@ class AccountTest extends AssertionsForJUnit {
     assert(1 === operations.size)
     val headOp = Await.result(account0.operation(operations.head.uid, 1), Duration.Inf)
     assert(headOp === Option(operations.head))
+    assert(!freshAddresses.isEmpty)
   }
 }
