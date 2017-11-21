@@ -27,7 +27,7 @@ class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging wit
   private[this] val self = this
 
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
-  private val _coreExecutionContext = LedgerCoreExecutionContext.observerExecutionContext
+  private val _coreExecutionContext = LedgerCoreExecutionContext.newThreadPool()
   private[this] val eventReceivers: mutable.Set[core.EventReceiver] = utils.newConcurrentSet[core.EventReceiver]
   private[this] val cachedWallets: Cache[String, Wallet] = newCache(initialCapacity = INITIAL_WALLET_CAP_PER_POOL)
   private[this] val cachedCurrencies: Cache[String, Currency] = newCache(initialCapacity = INITIAL_CURRENCY_CAP)

@@ -7,9 +7,9 @@ import scala.concurrent.ExecutionContext
 
 
 object ClientFactory {
-  implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.cachedNamedThreads("client-factory-thread-pool")
+  implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
 
   lazy val webSocketClient = new ScalaWebSocketClient
   lazy val httpClient = new ScalaHttpClient
-  lazy val threadDispatcher = new ScalaThreadDispatcher(MDCPropagatingExecutionContext.Implicits.global)
+  lazy val threadDispatcher = new ScalaThreadDispatcher(ec)
 }

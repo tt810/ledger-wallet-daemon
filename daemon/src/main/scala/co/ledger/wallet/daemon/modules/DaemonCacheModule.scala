@@ -55,7 +55,7 @@ object DaemonCacheModule extends TwitterModule {
       if (existingUser.isEmpty) Await.result(usersService.createUser(user._1, user._2), 1.minutes)
     }
     val scheduler = new ScheduledThreadPoolTimer(
-      poolSize = 2,
+      poolSize = 1,
       threadFactory = new NamedPoolThreadFactory("scheduler-thread-pool")
     )
     scheduler.schedule(

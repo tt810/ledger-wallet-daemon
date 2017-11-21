@@ -18,7 +18,7 @@ object Account {
 
   class Account(private val coreA: core.Account, private val wallet: Wallet) extends Logging {
     private[this] val self = this
-    private val _coreExecutionContext = LedgerCoreExecutionContext.observerExecutionContext
+    private val _coreExecutionContext = LedgerCoreExecutionContext.newThreadPool()
     implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
 
     val index: Int = coreA.getIndex

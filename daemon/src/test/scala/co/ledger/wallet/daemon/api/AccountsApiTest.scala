@@ -37,10 +37,10 @@ class AccountsApiTest extends APIFeatureTest {
   }
 
   test("AccountsApi#Get fresh addresses from account") {
-    createPool("list_pool")
-    assertWalletCreation("list_pool", "account_wallet", "bitcoin", Status.Ok)
-    assertCreateAccount(CORRECT_BODY, "list_pool", "account_wallet", Status.Ok)
-    val addresses = parse[Seq[String]](assertGetFreshAddresses("list_pool", "account_wallet", index = 0, Status.Ok))
+    createPool("fresh_addresses_pool")
+    assertWalletCreation("fresh_addresses_pool", "account_wallet", "bitcoin", Status.Ok)
+    assertCreateAccount(CORRECT_BODY, "fresh_addresses_pool", "account_wallet", Status.Ok)
+    val addresses = parse[Seq[String]](assertGetFreshAddresses("fresh_addresses_pool", "account_wallet", index = 0, Status.Ok))
     assert(!addresses.isEmpty)
   }
 
