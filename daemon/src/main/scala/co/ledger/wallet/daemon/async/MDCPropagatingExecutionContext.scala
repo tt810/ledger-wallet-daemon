@@ -44,11 +44,6 @@ object MDCPropagatingExecutionContext {
   object Implicits {
     implicit lazy val global: ExecutionContext = MDCPropagatingExecutionContextWrapper(ExecutionContext.Implicits.global)
   }
-
-  def cachedNamedThreads(prefix: String): ExecutionContext = {
-    val threadPoolExecutor = Executors.newCachedThreadPool(new NamedPoolThreadFactory(prefix))
-    MDCPropagatingExecutionContextWrapper(ExecutionContext.fromExecutor(threadPoolExecutor))
-  }
 }
 
 class MDCPropagatingExecutionContextWrapper(wrapped: ExecutionContext) extends ExecutionContext with MDCPropagatingExecutionContext {

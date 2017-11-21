@@ -11,15 +11,6 @@ object SerialExecutionContext {
     implicit lazy val global: ExecutionContext = SerialExecutionContextWrapper(ExecutionContext.Implicits.global)
   }
 
-  def singleNamedThread(prefix: String): ExecutionContext = {
-    val threadPoolExecutor = Executors.newFixedThreadPool(1, new NamedPoolThreadFactory(prefix))
-    SerialExecutionContextWrapper(ExecutionContext.fromExecutor(threadPoolExecutor))
-  }
-
-  def cachedNamedThreads(prefix: String): ExecutionContext = {
-    val threadPoolExecutor = Executors.newCachedThreadPool(new NamedPoolThreadFactory(prefix))
-    SerialExecutionContextWrapper(ExecutionContext.fromExecutor(threadPoolExecutor))
-  }
 }
 
 class SerialExecutionContextWrapper(implicit val ec: ExecutionContext) extends ExecutionContext with MDCPropagatingExecutionContext {

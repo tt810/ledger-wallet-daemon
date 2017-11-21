@@ -18,11 +18,11 @@ import scala.concurrent.{ExecutionContext, Future}
 class DatabaseDao @Inject()(db: Database) extends Logging {
   import Tables._
   import Tables.profile.api._
-  implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.cachedNamedThreads("database-read-thread-pool")
-  private val _writeContext = SerialExecutionContext.cachedNamedThreads("database-write-thread-pool")
+  implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
+  private val _writeContext: ExecutionContext = SerialExecutionContext.Implicits.global
 
   def migrate(): Future[Unit] = {
-    implicit val ec: ExecutionContext = SerialExecutionContext.singleNamedThread("database-migration-thread-pool")
+    implicit val ec: ExecutionContext = _writeContext
     info("Start database migration")
     val lastMigrationVersion = databaseVersions.sortBy(_.version.desc).map(_.version).take(1).result.head
     db.run(lastMigrationVersion.transactionally) recover {

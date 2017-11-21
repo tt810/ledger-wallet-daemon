@@ -14,7 +14,7 @@ class ScalaThreadDispatcher(mainContext: ExecutionContext) extends ThreadDispatc
     _pools.getOrElseUpdate(name, LedgerCoreExecutionContext.newSerialQueue())
   }
   override def getThreadPoolExecutionContext(name: String): co.ledger.core.ExecutionContext = synchronized {
-    _pools.getOrElseUpdate(name, LedgerCoreExecutionContext.newThreadPool("scala-thread-dispatcher-thread-pool"))
+    _pools.getOrElseUpdate(name, LedgerCoreExecutionContext.newThreadPool())
   }
   override def getMainExecutionContext: co.ledger.core.ExecutionContext = _mainContext
   override def newLock(): Lock = ???
