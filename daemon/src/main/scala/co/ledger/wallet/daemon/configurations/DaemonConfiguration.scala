@@ -62,4 +62,6 @@ object DaemonConfiguration {
     if (config.hasPath("realtimeobservation")) { config.getBoolean("realtimeobservation") }
     else { false }
 
+  val isPrintCoreLibLogsEnabled: Boolean = config.hasPath("debug.print_core_logs") && config.getBoolean("debug.print_core_logs")
+
 }
