@@ -4,7 +4,10 @@ import co.ledger.core
 import co.ledger.core.implicits.{CurrencyNotFoundException => CoreCurrencyNotFoundException, _}
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.clients.ClientFactory
+<<<<<<< HEAD
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
+=======
+>>>>>>> dd91740a2d6a8fd444426cc07edaa56392f46bc7
 import co.ledger.wallet.daemon.database.PoolDto
 import co.ledger.wallet.daemon.exceptions.{CurrencyNotFoundException, WalletNotFoundException}
 import co.ledger.wallet.daemon.libledger_core.async.LedgerCoreExecutionContext
