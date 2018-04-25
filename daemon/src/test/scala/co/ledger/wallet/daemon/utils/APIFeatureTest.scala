@@ -49,6 +49,10 @@ trait APIFeatureTest extends FeatureTest {
     server.httpPost(s"/pools/operations/synchronize", "", headers = defaultHeaders, andExpect = expected)
   }
 
+  protected def assertCreateAccount(accountCreationBody: String, poolName: String, walletName: String, expected: Status): Response = {
+    server.httpPost(s"/pools/$poolName/wallets/$walletName/accounts", accountCreationBody, headers = defaultHeaders, andExpect = expected)
+  }
+
   private def lwdBasicAuthorisationHeader(seedName: String, time: Date = new Date()) = {
     val ecdsa = server.injector.instance(classOf[ECDSAService])
     val privKey = Sha256Hash.hash(FixturesUtils.seed(seedName).getBytes)

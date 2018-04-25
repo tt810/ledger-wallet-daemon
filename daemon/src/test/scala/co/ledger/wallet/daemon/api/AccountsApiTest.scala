@@ -180,10 +180,6 @@ class AccountsApiTest extends APIFeatureTest {
 
   }
 
-  private def assertCreateAccount(accountCreationBody: String, poolName: String, walletName: String, expected: Status): Response = {
-    server.httpPost(s"/pools/$poolName/wallets/$walletName/accounts", accountCreationBody, headers = defaultHeaders, andExpect = expected)
-  }
-
   private def assertGetFreshAddresses(poolName: String, walletName: String, index: Int, expected: Status): Response = {
     server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/$index/addresses/fresh", headers = defaultHeaders, andExpect = expected)
   }

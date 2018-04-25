@@ -2,13 +2,19 @@ package co.ledger.wallet.daemon.models
 
 import co.ledger.core
 import co.ledger.core.implicits._
+import co.ledger.core.{BitcoinLikePickingStrategy, BitcoinLikeTransaction}
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
+import co.ledger.wallet.daemon.clients.ClientFactory
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
+import co.ledger.wallet.daemon.controllers.TransactionsController.TransactionInfo
 import co.ledger.wallet.daemon.libledger_core.async.LedgerCoreExecutionContext
+import co.ledger.wallet.daemon.models.coins.Bitcoin
+import co.ledger.wallet.daemon.models.coins.Coin.TransactionView
 import co.ledger.wallet.daemon.schedulers.observers.{SynchronizationEventReceiver, SynchronizationResult}
 import co.ledger.wallet.daemon.services.LogMsgMaker
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.google.common.primitives.UnsignedInteger
 import com.twitter.inject.Logging
 
 import scala.collection.JavaConverters._
@@ -27,6 +33,30 @@ object Account {
 
     def accountView: Future[AccountView] = balance.map { b =>
       AccountView(wallet.name, index, b, "account key chain", wallet.currency.currencyView)
+    }
+
+    def createTransaction(transactionInfo: TransactionInfo): Future[TransactionView] = {
+
+        if (coreA.isInstanceOfBitcoinLikeAccount) {
+          val feesPerByte: Future[core.Amount] = transactionInfo.feeAmount map { amount =>
+             Future.successful(wallet.convertAmount(amount))
+            } getOrElse {
+            ClientFactory.apiClient.getFees(wallet.currency.family).map { feesInfo =>
+              wallet.convertAmount(feesInfo.getAmount(transactionInfo.feeMethod.get))
+            }
+          }
+          val transaction: Future[BitcoinLikeTransaction] = feesPerByte.flatMap { fees =>
+            val tx = coreA.asBitcoinLikeAccount().buildTransaction()
+              .sendToAddress(wallet.convertAmount(transactionInfo.amount), transactionInfo.recipient)
+              .pickInputs(BitcoinLikePickingStrategy.DEEP_OUTPUTS_FIRST, UnsignedInteger.MAX_VALUE.intValue)
+              .setFeesPerByte(fees)
+            transactionInfo.excludeUtxos.foreach { case (previousTx, outputIndex) =>
+                tx.excludeUtxo(previousTx, outputIndex)
+            }
+            tx.build()
+          }
+          transaction.map { tx => Bitcoin.newUnsignedTransactionView(tx) }
+        } else throw new UnsupportedOperationException("Account type not supported")
     }
 
     def operation(uid: String, fullOp: Int): Future[Option[Operation]] = {
