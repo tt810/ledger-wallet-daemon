@@ -6,7 +6,7 @@ import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.controllers.requests.{CommonMethodValidations, RichRequest}
 import co.ledger.wallet.daemon.controllers.responses.ResponseSerializer
 import co.ledger.wallet.daemon.database.DefaultDaemonCache.User
-import co.ledger.wallet.daemon.exceptions.AccountNotFoundException
+import co.ledger.wallet.daemon.exceptions.{AccountNotFoundException, WalletNotFoundException}
 import co.ledger.wallet.daemon.models.FeeMethod
 import co.ledger.wallet.daemon.services.TransactionsService
 import co.ledger.wallet.daemon.utils.HexUtils
@@ -47,6 +47,8 @@ class TransactionsController @Inject()(transactionsService: TransactionsService)
     transactionsService.createTransaction(
       request.transactionInfo,
       request.accountInfo).recover {
+      case _: WalletNotFoundException => responseSerializer.serializeBadRequest(
+        Map("response" -> "Wallet doesn't exist"), response)
       case _: AccountNotFoundException => responseSerializer.serializeBadRequest(
         Map("response" -> "Account doesn't exist"), response)
       case e: Throwable => responseSerializer.serializeInternalError(response, e)
@@ -66,6 +68,8 @@ class TransactionsController @Inject()(transactionsService: TransactionsService)
   { request: SignTransactionRequest =>
     info(s"Sign transaction $request")
     transactionsService.signTransaction(request.rawTx, request.appendedSigs, request.accountInfo).recover {
+      case _: WalletNotFoundException => responseSerializer.serializeBadRequest(
+        Map("response" -> "Wallet doesn't exist"), response)
       case _: AccountNotFoundException => responseSerializer.serializeBadRequest(
         Map("response" -> "Account doesn't exist"), response)
       case e: IllegalArgumentException => responseSerializer.serializeBadRequest(

@@ -68,7 +68,7 @@ object Account {
             transactionInfo.excludeUtxos.foreach { case (previousTx, outputIndex) =>
                 tx.excludeUtxo(previousTx, outputIndex)
             }
-            tx.build().map { t =>
+            tx.build().flatMap { t =>
               Bitcoin.newUnsignedTransactionView(t, fees.toLong)
             }
           }

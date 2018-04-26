@@ -25,7 +25,11 @@ class TransactionsApiTest extends APIFeatureTest {
     assertCreateTransaction(INVALID_FEE_LEVEL_BODY, poolName, "wallet", 0, Status.BadRequest)
     assertSignTransaction(TX_MISSING_APPENDED_SIG, poolName, "wallet", 0, Status.BadRequest)
     assertSignTransaction(TX_MISSING_ONE_SIG, poolName, "wallet", 0, Status.BadRequest)
+<<<<<<< HEAD
     assertSignTransaction(TX_TO_SIGN_BODY, poolName, "wallet", 0, Status.Ok)
+=======
+    assertSignTransaction(TX_TO_SIGN_BODY, poolName, "wallet", 0, Status.InternalServerError)
+>>>>>>> signing transaction
   }
 
   private def assertSignTransaction(tx: String, poolName: String, walletName: String, accountIndex: Int, expected: Status): Response = {
