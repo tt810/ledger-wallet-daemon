@@ -19,7 +19,7 @@ class ApiClientTest extends AssertionsForJUnit {
   private[this] val apiClient = ClientFactory.apiClient
 
   @Test def verifyQueryBTCFee(): Unit = {
-    val feeInfo = Await.result(apiClient.getFees(CurrencyFamily.BITCOIN), Duration.Inf)
+    val feeInfo = Await.result(apiClient.getFees("bitcoin"), Duration.Inf)
     assert(feeInfo.fast >= feeInfo.normal)
     assert(feeInfo.normal >= feeInfo.slow)
     assert(feeInfo.fast >= feeInfo.slow)
@@ -27,7 +27,7 @@ class ApiClientTest extends AssertionsForJUnit {
 
   @Test def verifyQueryOtherFee(): Unit = {
     intercept[UnsupportedOperationException] {
-      Await.result(apiClient.getFees(CurrencyFamily.ETHERUEM), Duration.Inf)
+      Await.result(apiClient.getFees("other"), Duration.Inf)
     }
   }
 }

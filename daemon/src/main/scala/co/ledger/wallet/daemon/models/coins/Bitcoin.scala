@@ -40,10 +40,11 @@ object Bitcoin {
     )
   }
 
-  def newUnsignedTransactionView(from: core.BitcoinLikeTransaction): TransactionView = {
+  def newUnsignedTransactionView(from: core.BitcoinLikeTransaction, feesPerByte: Long): UnsignedBitcoinTransactionView = {
     UnsignedBitcoinTransactionView(
       newEstimatedSizeView(from.getEstimatedSize),
-      //from.getFees.toLong,
+      from.getFees.toLong,
+      feesPerByte,
       from.getInputs.asScala.map(newUnsignedInputView),
       from.getLockTime,
       from.getOutputs.asScala.map(newUnsignedOutputView),
@@ -51,7 +52,7 @@ object Bitcoin {
     )
   }
 
-  private def newUnsignedOutputView(from: core.BitcoinLikeOutput): OutputView = {
+  private def newUnsignedOutputView(from: core.BitcoinLikeOutput): UnsignedBitcoinOutputView = {
     UnsignedBitcoinOutputView(
       from.getAddress,
       from.getValue.toLong,
@@ -68,7 +69,7 @@ object Bitcoin {
     BitcoinBlockView(from.getHash, from.getHeight, from.getTime)
   }
 
-  private def newUnsignedInputView(from: core.BitcoinLikeInput): InputView = {
+  private def newUnsignedInputView(from: core.BitcoinLikeInput): UnsignedBitcoinInputView = {
     val derivationPath = for {
       path <- from.getDerivationPath.asScala
       pubKey <- from.getPublicKeys.asScala
@@ -152,10 +153,11 @@ case class UnsignedBitcoinOutputView(
 
 case class UnsignedBitcoinTransactionView(
                             @JsonProperty("estimated_size") estimatedSize: EstimatedSizeView,
-                           // @JsonProperty("fees_in_satoshi") fees: Long,
-                            @JsonProperty("inputs") inputs: Seq[InputView],
+                            @JsonProperty("fees") fees: Long,
+                            @JsonProperty("fees_per_byte") feesPerByte: Long,
+                            @JsonProperty("inputs") inputs: Seq[UnsignedBitcoinInputView],
                             @JsonProperty("lock_time") lockTime: Long,
-                            @JsonProperty("outputs") outputs: Seq[OutputView],
+                            @JsonProperty("outputs") outputs: Seq[UnsignedBitcoinOutputView],
                             @JsonProperty("raw_transaction") rawTransaction: String) extends TransactionView
 
 case class EstimatedSizeView(@JsonProperty("max") max: Int, @JsonProperty("min") min: Int)

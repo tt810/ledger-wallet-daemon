@@ -27,4 +27,11 @@ class TransactionsService @Inject()(defaultDaemonCache: DefaultDaemonCache) exte
         account.createTransaction(transactionInfo)
     }
   }
+
+  def signTransaction(rawTx: Array[Byte], appendedSigs: Seq[Array[Byte]], accountInfo: AccountInfo): Future[String] = {
+    defaultDaemonCache.getHardAccount(accountInfo.user.pubKey, accountInfo.poolName, accountInfo.walletName, accountInfo.index)
+      .flatMap { account =>
+        account.signTransaction(rawTx, appendedSigs)
+      }
+  }
 }

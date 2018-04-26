@@ -3,7 +3,7 @@ package co.ledger.wallet.daemon.clients
 import javax.inject.Singleton
 
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
-import co.ledger.wallet.daemon.models.{CurrencyFamily, FeeMethod}
+import co.ledger.wallet.daemon.models.FeeMethod
 import co.ledger.wallet.daemon.utils._
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
@@ -31,10 +31,10 @@ class ApiClient(implicit val ec: ExecutionContext) {
     .newService(s"$host:$port")
 
 
-  def getFees(currencyFamily: CurrencyFamily): Future[FeeInfo] = {
-    val path = currencyFamily match {
-      case CurrencyFamily.BITCOIN => "/blockchain/v2/btc/fees"
-      case _ => throw new UnsupportedOperationException(s"currency not supported '$currencyFamily'")
+  def getFees(currencyName: String): Future[FeeInfo] = {
+    val path = currencyName match {
+      case "bitcoin" => "/blockchain/v2/btc/fees"
+      case _ => throw new UnsupportedOperationException(s"currency not supported '$currencyName'")
     }
     val request = Request(Method.Get, path)
     request.host = "api.ledgerwallet.com"
@@ -53,10 +53,11 @@ object ApiClient {
                     @JsonProperty("1") fast: Long,
                     @JsonProperty("3") normal: Long,
                     @JsonProperty("6") slow: Long) {
+
     def getAmount(feeMethod: FeeMethod): Long = feeMethod match {
-      case FeeMethod.FAST => fast
-      case FeeMethod.NORMAL => normal
-      case FeeMethod.SLOW => slow
+      case FeeMethod.FAST => fast / 1000
+      case FeeMethod.NORMAL => normal / 1000
+      case FeeMethod.SLOW => slow / 1000
       case _ => throw new UnsupportedOperationException(s"Fee method not supported '$feeMethod'")
     }
   }

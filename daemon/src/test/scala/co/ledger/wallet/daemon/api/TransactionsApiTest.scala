@@ -1,5 +1,6 @@
 package co.ledger.wallet.daemon.api
 
+import co.ledger.wallet.daemon.models.coins.UnsignedBitcoinTransactionView
 import co.ledger.wallet.daemon.utils.APIFeatureTest
 import com.twitter.finagle.http.{Response, Status}
 
@@ -13,15 +14,27 @@ import com.twitter.finagle.http.{Response, Status}
   */
 class TransactionsApiTest extends APIFeatureTest {
 
-  test("TransactionsApi#Create transaction") {
+  test("TransactionsApi#Create and sign transaction") {
     val poolName = "transactionsAPI1"
     createPool(poolName)
     assertWalletCreation(poolName, "wallet", "bitcoin", Status.Ok)
     assertCreateAccount(ACCOUNT_BODY, poolName, "wallet", Status.Ok)
     assertSyncPool(Status.Ok)
-    assertCreateTransaction(TX_BODY_WITH_EXCLUDE_UTXO,poolName,"wallet",0,Status.Ok)
-    assertCreateTransaction(TX_BODY,poolName,"wallet",0,Status.Ok)
-    assertCreateTransaction(INVALID_FEE_LEVEL_BODY,poolName,"wallet",0,Status.BadRequest)
+    assertCreateTransaction(TX_BODY_WITH_EXCLUDE_UTXO, poolName, "wallet", 0, Status.Ok)
+    assertCreateTransaction(TX_BODY, poolName, "wallet", 0, Status.Ok)
+    assertCreateTransaction(INVALID_FEE_LEVEL_BODY, poolName, "wallet", 0, Status.BadRequest)
+    assertSignTransaction(TX_MISSING_APPENDED_SIG, poolName, "wallet", 0, Status.BadRequest)
+    assertSignTransaction(TX_MISSING_ONE_SIG, poolName, "wallet", 0, Status.BadRequest)
+    assertSignTransaction(TX_TO_SIGN_BODY, poolName, "wallet", 0, Status.Ok)
+  }
+
+  private def assertSignTransaction(tx: String, poolName: String, walletName: String, accountIndex: Int, expected: Status): Response = {
+    server.httpPost(
+      s"/pools/$poolName/wallets/$walletName/accounts/$accountIndex/transactions/sign",
+      tx,
+      headers = defaultHeaders,
+      andExpect = expected
+    )
   }
 
   private def assertCreateTransaction(tx: String, poolName: String, walletName: String, accountIndex: Int, expected: Status): Response = {
@@ -33,27 +46,48 @@ class TransactionsApiTest extends APIFeatureTest {
     )
   }
 
+  private val TX_TO_SIGN_BODY =
+    s"""{
+       |"raw_transaction": "0100000002A91F09D74BEE55D8E9F3673E42102FA9AB71185C47E83229076452C44EC301E9000000001976A91455F719785040EC522FB6CF9C4B45A7011912529188ACFFFFFFFFEA1B6F36DA6745A399878AB4B67BE9443A6155123BA1EFD252823F6987671095000000001976A914261E04A99A3E387DBA09A667F73C74E8C5A2523088ACFFFFFFFF02002D31010000000017A914394D7CE052572BF35DFC32CD6EFF5B4BE6D9300B870AC5E203000000001976A914F3CEB507BD0D264CE8B4C9564EA63E9426B3B66B88AC49EF0700",
+       |"signatures": ["0100000002A91F0", "100000002A91F"],
+       |"pubkeys": ["033B811F166EA0E8D764530960047A398F50AB89B40E70537DB06C303C7939930F","0229355FB9801567F6C332978F1383D7B6E717B7A3991524BC95F9D6A743DCA6CD"]
+       |}""".stripMargin
+
+  private val TX_MISSING_ONE_SIG =
+    s"""{
+       |"raw_transaction": "0100000002A91F09D74BEE55D8E9F3673E42102FA9AB71185C47E83229076452C44EC301E9000000001976A91455F719785040EC522FB6CF9C4B45A7011912529188ACFFFFFFFFEA1B6F36DA6745A399878AB4B67BE9443A6155123BA1EFD252823F6987671095000000001976A914261E04A99A3E387DBA09A667F73C74E8C5A2523088ACFFFFFFFF02002D31010000000017A914394D7CE052572BF35DFC32CD6EFF5B4BE6D9300B870AC5E203000000001976A914F3CEB507BD0D264CE8B4C9564EA63E9426B3B66B88AC49EF0700",
+       |"signatures": ["0100000002A91F0"],
+       |"pubkeys": ["033B811F166EA0E8D764530960047A398F50AB89B40E70537DB06C303C7939930F","0229355FB9801567F6C332978F1383D7B6E717B7A3991524BC95F9D6A743DCA6CD"]
+       |}""".stripMargin
+
+  private val TX_MISSING_APPENDED_SIG =
+    s"""{
+       |"raw_transaction": "0100000002A91F09D74BEE55D8E9F3673E42102FA9AB71185C47E83229076452C44EC301E9000000001976A91455F719785040EC522FB6CF9C4B45A7011912529188ACFFFFFFFFEA1B6F36DA6745A399878AB4B67BE9443A6155123BA1EFD252823F6987671095000000001976A914261E04A99A3E387DBA09A667F73C74E8C5A2523088ACFFFFFFFF02002D31010000000017A914394D7CE052572BF35DFC32CD6EFF5B4BE6D9300B870AC5E203000000001976A914F3CEB507BD0D264CE8B4C9564EA63E9426B3B66B88AC49EF0700",
+       |"signatures": ["0100000002A91F0"],
+       |"pubkeys": ["033B811F166EA0E8D764530960047A398F50AB89B40E70537DB06C303C7939930F"]
+       |}""".stripMargin
+
   private val INVALID_FEE_LEVEL_BODY =
     """{""" +
       """"recipient": "36v1GRar68bBEyvGxi9RQvdP6Rgvdwn2C2",""" +
-      """"fee_level": "OTHER",""" +
+      """"fees_level": "OTHER",""" +
       """"amount": 10000""" +
       """}"""
 
   private val TX_BODY =
     """{""" +
       """"recipient": "36v1GRar68bBEyvGxi9RQvdP6Rgvdwn2C2",""" +
-      """"fee_amount": 397000,""" +
-      """"fee_level": "FAST",""" +
+      """"fees_per_byte": 397000,""" +
+      """"fees_level": "FAST",""" +
       """"amount": 10000""" +
       """}"""
 
   private val TX_BODY_WITH_EXCLUDE_UTXO =
     """{""" +
     """"recipient": "36v1GRar68bBEyvGxi9RQvdP6Rgvdwn2C2",""" +
-    """"fee_level": "NORMAL",""" +
-    """"amount": 2000,""" +
-    """"exclude_utxos":{"6f6025991691d26f9bb329568d452b728978fa34b418375c31845b3698b797d7": 0 }""" +
+    """"fees_level": "NORMAL",""" +
+    """"amount": 20000000,""" +
+    """"exclude_utxos":{"beabf89d72eccdcb895373096a402ae48930aa54d2b9e4d01a05e8f068e9ea49": 0 }""" +
     """}"""
   private val ACCOUNT_BODY =
     """{""" +

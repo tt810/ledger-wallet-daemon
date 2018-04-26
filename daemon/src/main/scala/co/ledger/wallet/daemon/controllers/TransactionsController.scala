@@ -9,6 +9,7 @@ import co.ledger.wallet.daemon.database.DefaultDaemonCache.User
 import co.ledger.wallet.daemon.exceptions.AccountNotFoundException
 import co.ledger.wallet.daemon.models.FeeMethod
 import co.ledger.wallet.daemon.services.TransactionsService
+import co.ledger.wallet.daemon.utils.HexUtils
 import com.twitter.finagle.http.Request
 import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.RouteParam
@@ -33,8 +34,8 @@ class TransactionsController @Inject()(transactionsService: TransactionsService)
     * Input json
     * {
     *   recipient: recipient address,
-    *   fee_amount: optional(in satoshi),
-    *   fee_level: optional(SLOW, FAST, NORMAL),
+    *   fees_per_byte: optional(in satoshi),
+    *   fees_level: optional(SLOW, FAST, NORMAL),
     *   amount: in satoshi,
     *   exclude_utxos: map{txHash: index}
     * }
@@ -57,35 +58,65 @@ class TransactionsController @Inject()(transactionsService: TransactionsService)
     * Input json
     * {
     *   raw_transaction: the bytes,
-    *   signatures: map {input: signature}
+    *   signatures: [string],
+    *   pubkeys: [string]
     * }
     */
-  post("/pools/:pool_name/wallets/:wallet_name/accounts/:account_index/transactions/send")
-  { request: Request =>
-//    val account: BitcoinLikeAccount = Account(request.pool_name, request.wallet_name, request.account_index).buildTransaction()
-//    val rawtx: Array[Byte] = sign(request.raw_transaction, request.signatures)
-//
-//    account.broadcastRawTransaction(rawtx)
+  post("/pools/:pool_name/wallets/:wallet_name/accounts/:account_index/transactions/sign")
+  { request: SignTransactionRequest =>
+    info(s"Sign transaction $request")
+    transactionsService.signTransaction(request.rawTx, request.appendedSigs, request.accountInfo).recover {
+      case _: AccountNotFoundException => responseSerializer.serializeBadRequest(
+        Map("response" -> "Account doesn't exist"), response)
+      case e: IllegalArgumentException => responseSerializer.serializeBadRequest(
+        Map("response" -> e.getMessage), response)
+      case e: Throwable => responseSerializer.serializeInternalError(response, e)
+    }
   }
+
   private val responseSerializer: ResponseSerializer = ResponseSerializer.newInstance()
 }
 
 object TransactionsController {
+  case class SignTransactionRequest(
+                                   @RouteParam pool_name: String,
+                                   @RouteParam wallet_name: String,
+                                   @RouteParam account_index: Int,
+                                   raw_transaction: String,
+                                   signatures: Seq[String],
+                                   pubkeys: Seq[String],
+                                   request: Request
+                                   ) extends RichRequest(request) {
+    val accountInfo: AccountInfo = AccountInfo(pool_name, wallet_name, account_index, user)
+    val rawTx: Array[Byte] = HexUtils.valueOf(raw_transaction)
+    lazy val appendedSigs: Seq[Array[Byte]] = signatures.zipWithIndex.map { case (sig, index) =>
+      HexUtils.valueOf(sig) ++ HexUtils.valueOf(pubkeys(index))
+    }
+
+    @MethodValidation
+    def validateSignatures: ValidationResult = ValidationResult.validate(
+      signatures.size == pubkeys.size,
+      "signatures and pubkeys size not matching")
+
+    override def toString: String = s"$request, Parameters($accountInfo, raw_transaction: $raw_transaction, signatures: $signatures, pubkeys: $pubkeys)"
+
+  }
+
   case class CreateTransactionRequest(@RouteParam pool_name: String,
                                      @RouteParam wallet_name: String,
                                      @RouteParam account_index: Int,
                                       recipient: String,
-                                      fee_amount: Option[Long],
-                                      fee_level: Option[String],
+                                      fees_per_byte: Option[Long],
+                                      fees_level: Option[String],
                                       amount: Long,
                                       exclude_utxos: Option[Map[String, Int]],
                                       request: Request) extends RichRequest(request) {
 
     val accountInfo: AccountInfo = AccountInfo(pool_name, wallet_name, account_index, user)
-    val transactionInfo: TransactionInfo = TransactionInfo(recipient, fee_amount, fee_level, amount, exclude_utxos.getOrElse(Map[String, Int]()))
+    val transactionInfo: TransactionInfo = TransactionInfo(recipient, fees_per_byte, fees_level, amount, exclude_utxos.getOrElse(Map[String, Int]()))
 
     @MethodValidation
-    def validateFees: ValidationResult = CommonMethodValidations.validateFees(fee_amount, fee_level)
+    def validateFees: ValidationResult = CommonMethodValidations.validateFees(fees_per_byte, fees_level)
 
     override def toString: String = s"$request, Parameters($accountInfo, $transactionInfo)"
   }
