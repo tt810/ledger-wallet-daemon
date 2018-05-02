@@ -1,6 +1,5 @@
 package co.ledger.wallet.daemon.api
 
-import co.ledger.wallet.daemon.models.coins.UnsignedBitcoinTransactionView
 import co.ledger.wallet.daemon.utils.APIFeatureTest
 import com.twitter.finagle.http.{Response, Status}
 
