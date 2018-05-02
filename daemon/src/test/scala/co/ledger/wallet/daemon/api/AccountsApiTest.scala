@@ -94,6 +94,13 @@ class AccountsApiTest extends APIFeatureTest {
     deletePool("account_pool")
   }
 
+  test("AccountsApi#Create account on btc testnet") {
+    createPool("test_pool")
+    assertWalletCreation("test_pool", "accounts_wallet", "bitcoin_testnet", Status.Ok)
+    assertCreateAccount(CORRECT_BODY, "test_pool", "accounts_wallet", Status.Ok)
+    deletePool("test_pool")
+  }
+
   test("AccountsApi#Create account with request body as invalid json") {
     createPool("account_pool")
     assertWalletCreation("account_pool", "accounts_wallet", "bitcoin", Status.Ok)
