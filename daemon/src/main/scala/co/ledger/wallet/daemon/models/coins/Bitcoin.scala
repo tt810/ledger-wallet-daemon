@@ -49,7 +49,6 @@ object Bitcoin {
       UnsignedBitcoinTransactionView(
         newEstimatedSizeView(from.getEstimatedSize),
         from.getFees.toLong,
-        0L,
         feesPerByte,
         unsignedInputs,
         from.getLockTime,

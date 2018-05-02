@@ -81,8 +81,9 @@ public abstract class Account {
      */
     public abstract Preferences getOperationPreferences(String uid);
 
+    public abstract BitcoinLikeAccount asBitcoinLikeAccount();
+
     /**
-     * asBitcoinLikeAccount(): Callback<BitcoinLikeAccount>;
      * asEthereumLikeAccount(): Callback<EthereumLikeAccount>;
      * asRippleLikeAccount(): Callback<RippleLikeAccount>;
      *Check if account is a Bitcoin one
@@ -134,8 +135,6 @@ public abstract class Account {
      *@param callback, Callback returning, if getLastBlock succeeds, a Block object
      */
     public abstract void getLastBlock(BlockCallback callback);
-
-    public abstract BitcoinLikeAccount asBitcoinLikeAccount();
 
     private static final class CppProxy extends Account
     {
@@ -225,6 +224,14 @@ public abstract class Account {
         private native Preferences native_getOperationPreferences(long _nativeRef, String uid);
 
         @Override
+        public BitcoinLikeAccount asBitcoinLikeAccount()
+        {
+            assert !this.destroyed.get() : "trying to use a destroyed object";
+            return native_asBitcoinLikeAccount(this.nativeRef);
+        }
+        private native BitcoinLikeAccount native_asBitcoinLikeAccount(long _nativeRef);
+
+        @Override
         public boolean isInstanceOfBitcoinLikeAccount()
         {
             assert !this.destroyed.get() : "trying to use a destroyed object";
@@ -303,13 +310,5 @@ public abstract class Account {
             native_getLastBlock(this.nativeRef, callback);
         }
         private native void native_getLastBlock(long _nativeRef, BlockCallback callback);
-
-        @Override
-        public BitcoinLikeAccount asBitcoinLikeAccount()
-        {
-            assert !this.destroyed.get() : "trying to use a destroyed object";
-            return native_asBitcoinLikeAccount(this.nativeRef);
-        }
-        private native BitcoinLikeAccount native_asBitcoinLikeAccount(long _nativeRef);
     }
 }
